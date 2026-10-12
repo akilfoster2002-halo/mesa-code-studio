@@ -1,7 +1,7 @@
 # Code Studio
 
-**Live: https://code-studio-3ic6.onrender.com** (Render web service `srv-db6er9142hec73c05jo0`,
-redeploys on every push to main; database: Supabase project `code-studio`, schema `codestudio`).
+**Live: https://mesa-code-studio.onrender.com** (Render web service `srv-db6k8paj9qps73coko90`,
+redeploys on every push to main of this repo; database: Supabase project `code-studio`, schema `codestudio`).
 
 The MESA CS block editor: a Scratch-style editor on its own website, with a login for every
 student, auto-save, and history. This is the standard editor going forward.
