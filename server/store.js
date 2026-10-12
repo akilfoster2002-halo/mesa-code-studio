@@ -1,0 +1,286 @@
+/* =====================================================================
+   STORE — where accounts, projects, their history and uploaded files live.
+
+   Two back ends behind one interface:
+     • Postgres, when DATABASE_URL is set (the hosted site).
+     • Plain JSON files in DATA_DIR (a laptop, and the tests).
+
+   A project is one row holding its current JSON. Every save also may add
+   a VERSION (a full copy) so a student can go back; versions are thinned
+   so a project never holds more than MAX_VERSIONS of them.
+
+   Uploaded costumes and sounds are ASSETS, stored once by the SHA-256 of
+   their bytes and referenced from the project JSON by that id. A project
+   saved fifty times shares one copy of its pictures.
+   ===================================================================== */
+const fs = require('fs');
+const path = require('path');
+const crypto = require('crypto');
+
+const MAX_VERSIONS = 60;
+const VERSION_GAP_MS = 2 * 60 * 1000;      // at most one automatic version every 2 minutes
+
+const now = () => new Date().toISOString();
+const newId = () => crypto.randomBytes(9).toString('base64url');
+
+/* ------------------------------------------------------------ JSON files */
+class FileStore {
+  constructor(dir){
+    this.dir = dir;
+    fs.mkdirSync(path.join(dir, 'assets'), { recursive:true });
+    this.file = path.join(dir, 'db.json');
+    this.db = fs.existsSync(this.file) ? JSON.parse(fs.readFileSync(this.file, 'utf8'))
+                                       : { users:{}, projects:{}, versions:{} };
+    this._t = null;
+  }
+  async init(){}
+  _save(){
+    clearTimeout(this._t);
+    this._t = setTimeout(()=>this.flush(), 50);
+  }
+  flush(){
+    clearTimeout(this._t);
+    const tmp = this.file + '.tmp';
+    fs.writeFileSync(tmp, JSON.stringify(this.db));
+    fs.renameSync(tmp, this.file);
+  }
+
+  async getUser(username){ return this.db.users[username] || null; }
+  async listUsers(){ return Object.values(this.db.users); }
+  async upsertUser(u){
+    const old = this.db.users[u.username] || {};
+    this.db.users[u.username] = { created: now(), ...old, ...u };
+    this._save();
+  }
+
+  async listProjects(owner){
+    return Object.values(this.db.projects)
+      .filter(p => p.owner === owner && !p.deleted)
+      .map(({ data, ...meta }) => meta)
+      .sort((a, b) => b.updated.localeCompare(a.updated));
+  }
+  async getProject(id){ return this.db.projects[id] || null; }
+  async createProject(owner, name, data, thumb){
+    const p = { id:newId(), owner, name, data, thumb:thumb||null, created:now(), updated:now(), deleted:null };
+    this.db.projects[p.id] = p;
+    this.db.versions[p.id] = [];
+    await this._version(p, 'created');
+    this._save();
+    return p;
+  }
+  async saveProject(id, fields, opts={}){
+    const p = this.db.projects[id]; if(!p) return null;
+    if(fields.name != null) p.name = fields.name;
+    if(fields.data != null) p.data = fields.data;
+    if(fields.thumb !== undefined) p.thumb = fields.thumb;
+    p.updated = now();
+    if(fields.data != null) await this._maybeVersion(p, opts);
+    this._save();
+    return p;
+  }
+  async deleteProject(id){
+    const p = this.db.projects[id]; if(!p) return;
+    p.deleted = now(); this._save();
+  }
+  async restoreDeleted(id){
+    const p = this.db.projects[id]; if(!p) return;
+    p.deleted = null; this._save();
+  }
+  async listDeleted(owner){
+    return Object.values(this.db.projects).filter(p=>p.owner===owner && p.deleted)
+      .map(({ data, ...meta }) => meta);
+  }
+
+  async _maybeVersion(p, opts){
+    const vs = this.db.versions[p.id] || (this.db.versions[p.id] = []);
+    const last = vs[vs.length-1];
+    const due = !last || opts.force || (Date.now() - Date.parse(last.created)) >= VERSION_GAP_MS;
+    if(due) await this._version(p, opts.label || 'auto');
+    else { last.data = p.data; last.name = p.name; last.updated = now(); }   // keep the newest copy in the open slot
+  }
+  async _version(p, label){
+    const vs = this.db.versions[p.id] || (this.db.versions[p.id] = []);
+    vs.push({ id:newId(), created:now(), updated:now(), label, name:p.name, data:p.data });
+    thin(vs);
+  }
+  async listVersions(id){
+    return (this.db.versions[id] || []).map(({ data, ...v }) => ({ ...v, size: JSON.stringify(data).length }))
+      .reverse();
+  }
+  async getVersion(id, vid){ return (this.db.versions[id] || []).find(v => v.id === vid) || null; }
+  async addVersion(id, label){
+    const p = this.db.projects[id]; if(!p) return;
+    await this._version(p, label); this._save();
+  }
+
+  async putAsset(id, type, buf){
+    const f = path.join(this.dir, 'assets', id);
+    if(!fs.existsSync(f)){
+      fs.writeFileSync(f, buf);
+      fs.writeFileSync(f + '.type', type);
+    }
+  }
+  async getAsset(id){
+    const f = path.join(this.dir, 'assets', id);
+    if(!fs.existsSync(f)) return null;
+    return { type: fs.readFileSync(f + '.type', 'utf8'), data: fs.readFileSync(f) };
+  }
+  async hasAsset(id){ return fs.existsSync(path.join(this.dir, 'assets', id)); }
+}
+
+/* Keep the newest 20 as they are, then thin the older ones so the history
+   still reaches back to the first day without growing forever. */
+function thin(vs){
+  while(vs.length > MAX_VERSIONS){
+    // drop the version (outside the newest 20, never the first) closest in time to its neighbour
+    let best = -1, gap = Infinity;
+    for(let i = 1; i < vs.length - 20; i++){
+      const g = Date.parse(vs[i+1].created) - Date.parse(vs[i-1].created);
+      if(g < gap){ gap = g; best = i; }
+    }
+    if(best < 0) best = 1;
+    vs.splice(best, 1);
+  }
+}
+
+/* -------------------------------------------------------------- Postgres */
+class PgStore {
+  constructor(url){
+    const { Pool } = require('pg');
+    this.pool = new Pool({
+      connectionString: url,
+      ssl: /localhost|127\.0\.0\.1/.test(url) ? false : { rejectUnauthorized:false },
+      max: 5
+    });
+  }
+  q(sql, args){ return this.pool.query(sql, args); }
+  async init(){
+    await this.q(`
+      CREATE TABLE IF NOT EXISTS cs_users (
+        username TEXT PRIMARY KEY,
+        name     TEXT NOT NULL,
+        period   TEXT,
+        role     TEXT NOT NULL DEFAULT 'student',
+        salt     TEXT NOT NULL,
+        hash     TEXT NOT NULL,
+        created  TIMESTAMPTZ DEFAULT now()
+      );
+      CREATE TABLE IF NOT EXISTS cs_projects (
+        id      TEXT PRIMARY KEY,
+        owner   TEXT NOT NULL REFERENCES cs_users(username),
+        name    TEXT NOT NULL,
+        data    JSONB NOT NULL,
+        thumb   TEXT,
+        created TIMESTAMPTZ DEFAULT now(),
+        updated TIMESTAMPTZ DEFAULT now(),
+        deleted TIMESTAMPTZ
+      );
+      CREATE INDEX IF NOT EXISTS cs_projects_owner ON cs_projects(owner);
+      CREATE TABLE IF NOT EXISTS cs_versions (
+        id       TEXT PRIMARY KEY,
+        project  TEXT NOT NULL REFERENCES cs_projects(id) ON DELETE CASCADE,
+        created  TIMESTAMPTZ DEFAULT now(),
+        updated  TIMESTAMPTZ DEFAULT now(),
+        label    TEXT,
+        name     TEXT,
+        data     JSONB NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS cs_versions_project ON cs_versions(project, created);
+      CREATE TABLE IF NOT EXISTS cs_assets (
+        id   TEXT PRIMARY KEY,
+        type TEXT NOT NULL,
+        data BYTEA NOT NULL
+      );`);
+  }
+  async getUser(username){
+    const r = await this.q('SELECT * FROM cs_users WHERE username=$1', [username]);
+    return r.rows[0] || null;
+  }
+  async listUsers(){ return (await this.q('SELECT * FROM cs_users ORDER BY period, name')).rows; }
+  async upsertUser(u){
+    await this.q(`INSERT INTO cs_users (username,name,period,role,salt,hash) VALUES ($1,$2,$3,$4,$5,$6)
+      ON CONFLICT (username) DO UPDATE SET name=$2, period=$3, role=$4, salt=$5, hash=$6`,
+      [u.username, u.name, u.period||null, u.role||'student', u.salt, u.hash]);
+  }
+  meta(r){ return r && { id:r.id, owner:r.owner, name:r.name, thumb:r.thumb,
+    created:iso(r.created), updated:iso(r.updated), deleted:r.deleted && iso(r.deleted) }; }
+  async listProjects(owner){
+    const r = await this.q(`SELECT id,owner,name,thumb,created,updated,deleted FROM cs_projects
+      WHERE owner=$1 AND deleted IS NULL ORDER BY updated DESC`, [owner]);
+    return r.rows.map(x => this.meta(x));
+  }
+  async listDeleted(owner){
+    const r = await this.q(`SELECT id,owner,name,thumb,created,updated,deleted FROM cs_projects
+      WHERE owner=$1 AND deleted IS NOT NULL ORDER BY deleted DESC`, [owner]);
+    return r.rows.map(x => this.meta(x));
+  }
+  async getProject(id){
+    const r = await this.q('SELECT * FROM cs_projects WHERE id=$1', [id]);
+    const x = r.rows[0]; if(!x) return null;
+    return { ...this.meta(x), data:x.data };
+  }
+  async createProject(owner, name, data, thumb){
+    const id = newId();
+    await this.q('INSERT INTO cs_projects (id,owner,name,data,thumb) VALUES ($1,$2,$3,$4,$5)',
+      [id, owner, name, data, thumb||null]);
+    await this.addVersion(id, 'created');
+    return this.getProject(id);
+  }
+  async saveProject(id, fields, opts={}){
+    const sets = ['updated=now()'], args = [id];
+    if(fields.name != null){ args.push(fields.name); sets.push('name=$'+args.length); }
+    if(fields.data != null){ args.push(fields.data); sets.push('data=$'+args.length); }
+    if(fields.thumb !== undefined){ args.push(fields.thumb); sets.push('thumb=$'+args.length); }
+    await this.q(`UPDATE cs_projects SET ${sets.join(',')} WHERE id=$1`, args);
+    if(fields.data != null){
+      const last = (await this.q('SELECT id,created FROM cs_versions WHERE project=$1 ORDER BY created DESC LIMIT 1', [id])).rows[0];
+      const due = !last || opts.force || (Date.now() - new Date(last.created).getTime()) >= VERSION_GAP_MS;
+      if(due) await this.addVersion(id, opts.label || 'auto');
+      else await this.q(`UPDATE cs_versions v SET data=p.data, name=p.name, updated=now()
+        FROM cs_projects p WHERE v.id=$1 AND p.id=$2`, [last.id, id]);
+    }
+    return this.getProject(id);
+  }
+  async addVersion(id, label){
+    await this.q(`INSERT INTO cs_versions (id,project,label,name,data)
+      SELECT $1, id, $2, name, data FROM cs_projects WHERE id=$3`, [newId(), label, id]);
+    const vs = (await this.q('SELECT id,created FROM cs_versions WHERE project=$1 ORDER BY created', [id])).rows
+      .map(v => ({ id:v.id, created:iso(v.created) }));
+    if(vs.length > MAX_VERSIONS){
+      const keep = vs.slice(); thin(keep);
+      const keepIds = new Set(keep.map(v => v.id));
+      const drop = vs.filter(v => !keepIds.has(v.id)).map(v => v.id);
+      if(drop.length) await this.q('DELETE FROM cs_versions WHERE id = ANY($1)', [drop]);
+    }
+  }
+  async deleteProject(id){ await this.q('UPDATE cs_projects SET deleted=now() WHERE id=$1', [id]); }
+  async restoreDeleted(id){ await this.q('UPDATE cs_projects SET deleted=NULL WHERE id=$1', [id]); }
+  async listVersions(id){
+    const r = await this.q(`SELECT id,created,updated,label,name,length(data::text) AS size
+      FROM cs_versions WHERE project=$1 ORDER BY created DESC`, [id]);
+    return r.rows.map(v => ({ id:v.id, created:iso(v.created), updated:iso(v.updated), label:v.label,
+      name:v.name, size:Number(v.size) }));
+  }
+  async getVersion(id, vid){
+    const r = await this.q('SELECT * FROM cs_versions WHERE project=$1 AND id=$2', [id, vid]);
+    const v = r.rows[0]; return v ? { ...v, created:iso(v.created) } : null;
+  }
+  async putAsset(id, type, buf){
+    await this.q('INSERT INTO cs_assets (id,type,data) VALUES ($1,$2,$3) ON CONFLICT (id) DO NOTHING', [id, type, buf]);
+  }
+  async getAsset(id){
+    const r = await this.q('SELECT type,data FROM cs_assets WHERE id=$1', [id]);
+    return r.rows[0] || null;
+  }
+  async hasAsset(id){
+    return (await this.q('SELECT 1 FROM cs_assets WHERE id=$1', [id])).rowCount > 0;
+  }
+}
+const iso = d => d instanceof Date ? d.toISOString() : d;
+
+function open(){
+  if(process.env.DATABASE_URL) return new PgStore(process.env.DATABASE_URL);
+  return new FileStore(process.env.DATA_DIR || path.join(__dirname, '..', 'data'));
+}
+
+module.exports = { open, FileStore, PgStore, thin, MAX_VERSIONS, VERSION_GAP_MS };

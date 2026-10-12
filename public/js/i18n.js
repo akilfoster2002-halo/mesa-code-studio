@@ -1,0 +1,70 @@
+/* English and Spanish for everything on screen except the block words,
+   which stay English because they are the code (as in every 0.2 game).
+   t('Save') → 'Guardar' when the page is in Spanish. {n} fills in. */
+window.I18N = (function(){
+  const ES = {
+    'Motion':'Movimiento', 'Looks':'Apariencia', 'Sound':'Sonido', 'Events':'Eventos', 'Control':'Control',
+    'Sensing':'Sensores', 'Operators':'Operadores', 'Variables':'Variables', 'Lists':'Listas', 'My Blocks':'Mis bloques',
+    'Username':'Usuario', 'Password':'Contraseña', 'Log in':'Entrar', 'Log out':'Salir',
+    'Wrong username or password.':'Usuario o contraseña incorrectos.',
+    'Too many tries. Wait a few minutes.':'Demasiados intentos. Espera unos minutos.',
+    'Could not reach the server.':'No se pudo conectar con el servidor.',
+    'My Projects':'Mis proyectos', 'New project':'Proyecto nuevo', 'New':'Nuevo', 'Open':'Abrir',
+    'Rename':'Renombrar', 'Duplicate':'Duplicar', 'Delete':'Borrar', 'Restore':'Restaurar',
+    'Untitled':'Sin título', 'Saved':'Guardado', 'Saving…':'Guardando…', 'Not saved yet':'Aún no guardado',
+    'Offline — kept on this computer':'Sin conexión — guardado en esta computadora',
+    'Read only':'Solo lectura', 'History':'Historial', 'Save now':'Guardar ahora',
+    'Go back to this version':'Volver a esta versión', 'Versions are saved as you work.':'Las versiones se guardan mientras trabajas.',
+    'Restore this version? Your current work is kept in the history too.':'¿Volver a esta versión? Tu trabajo actual también queda en el historial.',
+    'just now':'ahora', '{n} min ago':'hace {n} min', '{n} h ago':'hace {n} h', 'yesterday':'ayer',
+    'Code':'Código', 'Costumes':'Disfraces', 'Backdrops':'Fondos', 'Sounds':'Sonidos',
+    'Sprite':'Objeto', 'Stage':'Escenario', 'Show':'Mostrar', 'Size':'Tamaño', 'Direction':'Dirección',
+    'Upload':'Subir', 'Library':'Biblioteca', 'Record':'Grabar', 'Stop':'Parar', 'Play':'Tocar',
+    'Choose a Sprite':'Elegir un objeto', 'Upload Sprite':'Subir objeto', 'Choose a Backdrop':'Elegir un fondo',
+    'Upload a picture':'Sube una imagen', 'Upload a sound':'Sube un sonido',
+    'PNG with a see-through background works best.':'Lo mejor es PNG con fondo transparente.',
+    'Remove background':'Quitar fondo', 'Flip':'Voltear', 'Name':'Nombre',
+    'This picture has a solid background.':'Esta imagen tiene fondo sólido.',
+    'Drop pictures here':'Suelta imágenes aquí', 'Drop sounds here':'Suelta sonidos aquí',
+    'That file is not a picture this browser can open.':'Ese archivo no es una imagen que este navegador pueda abrir.',
+    'That file is not a sound this browser can play.':'Ese archivo no es un sonido que este navegador pueda tocar.',
+    'File too big.':'Archivo demasiado grande.', 'Uploading…':'Subiendo…',
+    'Make a Variable':'Crear una variable', 'Make a List':'Crear una lista', 'Make a Block':'Crear un bloque',
+    'New variable name:':'Nombre de la nueva variable:', 'New list name:':'Nombre de la nueva lista:',
+    'For all sprites':'Para todos los objetos', 'For this sprite only':'Solo para este objeto',
+    'New message':'Nuevo mensaje', 'New message name:':'Nombre del nuevo mensaje:',
+    'Add Extension':'Añadir extensión', 'Pen':'Lápiz', 'Music':'Música', 'Text to Speech':'Texto a voz',
+    'Draw with your sprites.':'Dibuja con tus objetos.', 'Play notes and drums.':'Toca notas y tambores.',
+    'Make your projects talk.':'Haz que tus proyectos hablen.',
+    'Delete Block':'Borrar bloque', 'Clean up blocks':'Ordenar bloques', 'Undo':'Deshacer', 'Redo':'Rehacer',
+    'Help':'Ayuda', 'Rename variable':'Renombrar variable', 'Delete the "{n}" variable':'Borrar la variable "{n}"',
+    'Rename list':'Renombrar lista', 'Delete the "{n}" list':'Borrar la lista "{n}"', 'Edit':'Editar',
+    'Block name':'Nombre del bloque', 'Add an input (number or text)':'Añadir entrada (número o texto)',
+    'Add an input (boolean)':'Añadir entrada (booleana)', 'Add a label':'Añadir texto',
+    'Run without screen refresh':'Correr sin refrescar pantalla', 'Cancel':'Cancelar', 'OK':'Aceptar',
+    'Download to your computer':'Descargar a tu computadora', 'Load from your computer':'Cargar desde tu computadora',
+    'Delete this project?':'¿Borrar este proyecto?', 'Recently deleted':'Borrados recientemente',
+    'Students':'Estudiantes', 'Teacher':'Maestro', 'Period':'Período', 'Projects':'Proyectos', 'Last saved':'Último guardado',
+    'New password':'Nueva contraseña', 'Reset password':'Cambiar contraseña', 'Password changed.':'Contraseña cambiada.',
+    'Viewing {n}\'s project':'Viendo el proyecto de {n}', 'Back':'Atrás', 'Full screen':'Pantalla completa',
+    'Delete this sprite?':'¿Borrar este objeto?', 'export':'exportar', 'Allow the microphone to record.':'Permite el micrófono para grabar.',
+    'Recording…':'Grabando…', 'Nothing here yet. Press New project!':'Aún no hay nada. ¡Presiona Proyecto nuevo!',
+    'Undo delete':'Deshacer borrado', 'Drag blocks here':'Arrastra bloques aquí', 'Loading…':'Cargando…',
+    'Something went wrong loading this project.':'Algo salió mal al cargar este proyecto.',
+    'Zoom in':'Acercar', 'Zoom out':'Alejar', 'Reset zoom':'Zoom normal', 'Small stage':'Escenario pequeño',
+    'Stop all':'Parar todo', 'Go':'Ir', 'Choose':'Elegir', 'Search':'Buscar', 'All':'Todo', 'Sprites':'Objetos',
+    'empty':'vacío', 'length':'longitud', 'sprite name':'nombre del objeto', 'costume':'disfraz', 'backdrop':'fondo',
+    'Picture is still uploading.':'La imagen aún se está subiendo.', 'Load this file? It replaces the project you have open.':'¿Cargar este archivo? Reemplaza el proyecto abierto.'
+  };
+  let lang = 'en';
+  try { lang = localStorage.getItem('cs-lang') || (navigator.language || '').slice(0, 2) === 'es' && 'es' || 'en'; } catch(e){}
+  function t(s, vars){
+    let out = (lang === 'es' && ES[s]) || s;
+    if(vars) out = out.replace(/\{(\w+)\}/g, (m, k) => vars[k] != null ? vars[k] : m);
+    return out;
+  }
+  function set(l){ lang = l; try { localStorage.setItem('cs-lang', l); } catch(e){} document.documentElement.lang = l; }
+  document.documentElement.lang = lang;
+  return { t, set, get lang(){ return lang; } };
+})();
+window.t = I18N.t;
