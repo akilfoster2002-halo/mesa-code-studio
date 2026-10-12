@@ -40,7 +40,7 @@
   function userBits(){
     if(!me) return [];
     return [
-      me.role === 'teacher' ? h('a', { class:'btn ghost', href:'#/teacher' }, '🍎 ' + t('Students')) : null,
+      me.role === 'teacher' ? h('a', { class:'btn ghost', href:'#/teacher' }, '🍎 ' + t('Dashboard')) : null,
       h('span', { class:'who', title:me.username }, '👤 ' + me.name),
       h('button', { class:'btn ghost', type:'button', onclick:logout }, t('Log out'))
     ].filter(Boolean);
@@ -63,7 +63,8 @@
       try { me = await api('/me'); } catch(e){ me = null; }
     }
     if(!me) return loginView();
-    if(hash.startsWith('#/p/')) return editorView(hash.slice(4));
+    const pm = hash.match(/^#\/p\/([^/]+)(\/edit)?$/);
+    if(pm) return editorView(pm[1], !!pm[2]);
     if(hash === '#/teacher' && me.role === 'teacher') return teacherView();
     return projectsView();
   }
@@ -227,7 +228,7 @@
     if(tab !== 'code') showTab(tab);
   }
 
-  async function editorView(id){
+  async function editorView(id, edit){
     document.body.className = 'v-editor';
     const E = editorShell();
     E.userBox.replaceChildren(langBtn(), ...userBits());
@@ -237,7 +238,8 @@
     try { pr = await api('/projects/' + id); }
     catch(e){ if(e.status !== 401){ app.replaceChildren(h('div', { class:'login-page' }, h('div', { class:'login-card' }, h('p', {}, t('Something went wrong loading this project.')), h('a', { class:'btn primary', href:'#/' }, t('My Projects'))))); } return; }
     projectMeta = { id:pr.id, name:pr.name, updated:pr.updated, owner:pr.owner };
-    readOnly = !!pr.readOnly;
+    readOnly = !!pr.readOnly && !(edit && pr.canEdit);
+    const someoneElse = pr.owner !== me.username;
     let data = pr.data;
     // a newer copy left in this browser (saved while offline) wins
     const bak = SAVE.backup(id);
@@ -245,8 +247,16 @@
     P = PROJECT.repair(JSON.parse(JSON.stringify(data)));
     await MEDIA.loadAll(PROJECT.assets(P));
     E.title.value = pr.name; E.title.disabled = readOnly;
-    E.banner.classList.toggle('hidden', !readOnly);
-    E.banner.textContent = readOnly ? '👁 ' + t('Viewing {n}\'s project', { n:pr.owner }) + ' — ' + t('Read only') : '';
+    E.banner.classList.toggle('hidden', !someoneElse);
+    E.banner.classList.toggle('editing', someoneElse && !readOnly);
+    E.banner.replaceChildren();
+    if(someoneElse){
+      const back = me.role === 'teacher' ? h('a', { class:'btn small', href:'#/teacher' }, '← ' + t('Dashboard')) : null;
+      if(readOnly) E.banner.append(h('span', {}, '👁 ' + t('Viewing {n}\'s project', { n:pr.ownerName || pr.owner }) + ' — ' + t('Read only')),
+        h('span', { class:'grow' }), pr.canEdit ? h('a', { class:'btn small primary', href:'#/p/' + id + '/edit' }, '✏️ ' + t('Edit this project')) : null, back);
+      else E.banner.append(h('span', {}, '✏️ ' + t('Editing {n}\'s project — changes save to their account. Their work from before is kept in History.', { n:pr.ownerName || pr.owner })),
+        h('span', { class:'grow' }), h('a', { class:'btn small', href:'#/p/' + id }, '✓ ' + t('Done')), back);
+    }
     document.body.classList.toggle('readonly', readOnly);
     STAGE.clearMonitors();
     VM.load(P, { username: me.username });
@@ -409,46 +419,127 @@
     SAVE.mark();
   }
 
-  /* ------------------------------------------------------------ teacher */
+  /* ---------------------------------------------------------- dashboard
+     Everyone's progress at a glance, and the things a teacher needs to do
+     for a student: open or fix a project, change a password, add or turn
+     off an account. */
+  let dash = { tab:null, sort:'name', dir:1, q:'' };
+  try { Object.assign(dash, JSON.parse(sessionStorage.getItem('cs-dash') || '{}')); } catch(e){}
   async function teacherView(){
     document.body.className = 'v-teacher';
     const main = h('main', { class:'tmain' }, h('div', { class:'loading' }, t('Loading…')));
-    app.replaceChildren(h('header', { class:'top' }, logo(), h('h1', {}, '🍎 ' + t('Students')), h('span', { class:'grow' }),
+    app.replaceChildren(h('header', { class:'top' }, logo(), h('h1', {}, '🍎 ' + t('Dashboard')), h('span', { class:'grow' }),
       h('a', { class:'btn ghost', href:'#/' }, '🗂 ' + t('My Projects')), langBtn(), ...userBits()), main);
-    const all = (await api('/admin/students')).filter(s => s.role === 'student');
-    const periods = [...new Set(all.map(s => s.period))].sort();
-    let pick = (() => { try { return sessionStorage.getItem('cs-period'); } catch(e){ return null; } })() || periods[0];
+    let rows = [];
+    async function load(){ rows = await api('/admin/overview'); draw(); }
     function draw(){
-      try { sessionStorage.setItem('cs-period', pick); } catch(e){}
-      const rows = all.filter(s => s.period === pick).sort((a, b) => a.name.localeCompare(b.name));
+      try { sessionStorage.setItem('cs-dash', JSON.stringify(dash)); } catch(e){}
+      const students = rows.filter(r => r.role === 'student');
+      const periods = [...new Set(students.map(r => r.period))].sort((a, b) => String(a).localeCompare(String(b), undefined, { numeric:true }));
+      if(!dash.tab || (dash.tab !== 'all' && dash.tab !== 'teachers' && !periods.includes(dash.tab))) dash.tab = periods[0] || 'all';
+      let list = dash.tab === 'teachers' ? rows.filter(r => r.role === 'teacher')
+               : students.filter(r => dash.tab === 'all' || r.period === dash.tab);
+      const shown = list.filter(r => !r.disabled);
+      if(dash.q) list = list.filter(r => (r.name + ' ' + r.username).toLowerCase().includes(dash.q.toLowerCase()));
+      const key = dash.sort, dir = dash.dir;
+      list.sort((x, y) => {
+        const a = x[key], b = y[key];
+        if(a == null && b == null) return x.name.localeCompare(y.name);
+        if(a == null) return 1; if(b == null) return -1;
+        return (typeof a === 'string' ? a.localeCompare(b) : a - b) * dir || x.name.localeCompare(y.name);
+      });
+      const week = shown.filter(r => r.recent > 0).length;
+      const stat = (icon, n, label) => h('div', { class:'stat' }, h('span', { class:'stat-ico' }, icon), h('b', {}, String(n)), h('small', {}, label));
+      const th = (k, label) => h('th', { class:'sortable' + (dash.sort === k ? ' on' : ''), onclick:() => { dash.dir = dash.sort === k ? -dash.dir : (k === 'name' || k === 'username' ? 1 : -1); dash.sort = k; draw(); } },
+        label + (dash.sort === k ? (dash.dir > 0 ? ' ▲' : ' ▼') : ''));
+      const maxRecent = Math.max(1, ...list.map(r => r.recent || 0));
+      const search = h('input', { class:'inp', type:'search', placeholder:'🔍 ' + t('Search'), value:dash.q });
+      search.oninput = () => { dash.q = search.value; const pos = search.selectionStart; draw(); const s2 = $('.tsearch'); s2.focus(); s2.setSelectionRange(pos, pos); };
+      search.className = 'inp tsearch';
       main.replaceChildren(
-        h('div', { class:'ptabs' }, periods.map(p => h('button', { class:'tab' + (p === pick ? ' on' : ''), type:'button', onclick:() => { pick = p; draw(); } }, t('Period') + ' ' + p))),
-        h('table', { class:'ttable' },
-          h('thead', {}, h('tr', {}, h('th', {}, t('Name')), h('th', {}, t('Username')), h('th', {}, t('Projects')), h('th', {}, t('Last saved')), h('th', {}))),
-          h('tbody', {}, rows.map(s => h('tr', {},
-            h('td', {}, s.name), h('td', {}, h('code', {}, s.username)), h('td', {}, String(s.projects)),
-            h('td', {}, s.updated ? UI.ago(s.updated) : '—'),
+        h('div', { class:'stats' },
+          stat('👥', shown.length, dash.tab === 'teachers' ? t('Teachers') : t('Students')),
+          stat('🟢', week, t('Worked this week')),
+          stat('🗂', shown.reduce((n, r) => n + r.projects, 0), t('Projects')),
+          stat('🧱', shown.length ? Math.round(shown.reduce((n, r) => n + r.blocks, 0) / shown.length) : 0, t('Blocks (average)'))),
+        h('div', { class:'ptabs' },
+          h('button', { class:'tab' + (dash.tab === 'all' ? ' on' : ''), type:'button', onclick:() => { dash.tab = 'all'; draw(); } }, t('All')),
+          ...periods.map(p => h('button', { class:'tab' + (p === dash.tab ? ' on' : ''), type:'button', onclick:() => { dash.tab = p; draw(); } }, t('Period') + ' ' + p)),
+          h('button', { class:'tab' + (dash.tab === 'teachers' ? ' on' : ''), type:'button', onclick:() => { dash.tab = 'teachers'; draw(); } }, '👩‍🏫 ' + t('Teachers')),
+          h('span', { class:'grow' }), search,
+          h('button', { class:'btn primary', type:'button', onclick:() => addAccount(dash.tab === 'teachers' ? 'teacher' : 'student', periods, dash.tab, load) },
+            '＋ ' + (dash.tab === 'teachers' ? t('Teacher') : t('Student')))),
+        h('div', { class:'twrap' }, h('table', { class:'ttable' },
+          h('thead', {}, h('tr', {}, th('name', t('Name')), th('username', t('Username')), dash.tab === 'all' ? th('period', t('Period')) : null,
+            th('projects', '🗂'), th('blocks', '🧱 ' + t('Blocks')), th('recent', '⏱ ' + t('This week')), th('updated', t('Last saved')), th('last_login', t('Last login')), h('th', {}))),
+          h('tbody', {}, list.length ? list.map(r => h('tr', { class:r.disabled ? 'off' : '' },
+            h('td', {}, h('b', {}, r.name), r.disabled ? h('span', { class:'tag' }, t('off')) : null),
+            h('td', {}, h('code', {}, r.username)),
+            dash.tab === 'all' ? h('td', {}, r.period) : null,
+            h('td', { class:'num' }, String(r.projects)),
+            h('td', { class:'num' }, String(r.blocks)),
+            h('td', {}, h('div', { class:'bar', title:'≈ ' + (r.recent * 2) + ' min' }, h('i', { style:{ width:Math.round((r.recent || 0) / maxRecent * 100) + '%' } }), h('span', {}, r.recent ? '≈ ' + r.recent * 2 + ' min' : '—'))),
+            h('td', {}, r.updated ? UI.ago(r.updated) : '—'),
+            h('td', {}, r.last_login ? UI.ago(r.last_login) : t('never')),
             h('td', { class:'tact' },
-              h('button', { class:'btn small', type:'button', disabled:!s.projects, onclick:() => studentProjects(s) }, '🗂 ' + t('Projects')),
-              h('button', { class:'btn small', type:'button', onclick:() => resetPassword(s) }, '🔑 ' + t('Reset password'))))))));
+              h('button', { class:'btn small', type:'button', disabled:!r.projects, title:t('Projects'), onclick:() => studentProjects(r) }, '🗂'),
+              h('button', { class:'btn small', type:'button', title:t('Reset password'), onclick:() => resetPassword(r) }, '🔑'),
+              r.username === me.username ? null : h('button', { class:'btn small', type:'button', title:r.disabled ? t('Turn on') : t('Turn off'),
+                onclick:async () => {
+                  if(!r.disabled && !(await UI.confirm(t('Turn off {n}? They will not be able to log in. Nothing is deleted.', { n:r.name }), t('Turn off')))) return;
+                  await api('/admin/students/' + r.username + '/disable', { method:'POST', body:json({ disabled:!r.disabled }) }); load();
+                } }, r.disabled ? '▶' : '⏸'))))
+            : h('tr', {}, h('td', { colspan:9, class:'empty' }, '—'))))));
     }
-    draw();
+    load();
   }
+
   async function studentProjects(s){
     const list = await api('/admin/students/' + s.username + '/projects');
     let close = null;
-    const body = h('div', { class:'pgrid small' }, list.map(p => h('a', { class:'pcard', href:'#/p/' + p.id, onclick:() => close && close(false) },
-      h('span', { class:'pthumb' }, p.thumb ? h('img', { src:p.thumb, alt:'' }) : h('span', { class:'pblank' }, '◆')),
-      h('div', { class:'pfoot' }, h('span', { class:'pname' }, p.name), h('small', {}, UI.ago(p.updated))))));
-    UI.dialog({ title:s.name, body, ok:null, cancel:t('Back'), wide:true, onOpen:(c, d) => close = d });
+    const body = h('div', { class:'pgrid small' }, list.map(p => h('div', { class:'pcard' },
+      h('a', { class:'pthumb', href:'#/p/' + p.id, onclick:() => close && close(false) }, p.thumb ? h('img', { src:p.thumb, alt:'' }) : h('span', { class:'pblank' }, '◆')),
+      h('div', { class:'pfoot col' },
+        h('span', { class:'pname' }, p.name),
+        h('small', {}, UI.ago(p.updated) + (p.stats ? ' · 🧱 ' + p.stats.blocks + ' · 👾 ' + p.stats.sprites : '') + (p.edited_by ? ' · ✏️ ' + p.edited_by : '')),
+        h('div', { class:'pbtns' },
+          h('a', { class:'btn small', href:'#/p/' + p.id, onclick:() => close && close(false) }, '👁 ' + t('Open')),
+          h('a', { class:'btn small primary', href:'#/p/' + p.id + '/edit', onclick:() => close && close(false) }, '✏️ ' + t('Edit')))))));
+    UI.dialog({ title:'🗂 ' + s.name, body, ok:null, cancel:t('Back'), wide:true, onOpen:(c, d) => close = d });
+  }
+
+  /* a username and password, big enough to read out or copy */
+  function showLogin(title, username, password){
+    const text = username + ' / ' + password;
+    const body = h('div', { class:'newlogin' },
+      h('div', {}, h('small', {}, '👤 ' + t('Username')), h('b', {}, username)),
+      h('div', {}, h('small', {}, '🔑 ' + t('Password')), h('b', {}, password)),
+      h('button', { class:'btn', type:'button', onclick:() => { navigator.clipboard && navigator.clipboard.writeText(text); UI.toast('✓ ' + text); } }, '📋 ' + t('Copy')),
+      h('p', { class:'muted' }, t('Write it down — it is not shown again.')));
+    return UI.dialog({ title, body, cancel:null });
+  }
+  async function addAccount(role, periods, tab, done){
+    const name = h('input', { class:'inp', maxlength:60, placeholder:t('First and last name'), autocomplete:'off' });
+    const period = h('input', { class:'inp', maxlength:10, list:'periods', value: role === 'student' && tab !== 'all' && tab !== 'teachers' ? tab : '' });
+    const body = h('div', { class:'form' },
+      h('label', {}, h('span', {}, t('Name')), name),
+      role === 'student' ? h('label', {}, h('span', {}, t('Period')), period, h('datalist', { id:'periods' }, periods.map(p => h('option', { value:p })))) : null);
+    if(!(await UI.dialog({ title:'＋ ' + (role === 'teacher' ? t('Teacher') : t('Student')), body, ok:t('Add') }))) return;
+    try {
+      const r = await api('/admin/users', { method:'POST', body:json({ name:name.value, period:period.value, role }) });
+      await showLogin('✓ ' + r.name, r.username, r.password);
+      done();
+    } catch(e){ UI.toast(e.message === 'period' ? t('Period') + '?' : e.message === 'name' ? t('Name') + '?' : e.message, 'bad'); }
   }
   async function resetPassword(s){
     const words = ['apple','bear','bird','boat','cake','cloud','duck','fish','frog','kite','lemon','lion','moon','owl','panda','pizza','robot','rocket','star','sun','taco','tiger','train','tree','turtle','whale','zebra'];
     const suggest = words[Math.floor(Math.random() * words.length)] + (10 + Math.floor(Math.random() * 90));
-    const pw = await UI.ask(t('New password') + ' — ' + s.name, suggest);
+    const pw = await UI.ask('🔑 ' + t('New password') + ' — ' + s.name, suggest);
     if(!pw) return;
-    try { await api('/admin/students/' + s.username + '/password', { method:'POST', body:json({ password:pw }) }); UI.toast(t('Password changed.') + ' ' + s.username + ' / ' + pw.toLowerCase()); }
-    catch(e){ UI.toast(e.message, 'bad'); }
+    try {
+      await api('/admin/students/' + s.username + '/password', { method:'POST', body:json({ password:pw }) });
+      showLogin('✓ ' + t('Password changed.'), s.username, pw.toLowerCase());
+    } catch(e){ UI.toast(e.message === 'short' ? t('At least 4 letters.') : e.message, 'bad'); }
   }
 
   route();

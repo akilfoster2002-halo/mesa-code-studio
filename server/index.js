@@ -6,8 +6,11 @@
      GET/POST /api/projects         GET/PUT/DELETE /api/projects/:id
      GET /api/projects/:id/versions[/:vid]   POST /api/projects/:id/restore/:vid
      POST /api/assets (raw bytes)   GET /api/assets/:id
-     teacher only: GET /api/admin/students, /api/admin/students/:u/projects,
-                   POST /api/admin/students/:u/password
+     teacher only: GET /api/admin/overview, /api/admin/students/:u/projects,
+                   POST /api/admin/users (add a student or teacher),
+                   POST /api/admin/students/:u/password, /api/admin/students/:u/disable
+     A teacher may also open, change and restore any student's project; the
+     student's work from before the change is kept in its history.
 
    Accounts live in the database. The class list (private/roster.json, made
    by tools/make-logins.js) is never in the repo: `npm run seed` adds any new
@@ -20,7 +23,8 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 const auth = require('./auth');
-const { open } = require('./store');
+const { open, projectStats } = require('./store');
+const names = require('./names');
 
 const PORT = Number(process.env.PORT) || 8790;
 const PUBLIC = path.join(__dirname, '..', 'public');
@@ -104,11 +108,13 @@ async function api(req, res, url){
     if(limited('u:'+username, 8) || limited('ip:'+ip, 40))
       return send(res, 429, { error:'wait' });
     const u = username && await store.getUser(username);
+    if(u && u.disabled) return send(res, 403, { error:'off' });
     if(!u || !auth.verify(String(b.password || '').trim().toLowerCase(), u.salt, u.hash)){
       fail('u:'+username); fail('ip:'+ip);
       return send(res, 401, { error:'wrong' });
     }
     tries.delete('u:'+username);
+    await store.setLogin(u.username);
     auth.setCookie(res, { u:u.username, role:u.role });
     return send(res, 200, { username:u.username, name:u.name, role:u.role, period:u.period });
   }
@@ -125,7 +131,7 @@ async function api(req, res, url){
 
   if(!me) return send(res, 401, { error:'login' });
   const user = await store.getUser(me.u);
-  if(!user) return send(res, 401, { error:'login' });
+  if(!user || user.disabled) return send(res, 401, { error:'login' });
   const teacher = user.role === 'teacher';
 
   if(p[0] === 'me') return send(res, 200, { username:user.username, name:user.name, role:user.role, period:user.period });
@@ -153,10 +159,14 @@ async function api(req, res, url){
     const pr = await store.getProject(p[1]);
     if(!pr || (pr.owner !== user.username && !teacher)) return send(res, 404, { error:'none' });
     const mine = pr.owner === user.username;
+    const canEdit = mine || teacher;
 
     if(!p[2]){
-      if(m === 'GET') return send(res, 200, { ...pr, readOnly: !mine });
-      if(!mine) return send(res, 403, { error:'not yours' });
+      if(m === 'GET'){
+        const owner = mine ? user : await store.getUser(pr.owner);
+        return send(res, 200, { ...pr, readOnly: !mine, canEdit, ownerName: owner ? owner.name : pr.owner });
+      }
+      if(!canEdit || (m === 'DELETE' && !mine)) return send(res, 403, { error:'not yours' });
       if(m === 'PUT'){
         const b = await readJSON(req);
         const fields = {};
@@ -164,10 +174,20 @@ async function api(req, res, url){
         if(b.data != null){
           if(typeof b.data !== 'object') return send(res, 400, { error:'data' });
           fields.data = b.data;
+          fields.stats = projectStats(b.data);
         }
         if(b.thumb !== undefined) fields.thumb = typeof b.thumb === 'string' && b.thumb.length < 200000 ? b.thumb : null;
-        if(pr.deleted) await store.restoreDeleted(pr.id);
-        const saved = await store.saveProject(pr.id, fields, { force: !!b.checkpoint, label: b.checkpoint ? 'saved' : undefined });
+        if(pr.deleted && mine) await store.restoreDeleted(pr.id);
+        let opts = { force: !!b.checkpoint, label: b.checkpoint ? 'saved' : undefined };
+        if(!mine){
+          // a teacher's change: keep the student's own work first, and mark the change
+          fields.editedBy = user.username;
+          if(await store.lastVersionLabel(pr.id) !== 'teacher edit'){
+            await store.addVersion(pr.id, 'before teacher edit');
+            opts = { force:true, label:'teacher edit' };
+          }
+        } else if(fields.data) fields.editedBy = null;
+        const saved = await store.saveProject(pr.id, fields, opts);
         return send(res, 200, { id:saved.id, name:saved.name, updated:saved.updated });
       }
       if(m === 'DELETE'){ await store.deleteProject(pr.id); return send(res, 200, { ok:true }); }
@@ -178,7 +198,7 @@ async function api(req, res, url){
       const v = await store.getVersion(pr.id, p[3]);
       return v ? send(res, 200, v) : send(res, 404, { error:'none' });
     }
-    if(p[2] === 'restore' && m === 'POST' && mine){
+    if(p[2] === 'restore' && m === 'POST' && canEdit){
       const v = await store.getVersion(pr.id, p[3]);
       if(!v) return send(res, 404, { error:'none' });
       await store.addVersion(pr.id, 'before restore');          // the work being replaced is kept too
@@ -189,15 +209,17 @@ async function api(req, res, url){
 
   if(p[0] === 'admin'){
     if(!teacher) return send(res, 403, { error:'teacher' });
-    if(p[1] === 'students' && !p[2]){
-      const users = await store.listUsers();
-      const out = [];
-      for(const u of users){
-        const ps = await store.listProjects(u.username);
-        out.push({ username:u.username, name:u.name, period:u.period, role:u.role,
-          projects:ps.length, updated: ps[0] ? ps[0].updated : null });
-      }
-      return send(res, 200, out);
+    if((p[1] === 'overview' || p[1] === 'students') && !p[2]) return send(res, 200, await store.overview());
+    if(p[1] === 'users' && m === 'POST'){
+      const b = await readJSON(req, 4000);
+      const name = cleanName(b.name), role = b.role === 'teacher' ? 'teacher' : 'student';
+      const period = role === 'teacher' ? '' : cleanName(b.period).slice(0, 10);
+      if(!name) return send(res, 400, { error:'name' });
+      if(role === 'student' && !period) return send(res, 400, { error:'period' });
+      const username = await names.username(name, period, async u => !!(await store.getUser(u)));
+      const password = role === 'teacher' ? names.teacherPassword() : names.studentPassword();
+      await store.upsertUser({ username, name, period, role, ...auth.makeHash(password) });
+      return send(res, 200, { username, password, name, period, role });
     }
     if(p[1] === 'students' && p[3] === 'projects'){
       return send(res, 200, await store.listProjects(p[2]));
@@ -209,6 +231,14 @@ async function api(req, res, url){
       const pw = String(b.password || '').trim().toLowerCase();
       if(pw.length < 4) return send(res, 400, { error:'short' });
       await store.upsertUser({ ...u, ...auth.makeHash(pw) });
+      return send(res, 200, { ok:true });
+    }
+    if(p[1] === 'students' && p[3] === 'disable' && m === 'POST'){
+      const u = await store.getUser(p[2]);
+      if(!u) return send(res, 404, { error:'none' });
+      if(u.username === user.username) return send(res, 400, { error:'self' });
+      const b = await readJSON(req, 2000);
+      await store.setDisabled(u.username, !!b.disabled);
       return send(res, 200, { ok:true });
     }
   }

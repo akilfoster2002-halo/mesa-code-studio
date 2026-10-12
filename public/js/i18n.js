@@ -3,6 +3,13 @@
    t('Save') → 'Guardar' when the page is in Spanish. {n} fills in. */
 window.I18N = (function(){
   const ES = {
+    'Dashboard':'Panel', 'Teachers':'Maestros', 'Student':'Estudiante', 'Worked this week':'Trabajaron esta semana',
+    'Blocks (average)':'Bloques (promedio)', 'Blocks':'Bloques', 'This week':'Esta semana', 'Last login':'Última entrada',
+    'never':'nunca', 'off':'apagado', 'Turn on':'Activar', 'Turn off':'Desactivar', 'Add':'Añadir', 'Copy':'Copiar',
+    'Turn off {n}? They will not be able to log in. Nothing is deleted.':'¿Desactivar a {n}? No podrá entrar. No se borra nada.',
+    'First and last name':'Nombre y apellido', 'Write it down — it is not shown again.':'Anótalo — no se vuelve a mostrar.',
+    'At least 4 letters.':'Al menos 4 letras.', 'Edit this project':'Editar este proyecto', 'Done':'Listo',
+    "Editing {n}'s project — changes save to their account. Their work from before is kept in History.":'Editando el proyecto de {n} — los cambios se guardan en su cuenta. Su trabajo anterior queda en el Historial.',
     'Motion':'Movimiento', 'Looks':'Apariencia', 'Sound':'Sonido', 'Events':'Eventos', 'Control':'Control',
     'Sensing':'Sensores', 'Operators':'Operadores', 'Variables':'Variables', 'Lists':'Listas', 'My Blocks':'Mis bloques',
     'Username':'Usuario', 'Password':'Contraseña', 'Log in':'Entrar', 'Log out':'Salir',

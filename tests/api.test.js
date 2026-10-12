@@ -58,17 +58,46 @@ test('create, save, version, restore', async () => {
   assert.ok(after.some(v => v.label === 'before restore'), 'the replaced work is kept');
 });
 
-test('another student cannot see or change your project; the teacher can see it read-only', async () => {
+test('another student cannot see or change your project; a teacher can open and fix it', async () => {
   const a = await login('ana', 'tiger42'), b = await login('ben', 'owl11'), t = await login('teach', 'apple-pear');
   const p = await (await call(a.cookie, '/projects', { method:'POST', body:JSON.stringify({ name:'Secret', data:{ s:1 } }) })).json();
   assert.strictEqual((await call(b.cookie, '/projects/' + p.id)).status, 404);
   assert.strictEqual((await call(b.cookie, '/projects/' + p.id, { method:'PUT', body:'{"data":{}}' })).status, 404);
   const seen = await (await call(t.cookie, '/projects/' + p.id)).json();
   assert.strictEqual(seen.readOnly, true);
-  assert.strictEqual((await call(t.cookie, '/projects/' + p.id, { method:'PUT', body:'{"data":{}}' })).status, 403);
-  assert.strictEqual((await call(a.cookie, '/admin/students')).status, 403);
-  const list = await (await call(t.cookie, '/admin/students')).json();
-  assert.ok(list.find(s => s.username === 'ana').projects >= 1);
+  assert.strictEqual(seen.canEdit, true);
+  assert.strictEqual(seen.ownerName, 'Ana');
+  // the teacher's change saves, and the student's own work is kept in history first
+  assert.strictEqual((await call(t.cookie, '/projects/' + p.id, { method:'PUT', body:JSON.stringify({ data:{ s:2 } }) })).status, 200);
+  await call(t.cookie, '/projects/' + p.id, { method:'PUT', body:JSON.stringify({ data:{ s:3 } }) });
+  const vs = await (await call(a.cookie, '/projects/' + p.id + '/versions')).json();
+  assert.deepStrictEqual(vs.map(v => v.label).slice(0, 3), ['teacher edit', 'before teacher edit', 'created']);
+  assert.deepStrictEqual((await (await call(a.cookie, '/projects/' + p.id)).json()).data, { s:3 });
+  assert.strictEqual((await call(t.cookie, '/projects/' + p.id, { method:'DELETE' })).status, 403, 'only the owner deletes');
+  assert.strictEqual((await call(a.cookie, '/admin/overview')).status, 403);
+});
+
+test('dashboard: progress per student, add accounts, turn one off', async () => {
+  const t = await login('teach', 'apple-pear');
+  const a = await login('ana', 'tiger42');
+  await call(a.cookie, '/projects', { method:'POST', body:JSON.stringify({ name:'Big', data:{ targets:[{ isStage:true, scripts:[] },
+    { scripts:[{ blocks:[{ op:'event_whenflagclicked' }, { op:'control_forever', body:[{ op:'motion_movesteps', inputs:{ STEPS:{ op:'operator_random' } } }] }] }] }] } }) });
+  const rows = await (await call(t.cookie, '/admin/overview')).json();
+  const ana = rows.find(r => r.username === 'ana');
+  assert.strictEqual(ana.blocks, 4, 'blocks of the biggest project, reporters included');
+  assert.ok(ana.last_login && ana.projects >= 1 && ana.recent >= 1);
+  const made = await (await call(t.cookie, '/admin/users', { method:'POST', body:JSON.stringify({ name:'Ana Lopez', period:'2' }) })).json();
+  assert.strictEqual(made.username, 'anal', 'ana is taken, so more of the last name');
+  assert.match(made.password, /^[a-z]+\d\d$/);
+  assert.strictEqual((await login('anal', made.password)).status, 200);
+  const tt = await (await call(t.cookie, '/admin/users', { method:'POST', body:JSON.stringify({ name:'Emily Teach', role:'teacher' }) })).json();
+  assert.strictEqual(tt.role, 'teacher');
+  assert.strictEqual((await call((await login(tt.username, tt.password)).cookie, '/admin/overview')).status, 200);
+  await call(t.cookie, '/admin/students/anal/disable', { method:'POST', body:'{"disabled":true}' });
+  assert.strictEqual((await login('anal', made.password)).status, 403);
+  await call(t.cookie, '/admin/students/anal/disable', { method:'POST', body:'{"disabled":false}' });
+  assert.strictEqual((await login('anal', made.password)).status, 200);
+  assert.strictEqual((await call(t.cookie, '/admin/students/teach/disable', { method:'POST', body:'{"disabled":true}' })).status, 400);
 });
 
 test('deleted projects can be brought back', async () => {

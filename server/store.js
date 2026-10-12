@@ -33,7 +33,9 @@ class FileStore {
                                        : { users:{}, projects:{}, versions:{} };
     this._t = null;
   }
-  async init(){}
+  async init(){
+    for(const p of Object.values(this.db.projects)) if(!p.stats) p.stats = projectStats(p.data);
+  }
   _save(){
     clearTimeout(this._t);
     this._t = setTimeout(()=>this.flush(), 50);
@@ -53,6 +55,19 @@ class FileStore {
     this._save();
   }
 
+  async setLogin(username){ const u = this.db.users[username]; if(u){ u.last_login = now(); this._save(); } }
+  async setDisabled(username, v){ const u = this.db.users[username]; if(u){ u.disabled = !!v; this._save(); } }
+  async lastVersionLabel(id){ const vs = this.db.versions[id] || []; return vs.length ? vs[vs.length-1].label : null; }
+  /* one row per account: how far each student has got */
+  async overview(){
+    const week = Date.now() - 7*86400000;
+    return Object.values(this.db.users).map(u => {
+      const ps = Object.values(this.db.projects).filter(p => p.owner === u.username && !p.deleted);
+      const vs = ps.flatMap(p => this.db.versions[p.id] || []);
+      return row(u, ps, vs.filter(v => Date.parse(v.updated || v.created) > week).length);
+    });
+  }
+
   async listProjects(owner){
     return Object.values(this.db.projects)
       .filter(p => p.owner === owner && !p.deleted)
@@ -61,7 +76,7 @@ class FileStore {
   }
   async getProject(id){ return this.db.projects[id] || null; }
   async createProject(owner, name, data, thumb){
-    const p = { id:newId(), owner, name, data, thumb:thumb||null, created:now(), updated:now(), deleted:null };
+    const p = { id:newId(), owner, name, data, thumb:thumb||null, stats:projectStats(data), created:now(), updated:now(), deleted:null };
     this.db.projects[p.id] = p;
     this.db.versions[p.id] = [];
     await this._version(p, 'created');
@@ -73,6 +88,8 @@ class FileStore {
     if(fields.name != null) p.name = fields.name;
     if(fields.data != null) p.data = fields.data;
     if(fields.thumb !== undefined) p.thumb = fields.thumb;
+    if(fields.stats !== undefined) p.stats = fields.stats;
+    if(fields.editedBy !== undefined) p.edited_by = fields.editedBy;
     p.updated = now();
     if(fields.data != null) await this._maybeVersion(p, opts);
     this._save();
@@ -126,6 +143,31 @@ class FileStore {
     return { type: fs.readFileSync(f + '.type', 'utf8'), data: fs.readFileSync(f) };
   }
   async hasAsset(id){ return fs.existsSync(path.join(this.dir, 'assets', id)); }
+}
+
+/* what a project has in it, for the teacher's dashboard */
+function projectStats(data){
+  const out = { blocks:0, scripts:0, sprites:0, costumes:0, sounds:0 };
+  const ts = data && Array.isArray(data.targets) ? data.targets : [];
+  const walk = b => {
+    if(!b || typeof b !== 'object') return;
+    out.blocks++;
+    for(const k in b.inputs || {}) walk(b.inputs[k]);
+    (b.body || []).forEach(walk); (b.body2 || []).forEach(walk);
+  };
+  for(const t of ts){
+    if(!t.isStage) out.sprites++;
+    out.costumes += (t.costumes || []).length; out.sounds += (t.sounds || []).length;
+    for(const sc of t.scripts || []){ out.scripts++; (sc.blocks || []).forEach(walk); }
+  }
+  return out;
+}
+function row(u, ps, recent){
+  const best = ps.reduce((a, p) => Math.max(a, (p.stats && p.stats.blocks) || 0), 0);
+  const last = ps.reduce((a, p) => !a || p.updated > a ? p.updated : a, null);
+  return { username:u.username, name:u.name, period:u.period, role:u.role, disabled:!!u.disabled,
+    last_login: u.last_login ? iso(u.last_login) : null, projects:ps.length, updated: last ? iso(last) : null,
+    blocks:best, recent };
 }
 
 /* Keep the newest 20 as they are, then thin the older ones so the history
@@ -190,7 +232,14 @@ class PgStore {
         id   TEXT PRIMARY KEY,
         type TEXT NOT NULL,
         data BYTEA NOT NULL
-      );`);
+      );
+      ALTER TABLE cs_users ADD COLUMN IF NOT EXISTS last_login TIMESTAMPTZ;
+      ALTER TABLE cs_users ADD COLUMN IF NOT EXISTS disabled BOOLEAN NOT NULL DEFAULT false;
+      ALTER TABLE cs_projects ADD COLUMN IF NOT EXISTS stats JSONB;
+      ALTER TABLE cs_projects ADD COLUMN IF NOT EXISTS edited_by TEXT;`);
+    // projects saved before the dashboard counted blocks
+    for(const r of (await this.q('SELECT id, data FROM cs_projects WHERE stats IS NULL')).rows)
+      await this.q('UPDATE cs_projects SET stats=$2 WHERE id=$1', [r.id, projectStats(r.data)]);
   }
   async getUser(username){
     const r = await this.q('SELECT * FROM cs_users WHERE username=$1', [username]);
@@ -202,10 +251,24 @@ class PgStore {
       ON CONFLICT (username) DO UPDATE SET name=$2, period=$3, role=$4, salt=$5, hash=$6`,
       [u.username, u.name, u.period||null, u.role||'student', u.salt, u.hash]);
   }
-  meta(r){ return r && { id:r.id, owner:r.owner, name:r.name, thumb:r.thumb,
+  async setLogin(username){ await this.q('UPDATE cs_users SET last_login=now() WHERE username=$1', [username]); }
+  async setDisabled(username, v){ await this.q('UPDATE cs_users SET disabled=$2 WHERE username=$1', [username, !!v]); }
+  async lastVersionLabel(id){
+    const r = await this.q('SELECT label FROM cs_versions WHERE project=$1 ORDER BY created DESC LIMIT 1', [id]);
+    return r.rows[0] ? r.rows[0].label : null;
+  }
+  async overview(){
+    const users = (await this.q('SELECT * FROM cs_users')).rows;
+    const ps = (await this.q('SELECT id,owner,updated,stats FROM cs_projects WHERE deleted IS NULL')).rows;
+    const rec = (await this.q(`SELECT p.owner, count(*)::int n FROM cs_versions v JOIN cs_projects p ON p.id=v.project
+      WHERE v.updated > now() - interval '7 days' AND p.deleted IS NULL GROUP BY p.owner`)).rows;
+    const recent = Object.fromEntries(rec.map(r => [r.owner, r.n]));
+    return users.map(u => row(u, ps.filter(p => p.owner === u.username).map(p => ({ ...p, updated:iso(p.updated) })), recent[u.username] || 0));
+  }
+  meta(r){ return r && { id:r.id, owner:r.owner, name:r.name, thumb:r.thumb, stats:r.stats || null, edited_by:r.edited_by || null,
     created:iso(r.created), updated:iso(r.updated), deleted:r.deleted && iso(r.deleted) }; }
   async listProjects(owner){
-    const r = await this.q(`SELECT id,owner,name,thumb,created,updated,deleted FROM cs_projects
+    const r = await this.q(`SELECT id,owner,name,thumb,stats,edited_by,created,updated,deleted FROM cs_projects
       WHERE owner=$1 AND deleted IS NULL ORDER BY updated DESC`, [owner]);
     return r.rows.map(x => this.meta(x));
   }
@@ -221,8 +284,8 @@ class PgStore {
   }
   async createProject(owner, name, data, thumb){
     const id = newId();
-    await this.q('INSERT INTO cs_projects (id,owner,name,data,thumb) VALUES ($1,$2,$3,$4,$5)',
-      [id, owner, name, data, thumb||null]);
+    await this.q('INSERT INTO cs_projects (id,owner,name,data,thumb,stats) VALUES ($1,$2,$3,$4,$5,$6)',
+      [id, owner, name, data, thumb||null, projectStats(data)]);
     await this.addVersion(id, 'created');
     return this.getProject(id);
   }
@@ -231,6 +294,8 @@ class PgStore {
     if(fields.name != null){ args.push(fields.name); sets.push('name=$'+args.length); }
     if(fields.data != null){ args.push(fields.data); sets.push('data=$'+args.length); }
     if(fields.thumb !== undefined){ args.push(fields.thumb); sets.push('thumb=$'+args.length); }
+    if(fields.stats !== undefined){ args.push(fields.stats); sets.push('stats=$'+args.length); }
+    if(fields.editedBy !== undefined){ args.push(fields.editedBy); sets.push('edited_by=$'+args.length); }
     await this.q(`UPDATE cs_projects SET ${sets.join(',')} WHERE id=$1`, args);
     if(fields.data != null){
       const last = (await this.q('SELECT id,created FROM cs_versions WHERE project=$1 ORDER BY created DESC LIMIT 1', [id])).rows[0];
@@ -283,4 +348,4 @@ function open(){
   return new FileStore(process.env.DATA_DIR || path.join(__dirname, '..', 'data'));
 }
 
-module.exports = { open, FileStore, PgStore, thin, MAX_VERSIONS, VERSION_GAP_MS };
+module.exports = { open, FileStore, PgStore, thin, projectStats, MAX_VERSIONS, VERSION_GAP_MS };

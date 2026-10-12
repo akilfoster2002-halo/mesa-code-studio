@@ -102,6 +102,36 @@ header.top h1{font-size:17px;margin:0 0 0 8px;font-weight:600}
 .ttable code{background:var(--panel2);padding:2px 6px;border-radius:6px}
 .tact{display:flex;gap:6px;justify-content:flex-end}
 
+/* dashboard */
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:18px}
+.stat{background:#fff;border:1px solid var(--line);border-radius:14px;padding:14px 16px;display:grid;grid-template-columns:auto 1fr;column-gap:12px;align-items:center}
+.stat-ico{font-size:28px;grid-row:span 2}
+.stat b{font-size:24px;line-height:1}
+.stat small{color:var(--muted)}
+.ptabs{align-items:center}
+.tsearch{width:200px}
+.twrap{overflow-x:auto;border-radius:12px;border:1px solid var(--line)}
+.ttable th.sortable{cursor:pointer;user-select:none;white-space:nowrap}
+.ttable th.sortable.on{color:var(--brand)}
+.ttable td.num{text-align:right;font-variant-numeric:tabular-nums}
+.ttable td.empty{text-align:center;color:var(--muted)}
+.ttable tr.off td{opacity:.5}
+.ttable tbody tr:hover{background:#f7f8fd}
+.tag{display:inline-block;margin-left:6px;font-size:11px;background:#fde2e2;color:var(--bad);border-radius:6px;padding:1px 6px}
+.bar{position:relative;width:120px;height:20px;background:var(--panel2);border-radius:6px;overflow:hidden}
+.bar i{position:absolute;left:0;top:0;bottom:0;background:#bfe8c8}
+.bar span{position:relative;font-size:12px;padding-left:6px;line-height:20px;white-space:nowrap}
+.newlogin{display:grid;gap:12px;justify-items:start}
+.newlogin div{display:grid}
+.newlogin small{color:var(--muted)}
+.newlogin b{font-family:ui-monospace,Menlo,monospace;font-size:26px}
+.form{display:grid;gap:12px}
+.form label{display:grid;gap:5px;font-weight:600}
+.pfoot.col{flex-direction:column;align-items:stretch;gap:4px}
+.pbtns{display:flex;gap:6px;margin-top:4px}
+.banner{display:flex;align-items:center;gap:10px}
+.banner.editing{background:#e3f6e8;color:#14532d}
+
 /* -------------------------------------------------------------- editor */
 .v-editor{overflow:hidden}
 .editor{height:100vh;display:flex;flex-direction:column}
