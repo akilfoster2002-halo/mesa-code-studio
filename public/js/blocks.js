@@ -26,19 +26,19 @@
    ===================================================================== */
 window.BLOCKS = (function(){
   const CATS = [
-    { id:'motion',   name:'Motion',    color:'#4C97FF', dark:'#3373CC' },
-    { id:'looks',    name:'Looks',     color:'#9966FF', dark:'#774DCB' },
-    { id:'sound',    name:'Sound',     color:'#CF63CF', dark:'#BD42BD' },
-    { id:'events',   name:'Events',    color:'#FFBF00', dark:'#CC9900' },
-    { id:'control',  name:'Control',   color:'#FFAB19', dark:'#CF8B17' },
-    { id:'sensing',  name:'Sensing',   color:'#5CB1D6', dark:'#2E8EB8' },
-    { id:'operators',name:'Operators', color:'#59C059', dark:'#389438' },
-    { id:'variables',name:'Variables', color:'#FF8C1A', dark:'#DB6E00' },
-    { id:'lists',    name:'Lists',     color:'#FF661A', dark:'#E64D00', hidden:true },
-    { id:'myblocks', name:'My Blocks', color:'#FF6680', dark:'#FF4D6A' },
-    { id:'pen',      name:'Pen',       color:'#0FBD8C', dark:'#0B8E69', ext:true },
-    { id:'music',    name:'Music',     color:'#0FBD8C', dark:'#0B8E69', ext:true },
-    { id:'tts',      name:'Text to Speech', color:'#0FBD8C', dark:'#0B8E69', ext:true }
+    { id:'motion', pastel:'#8fd3ff',   name:'Motion',    color:'#4C97FF', dark:'#3373CC' },
+    { id:'looks', pastel:'#cdb4f6',    name:'Looks',     color:'#9966FF', dark:'#774DCB' },
+    { id:'sound', pastel:'#f2b8ee',    name:'Sound',     color:'#CF63CF', dark:'#BD42BD' },
+    { id:'events', pastel:'#ffd8a8',   name:'Events',    color:'#FFBF00', dark:'#CC9900' },
+    { id:'control', pastel:'#ffb4a2',  name:'Control',   color:'#FFAB19', dark:'#CF8B17' },
+    { id:'sensing', pastel:'#a8e6cf',  name:'Sensing',   color:'#5CB1D6', dark:'#2E8EB8' },
+    { id:'operators', pastel:'#9fe6b4',name:'Operators', color:'#59C059', dark:'#389438' },
+    { id:'variables', pastel:'#ffc48f',name:'Variables', color:'#FF8C1A', dark:'#DB6E00' },
+    { id:'lists', pastel:'#ffb38a',    name:'Lists',     color:'#FF661A', dark:'#E64D00', hidden:true },
+    { id:'myblocks', pastel:'#ff9aa2', name:'My Blocks', color:'#FF6680', dark:'#FF4D6A' },
+    { id:'pen', pastel:'#9fe8d2',      name:'Pen',       color:'#0FBD8C', dark:'#0B8E69', ext:true },
+    { id:'music', pastel:'#9fe8d2',    name:'Music',     color:'#0FBD8C', dark:'#0B8E69', ext:true },
+    { id:'tts', pastel:'#9fe8d2',      name:'Text to Speech', color:'#0FBD8C', dark:'#0B8E69', ext:true }
   ];
 
   const num = d => ({ t:'num', d });

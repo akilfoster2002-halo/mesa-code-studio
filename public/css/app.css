@@ -230,6 +230,63 @@ header.top h1{font-size:17px;margin:0 0 0 8px;font-weight:600}
 .argtpl{cursor:grab}
 .b.missing > .r{background:#c7c7c7;border-color:#999}
 .b.pal{cursor:grab}
+/* ------------------------------------------------- the 0.2 editor look
+   The same format as Dino Run, Bug Squad and the Arcade: every block a
+   full-width line in a pastel colour, bold monospace words, and the
+   inside of a loop or if indented behind a guide line — code that reads
+   like code, with the indentation you can see. */
+@font-face{font-family:'Ubuntu Mono';src:url('../fonts/ubuntumono-400.woff2') format('woff2');font-weight:400;font-display:swap}
+@font-face{font-family:'Ubuntu Mono';src:url('../fonts/ubuntumono-700.woff2') format('woff2');font-weight:700;font-display:swap}
+:root{--code-ink:#241d38;--code-bg:#15142b;--code-panel:#1a1838;--code-line:#5a4b85;
+  --mono:'Ubuntu Mono',ui-monospace,'SF Mono','Cascadia Mono',Menlo,Consolas,'DejaVu Sans Mono',monospace}
+#ws{background-color:var(--code-bg);background-image:radial-gradient(circle,#26244a 1px,transparent 1.2px)}
+#pal{background:var(--code-panel);border-right-color:#34326a}
+#cats{background:var(--code-panel);border-right-color:#34326a}
+.cat{color:#b9b5e0}.cat.on,.cat:hover{background:#2a2757;color:#fff}
+.ph{color:#f4f0ff}.pnote{color:#8d8bb8}
+.pbtn{background:#2a2757;border-color:#4b4885;color:#f4f0ff}.pbtn:hover{background:#34306a}
+.ws-empty{color:#4b4885}
+.zb{background:#2a2757;border-color:#4b4885;color:#cfcaf5}
+.code-area{border-color:#34326a}
+
+.list{align-items:stretch;gap:2px}
+.script > .list.top{min-width:300px;border-left:2px dashed var(--code-line);padding-left:6px;margin-left:6px}
+.b{color:var(--code-ink);font-family:var(--mono);font-size:12px;font-weight:700}
+.b > .r,.b > .r.else{background:var(--c);border:0;border-radius:8px;padding:5px 8px;min-height:30px;gap:6px;align-self:stretch}
+.s-hat > .r{border-radius:8px;padding-top:5px;min-height:30px}
+.s-hat{margin-top:0}
+.s-stack > .r::after,.s-hat > .r::after,.s-c > .foot::after,.s-c2 > .foot::after,
+.s-c > .r::after,.s-c2 > .r::after,.s-capc > .r::after,.s-c2 > .else::after{display:none}
+.s-c > .r,.s-c2 > .r,.s-capc > .r{border-radius:8px}
+.b > .else{margin-top:2px}
+.mouth{margin:2px 0 0 14px;border-left:3px solid var(--code-line);padding-left:6px}
+.arm,.foot{display:none!important}
+.list.in-mouth{min-height:22px}
+.mouth > .list:empty{min-height:22px;border:1px dashed var(--code-line);border-radius:6px;opacity:.7}
+.b > .r .rx{margin-left:auto;padding:0 2px 0 10px;opacity:0;cursor:pointer;color:var(--code-ink);font-weight:400}
+.b > .r:hover > .rx{opacity:.55}.b > .r .rx:hover{opacity:1}
+/* reporters and booleans inside a line */
+.s-report > .r{border-radius:12px;min-height:24px;padding:2px 8px;box-shadow:inset 0 0 0 1px rgba(0,0,0,.18)}
+.s-bool > .r{min-height:24px;padding:2px 14px}
+.r .s-report > .r,.r .s-bool > .r{min-height:22px;padding:1px 7px}
+.r .s-bool > .r{padding:1px 13px}
+.f{height:20px;min-width:22px;padding:1px 6px;border-radius:9px;border:1px solid rgba(0,0,0,.25);color:var(--code-ink);font-size:11.5px;font-weight:400}
+.f-menu,.f-rmenu{background:rgba(255,255,255,.55);color:var(--code-ink);border-radius:9px}
+.caret{border-top-color:var(--code-ink)}
+.hole{height:20px;background:rgba(0,0,0,.18)}
+.proto{background:#ffc2c7;border:0;border-radius:8px;min-height:24px;padding:2px 6px}
+/* palette: the same lines */
+#pal .prow > .b{flex:1;min-width:0}
+#pal .prow{margin-bottom:5px;padding-right:2px}
+#pal .prow.gap{margin-top:12px}
+.mon{margin-top:8px}
+.script.run > .list > .b:first-child, .script.run > .list{filter:drop-shadow(0 0 3px #ffe14d) drop-shadow(0 0 4px #ffe14d)}
+.marker{background:rgba(255,225,77,.85);border-radius:3px}
+.marker:not(.above):not(.wrap){height:4px!important;margin-top:-1px}
+.marker.above{background:rgba(255,225,77,.25);outline:2px dashed #ffe14d}
+.marker.wrap{background:rgba(255,225,77,.25);outline:2px dashed #ffe14d}
+.field-edit{font-family:var(--mono);color:var(--code-ink)}
+
 /* where a dragged block will land */
 .marker{position:absolute;background:rgba(40,40,60,.32);border-radius:4px;pointer-events:none;z-index:50}
 .marker.above{background:rgba(40,40,60,.18);outline:2px dashed rgba(40,40,60,.35)}

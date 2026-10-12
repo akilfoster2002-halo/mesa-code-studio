@@ -460,7 +460,7 @@ window.EDITOR = (function(){
     const cat = BLOCKS.cat(catId) || BLOCKS.cat('myblocks');
     let shape = spec ? spec.shape : 'stack';
     const el = h('div', { class:'b s-' + shape + (pal ? ' pal' : ''), 'data-id':b.id, 'data-op':b.op });
-    el.style.setProperty('--c', cat.color); el.style.setProperty('--d', cat.dark);
+    el.style.setProperty('--c', cat.pastel || cat.color); el.style.setProperty('--d', cat.dark);
     const row = h('div', { class:'r' });
 
     if(b.op === 'procedures_definition'){
@@ -470,7 +470,7 @@ window.EDITOR = (function(){
         if(typeof p === 'string') proto.append(h('span', { class:'t' }, p));
         else {
           const a = h('div', { class:'b argtpl ' + (p.kind === 'b' ? 's-bool' : 's-report'), 'data-argname':p.name, 'data-argkind':p.kind });
-          a.style.setProperty('--c', cat.color); a.style.setProperty('--d', cat.dark);
+          a.style.setProperty('--c', cat.pastel || cat.color); a.style.setProperty('--d', cat.dark);
           a.append(h('div', { class:'r' }, h('span', { class:'t' }, p.name)));
           proto.append(a);
         }
@@ -492,6 +492,7 @@ window.EDITOR = (function(){
         else row.append(argEl(b, p.arg, spec.args[p.arg], pal));
       }
     } else row.append(h('span', { class:'t' }, '? ' + b.op));
+    if(!pal && !readOnly && !BLOCKS.isReporter(shape)) row.append(h('span', { class:'rx', title:t('Delete Block') }, '✕'));
     el.append(row);
 
     if(BLOCKS.isC(shape)){
@@ -594,6 +595,8 @@ window.EDITOR = (function(){
   function down(e){
     if(e.button !== 0) return;
     if(e.target.closest('.zoom, .pbtn, input, button, .ws-empty')) return;
+    const x = e.target.closest('.rx');
+    if(x){ e.preventDefault(); const info = index[x.closest('.b').dataset.id]; if(info) deleteBlock(info); return; }
     const bEl = e.target.closest('.b');
     const fromPal = !!e.target.closest('#pal');
     if(!bEl){
