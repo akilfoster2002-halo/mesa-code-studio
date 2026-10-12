@@ -140,6 +140,22 @@
       if(v === 'del'){ if(await UI.confirm(t('Delete this project?') + ' “' + p.name + '”', t('Delete'))){ await api('/projects/' + p.id, { method:'DELETE' }); projectsView(); } }
     });
   }
+  /* jump between your projects without leaving the editor */
+  async function projectSwitcher(e){
+    const r = e.currentTarget.getBoundingClientRect();
+    let list = [];
+    try { list = await api('/projects'); } catch(err){ return; }
+    UI.menu(r.left, r.bottom + 4, [
+      { label:'＋ ' + t('New project'), value:'__new' },
+      { sep:true },
+      ...list.slice(0, 15).map(p => ({ label:(projectMeta && p.id === projectMeta.id ? '● ' : '') + p.name + '  ·  ' + UI.ago(p.updated), value:p.id, on: projectMeta && p.id === projectMeta.id })),
+      { sep:true },
+      { label:'🗂 ' + t('All my projects'), value:'__all' }], v => {
+      if(v === '__new') newProject();
+      else if(v === '__all') location.hash = '#/';
+      else location.hash = '#/p/' + v;
+    });
+  }
   async function newProject(){
     const name = await UI.ask(t('New project'), I18N.lang === 'es' ? 'Mi juego' : 'My Game');
     if(name === null) return;
@@ -177,7 +193,8 @@
     E.full = h('button', { class:'btn ghost icon', type:'button', title:t('Full screen'), onclick:() => { document.body.classList.toggle('full-stage'); VM.rt.dirty = true; setTimeout(() => STAGE.renderMonitors(), 50); } }, '⛶');
     E.root = h('div', { class:'editor' },
       h('header', { class:'top' }, logo(),
-        h('a', { class:'btn ghost', href:'#/' }, '🗂 ' + t('My Projects')),
+        h('button', { class:'btn ghost', type:'button', onclick:projectSwitcher }, '🗂 ' + t('My Projects') + ' ▾'),
+        h('button', { class:'btn ghost', type:'button', title:t('New project'), onclick:newProject }, '＋ ' + t('New')),
         E.title, E.status, h('span', { class:'grow' }),
         h('button', { class:'btn ghost', type:'button', onclick:historyPanel }, '🕘 ' + t('History')),
         h('button', { class:'btn ghost', type:'button', onclick:fileMenu }, '📁 ▾'),

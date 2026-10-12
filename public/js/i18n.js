@@ -3,7 +3,7 @@
    t('Save') → 'Guardar' when the page is in Spanish. {n} fills in. */
 window.I18N = (function(){
   const ES = {
-    'Dashboard':'Panel', 'Teachers':'Maestros', 'Student':'Estudiante', 'Worked this week':'Trabajaron esta semana',
+    'All my projects':'Todos mis proyectos', 'Dashboard':'Panel', 'Teachers':'Maestros', 'Student':'Estudiante', 'Worked this week':'Trabajaron esta semana',
     'Blocks (average)':'Bloques (promedio)', 'Blocks':'Bloques', 'This week':'Esta semana', 'Last login':'Última entrada',
     'never':'nunca', 'off':'apagado', 'Turn on':'Activar', 'Turn off':'Desactivar', 'Add':'Añadir', 'Copy':'Copiar',
     'Turn off {n}? They will not be able to log in. Nothing is deleted.':'¿Desactivar a {n}? No podrá entrar. No se borra nada.',
