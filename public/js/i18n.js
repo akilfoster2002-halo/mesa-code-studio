@@ -3,6 +3,9 @@
    t('Save') → 'Guardar' when the page is in Spanish. {n} fills in. */
 window.I18N = (function(){
   const ES = {
+    'Download script':'Descargar código', 'Save the code of every sprite as one PDF, to hand in':'Guarda el código de todos los objetos en un PDF para entregarlo',
+    'Block code':'Código de bloques', 'Student:':'Estudiante:', 'Username:':'Usuario:', 'Period:':'Período:', 'Date:':'Fecha:',
+    '(no blocks yet)':'(aún no hay bloques)',
     'All my projects':'Todos mis proyectos', 'Dashboard':'Panel', 'Teachers':'Maestros', 'Student':'Estudiante', 'Worked this week':'Trabajaron esta semana',
     'Blocks (average)':'Bloques (promedio)', 'Blocks':'Bloques', 'This week':'Esta semana', 'Last login':'Última entrada',
     'never':'nunca', 'off':'apagado', 'Turn on':'Activar', 'Turn off':'Desactivar', 'Add':'Añadir', 'Copy':'Copiar',

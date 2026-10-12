@@ -128,9 +128,11 @@
   function projectMenu(e, p){
     const r = e.target.getBoundingClientRect();
     UI.menu(r.left, r.bottom + 4, [
-      { label:t('Open'), value:'open' }, { label:t('Rename'), value:'ren' }, { label:t('Duplicate'), value:'dup' }, { sep:true },
+      { label:t('Open'), value:'open' }, { label:t('Rename'), value:'ren' }, { label:t('Duplicate'), value:'dup' },
+      { label:'⤓ ' + t('Download script'), value:'pdf' }, { sep:true },
       { label:t('Delete'), value:'del', danger:true }], async v => {
       if(v === 'open') location.hash = '#/p/' + p.id;
+      if(v === 'pdf'){ const full = await api('/projects/' + p.id); SCRIPTPDF.download(PROJECT.repair(full.data), scriptInfo(full)); }
       if(v === 'ren'){ const n = await UI.ask(t('Rename'), p.name); if(n){ await api('/projects/' + p.id, { method:'PUT', body:json({ name:n }) }); projectsView(); } }
       if(v === 'dup'){
         const full = await api('/projects/' + p.id);
@@ -140,6 +142,17 @@
       if(v === 'del'){ if(await UI.confirm(t('Delete this project?') + ' “' + p.name + '”', t('Delete'))){ await api('/projects/' + p.id, { method:'DELETE' }); projectsView(); } }
     });
   }
+  /* ⤓ the code of every sprite as one PDF, at any moment */
+  function scriptInfo(meta){
+    const mine = !meta.owner || meta.owner === me.username;
+    return { project:meta.name, name: mine ? me.name : (meta.ownerName || meta.owner), username: mine ? me.username : meta.owner, period: mine ? me.period : '' };
+  }
+  function downloadScript(){
+    if(!P || !projectMeta) return;
+    VM.syncLayers();
+    SCRIPTPDF.download(PROJECT.serialize(P), scriptInfo(projectMeta));
+  }
+
   /* jump between your projects without leaving the editor */
   async function projectSwitcher(e){
     const r = e.currentTarget.getBoundingClientRect();
@@ -196,6 +209,7 @@
         h('button', { class:'btn ghost', type:'button', onclick:projectSwitcher }, '🗂 ' + t('My Projects') + ' ▾'),
         h('button', { class:'btn ghost', type:'button', title:t('New project'), onclick:newProject }, '＋ ' + t('New')),
         E.title, E.status, h('span', { class:'grow' }),
+        h('button', { class:'btn ghost dl', type:'button', title:t('Save the code of every sprite as one PDF, to hand in'), onclick:downloadScript }, '⤓ ' + t('Download script')),
         h('button', { class:'btn ghost', type:'button', onclick:historyPanel }, '🕘 ' + t('History')),
         h('button', { class:'btn ghost', type:'button', onclick:fileMenu }, '📁 ▾'),
         E.userBox = h('span', { class:'userbox' })),
@@ -254,7 +268,7 @@
     let pr;
     try { pr = await api('/projects/' + id); }
     catch(e){ if(e.status !== 401){ app.replaceChildren(h('div', { class:'login-page' }, h('div', { class:'login-card' }, h('p', {}, t('Something went wrong loading this project.')), h('a', { class:'btn primary', href:'#/' }, t('My Projects'))))); } return; }
-    projectMeta = { id:pr.id, name:pr.name, updated:pr.updated, owner:pr.owner };
+    projectMeta = { id:pr.id, name:pr.name, updated:pr.updated, owner:pr.owner, ownerName:pr.ownerName };
     readOnly = !!pr.readOnly && !(edit && pr.canEdit);
     const someoneElse = pr.owner !== me.username;
     let data = pr.data;
