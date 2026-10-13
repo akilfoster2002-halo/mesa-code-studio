@@ -204,6 +204,7 @@ window.PANES = (function(){
     try {
       UI.toast(t('Uploading…'));
       const out = what === 'bg' ? await MEDIA.removeBackground(c.asset) : await MEDIA.flip(c.asset);
+      document.dispatchEvent(new CustomEvent('cs-did', { detail:what }));
       c.asset = out.asset; delete c.opaque;
       if(what === 'flip') c.cx = c.w - c.cx;
       VM.rt.dirty = true; renderCostumes(); renderSprites(); onChange('costume');
