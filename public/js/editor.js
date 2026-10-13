@@ -117,14 +117,20 @@ window.EDITOR = (function(){
     els.cats.innerHTML = '';
     for(const c of cats){
       els.cats.append(h('button', { class:'cat', 'data-cat':c.id, type:'button',
-        onclick:() => { const hd = $('#ph-' + c.id, els.pal); if(hd) els.pal.scrollTo({ top:hd.offsetTop - 4, behavior:'smooth' }); } },
+        onclick:() => {
+          const hd = $('#ph-' + c.id, els.pal); if(hd) els.pal.scrollTo({ top:hd.offsetTop - 4, behavior:'smooth' });
+          $$('.cat', els.cats).forEach(b => b.classList.toggle('on', b.dataset.cat === c.id));
+          pickedCat = c.id; clearTimeout(pickedT); pickedT = setTimeout(() => pickedCat = null, 900);
+        } },
         h('span', { class:'dot', style:{ background:c.color, borderColor:c.dark } }), h('span', {}, t(c.name))));
     }
     els.cats.append(h('button', { class:'cat ext-btn', type:'button', title:t('Add Extension'), onclick:extensionChooser },
       h('span', { class:'dot plus' }, '+'), h('span', {}, t('Add Extension'))));
     highlightCat();
   }
+  let pickedCat = null, pickedT = 0;
   function highlightCat(){
+    if(pickedCat) return;           // a click just chose it; let the smooth scroll catch up
     const top = els.pal.scrollTop + 10;
     let cur = null;
     for(const hd of $$('.ph', els.pal)) if(hd.offsetTop <= top + 30) cur = hd.dataset.cat;

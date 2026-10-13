@@ -41,6 +41,7 @@
     if(!me) return [];
     return [
       me.role === 'teacher' ? h('a', { class:'btn ghost', href:'#/teacher' }, '🍎 ' + t('Dashboard')) : null,
+      h('button', { class:'btn ghost', type:'button', title:t('Tour'), onclick:() => TOUR.start() }, '❓'),
       h('span', { class:'who', title:me.username }, '👤 ' + me.name),
       h('button', { class:'btn ghost', type:'button', onclick:logout }, t('Log out'))
     ].filter(Boolean);
@@ -48,7 +49,7 @@
   async function logout(){
     if(SAVE.dirty) await SAVE.flush();
     await fetch('/api/logout', { method:'POST' }).catch(() => {});
-    me = null; location.hash = '#/'; route(true);
+    me = null; tourChecked = false; if(TOUR.running) TOUR.finish(null); location.hash = '#/'; route(true);
   }
 
   /* ------------------------------------------------------------ routing */
@@ -63,12 +64,29 @@
       try { me = await api('/me'); } catch(e){ me = null; }
     }
     if(!me) return loginView();
+    setTimeout(maybeTour, 900);
     const pm = hash.match(/^#\/p\/([^/]+)(\/edit)?$/);
     if(pm) return editorView(pm[1], !!pm[2]);
     if(hash === '#/teacher' && me.role === 'teacher') return teacherView();
     return projectsView();
   }
   addEventListener('hashchange', () => route());
+
+  /* the walkthrough: on its own the first time a student logs in, and
+     carried on where they were if the page reloads */
+  let tourChecked = false;
+  function maybeTour(){
+    if(!me || tourChecked || TOUR.running) return;
+    tourChecked = true;
+    if(me.role !== 'student' || me.tutorial === 'done' || me.tutorial === 'skipped') return;
+    if(me.tutorial && /^\d+$/.test(me.tutorial)) TOUR.resume(Number(me.tutorial));
+    else TOUR.start(0);
+  }
+  TOUR.onState = state => {
+    if(!me) return;
+    me.tutorial = state;
+    fetch('/api/me/tutorial', { method:'POST', credentials:'same-origin', headers:{ 'Content-Type':'application/json' }, body:JSON.stringify({ state }) }).catch(() => {});
+  };
 
   /* -------------------------------------------------------------- login */
   function loginView(){
@@ -206,11 +224,11 @@
     E.full = h('button', { class:'btn ghost icon', type:'button', title:t('Full screen'), onclick:() => { document.body.classList.toggle('full-stage'); VM.rt.dirty = true; setTimeout(() => STAGE.renderMonitors(), 50); } }, '⛶');
     E.root = h('div', { class:'editor' },
       h('header', { class:'top' }, logo(),
-        h('button', { class:'btn ghost', type:'button', onclick:projectSwitcher }, '🗂 ' + t('My Projects') + ' ▾'),
+        h('button', { class:'btn ghost proj-btn', type:'button', onclick:projectSwitcher }, '🗂 ' + t('My Projects') + ' ▾'),
         h('button', { class:'btn ghost', type:'button', title:t('New project'), onclick:newProject }, '＋ ' + t('New')),
         E.title, E.status, h('span', { class:'grow' }),
         h('button', { class:'btn ghost dl', type:'button', title:t('Save the code of every sprite as one PDF, to hand in'), onclick:downloadScript }, '⤓ ' + t('Download script')),
-        h('button', { class:'btn ghost', type:'button', onclick:historyPanel }, '🕘 ' + t('History')),
+        h('button', { class:'btn ghost hist-btn', type:'button', onclick:historyPanel }, '🕘 ' + t('History')),
         h('button', { class:'btn ghost', type:'button', onclick:fileMenu }, '📁 ▾'),
         E.userBox = h('span', { class:'userbox' })),
       E.banner,
@@ -502,7 +520,7 @@
             '＋ ' + (dash.tab === 'teachers' ? t('Teacher') : t('Student')))),
         h('div', { class:'twrap' }, h('table', { class:'ttable' },
           h('thead', {}, h('tr', {}, th('name', t('Name')), th('username', t('Username')), dash.tab === 'all' ? th('period', t('Period')) : null,
-            th('projects', '🗂'), th('blocks', '🧱 ' + t('Blocks')), th('recent', '⏱ ' + t('This week')), th('updated', t('Last saved')), th('last_login', t('Last login')), h('th', {}))),
+            th('projects', '🗂'), th('blocks', '🧱 ' + t('Blocks')), th('recent', '⏱ ' + t('This week')), th('updated', t('Last saved')), th('last_login', t('Last login')), th('tutorial', '❓ ' + t('Tour')), h('th', {}))),
           h('tbody', {}, list.length ? list.map(r => h('tr', { class:r.disabled ? 'off' : '' },
             h('td', {}, h('b', {}, r.name), r.disabled ? h('span', { class:'tag' }, t('off')) : null),
             h('td', {}, h('code', {}, r.username)),
@@ -512,6 +530,7 @@
             h('td', {}, h('div', { class:'bar', title:'≈ ' + (r.recent * 2) + ' min' }, h('i', { style:{ width:Math.round((r.recent || 0) / maxRecent * 100) + '%' } }), h('span', {}, r.recent ? '≈ ' + r.recent * 2 + ' min' : '—'))),
             h('td', {}, r.updated ? UI.ago(r.updated) : '—'),
             h('td', {}, r.last_login ? UI.ago(r.last_login) : t('never')),
+            h('td', {}, r.tutorial === 'done' ? '✅' : r.tutorial === 'skipped' ? '⏭ ' + t('skipped') : r.tutorial ? (Number(r.tutorial) + 1) + ' / ' + TOUR.STEPS.length : '—'),
             h('td', { class:'tact' },
               h('button', { class:'btn small', type:'button', disabled:!r.projects, title:t('Projects'), onclick:() => studentProjects(r) }, '🗂'),
               h('button', { class:'btn small', type:'button', title:t('Reset password'), onclick:() => resetPassword(r) }, '🔑'),

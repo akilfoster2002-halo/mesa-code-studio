@@ -432,6 +432,25 @@ body.full-stage .stage-bar{width:min(100vw - 20px,(100vh - 70px) * 4 / 3)}
 #toast.show{transform:translate(-50%,0);opacity:1}
 #toast.bad{background:var(--bad)}
 
+/* the walkthrough: a spotlight and a card; clicks go through to the page */
+.tour{position:fixed;inset:0;z-index:1400;pointer-events:none}
+.tour.nospot{background:rgba(20,18,50,.45)}
+.tour-spot{position:fixed;border-radius:12px;box-shadow:0 0 0 9999px rgba(20,18,50,.45),0 0 0 3px #ffe14d inset,0 0 18px 4px rgba(255,225,77,.7);
+  transition:left .25s,top .25s,width .25s,height .25s}
+.tour-card{position:fixed;width:340px;pointer-events:auto;background:#fff;border-radius:16px;padding:12px 14px 12px;
+  box-shadow:0 16px 40px rgba(0,0,0,.3);display:grid;gap:8px;transition:left .25s,top .25s}
+.tour-card.doing{outline:3px solid #ffe14d}
+.tour-card.yay{outline:3px solid #2bb44a;transform:scale(1.03)}
+.tour-top{display:flex;justify-content:space-between;align-items:center;font-size:12px;color:var(--muted)}
+.tour-skip{border:0;background:none;color:var(--muted);cursor:pointer;text-decoration:underline;font-size:12px}
+.tour-body{display:flex;gap:12px;align-items:center}
+.tour-ico{font-size:36px;line-height:1;min-width:42px;text-align:center}
+.tour-body p{margin:0;font-size:16px;line-height:1.35;font-weight:600;color:var(--ink)}
+.tour-bar{height:6px;border-radius:3px;background:var(--panel2);overflow:hidden}
+.tour-bar i{display:block;height:100%;background:var(--brand)}
+.tour-row{display:flex;align-items:center;gap:8px;justify-content:space-between}
+.tour-turn{font-weight:700;color:#b07800;font-size:14px}
+
 /* read only: nothing to change */
 body.readonly .add-row,body.readonly .add-col,body.readonly .add-stack{display:none}
 

@@ -116,7 +116,7 @@ async function api(req, res, url){
     tries.delete('u:'+username);
     await store.setLogin(u.username);
     auth.setCookie(res, { u:u.username, role:u.role });
-    return send(res, 200, { username:u.username, name:u.name, role:u.role, period:u.period });
+    return send(res, 200, { username:u.username, name:u.name, role:u.role, period:u.period, tutorial:u.tutorial || null });
   }
   if(p[0] === 'logout' && m === 'POST'){ auth.clearCookie(res); return send(res, 200, { ok:true }); }
 
@@ -134,7 +134,14 @@ async function api(req, res, url){
   if(!user || user.disabled) return send(res, 401, { error:'login' });
   const teacher = user.role === 'teacher';
 
-  if(p[0] === 'me') return send(res, 200, { username:user.username, name:user.name, role:user.role, period:user.period });
+  if(p[0] === 'me' && p[1] === 'tutorial' && m === 'POST'){
+    const b = await readJSON(req, 2000);
+    const v = String(b.state || '').slice(0, 20);
+    if(!/^(done|skipped|\d{1,3})$/.test(v)) return send(res, 400, { error:'state' });
+    await store.setTutorial(user.username, v);
+    return send(res, 200, { ok:true });
+  }
+  if(p[0] === 'me') return send(res, 200, { username:user.username, name:user.name, role:user.role, period:user.period, tutorial:user.tutorial || null });
 
   if(p[0] === 'assets' && m === 'POST'){
     const type = String(req.headers['content-type'] || '').split(';')[0].trim().toLowerCase();

@@ -125,6 +125,17 @@ test('assets: pictures and sounds go in, by content hash; other types do not', a
   assert.strictEqual((await fetch(base + '/api/assets', { method:'POST', headers:{ 'Content-Type':'image/png' }, body:png })).status, 401);
 });
 
+test('the tour: a step number while it runs, then done or skipped', async () => {
+  const { cookie } = await login('ana', 'tiger42');
+  assert.strictEqual((await (await call(cookie, '/me')).json()).tutorial, null);
+  await call(cookie, '/me/tutorial', { method:'POST', body:'{"state":"7"}' });
+  assert.strictEqual((await (await call(cookie, '/me')).json()).tutorial, '7');
+  await call(cookie, '/me/tutorial', { method:'POST', body:'{"state":"done"}' });
+  assert.strictEqual((await login('ana', 'tiger42')).status, 200);
+  assert.strictEqual((await (await call(cookie, '/me')).json()).tutorial, 'done');
+  assert.strictEqual((await call(cookie, '/me/tutorial', { method:'POST', body:'{"state":"<x>"}' })).status, 400);
+});
+
 test('too many wrong passwords locks that username for a while', async () => {
   for(let i = 0; i < 8; i++) await login('ben', 'wrong' + i);
   assert.strictEqual((await login('ben', 'owl11')).status, 429);
