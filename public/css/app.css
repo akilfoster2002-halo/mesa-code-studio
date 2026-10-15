@@ -42,7 +42,13 @@ header.top{height:50px;display:flex;align-items:center;gap:8px;padding:0 12px;ba
 header.top h1{font-size:17px;margin:0 0 0 8px;font-weight:600}
 .logo{display:flex;align-items:center;gap:7px;font-weight:700;font-size:16px;text-decoration:none;color:#fff;margin-right:6px;letter-spacing:.3px}
 .logo-mark{color:#ffd166;font-size:18px}
-.userbox{display:flex;gap:8px;align-items:center}
+.userbox{display:flex;gap:8px;align-items:center;flex:none}
+header.top>*{flex-shrink:0}
+.tour-btn{background:#fff;color:var(--top,#3b3793);font-weight:700;border:0;padding:6px 12px;border-radius:999px}
+.tour-btn:hover{background:#ece9ff}
+header.top>.title-in{flex-shrink:1;min-width:90px}
+header.top>.grow{flex-shrink:1;min-width:0}
+@media (max-width:1250px){ header.top .lbl{display:none} }
 .who{font-size:13px;opacity:.9;margin:0 4px;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .lang{font-weight:700;letter-spacing:1px}
 .title-in{background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.25);color:#fff;border-radius:8px;

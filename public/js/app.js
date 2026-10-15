@@ -41,7 +41,7 @@
     if(!me) return [];
     return [
       me.role === 'teacher' ? h('a', { class:'btn ghost', href:'#/teacher' }, '🍎 ' + t('Dashboard')) : null,
-      h('button', { class:'btn ghost', type:'button', title:t('Tour'), onclick:() => TOUR.start() }, '❓'),
+      h('button', { class:'btn tour-btn', type:'button', title:t('Tour'), onclick:() => TOUR.start() }, '❓ ' + t('Tour')),
       h('span', { class:'who', title:me.username }, '👤 ' + me.name),
       h('button', { class:'btn ghost', type:'button', onclick:logout }, t('Log out'))
     ].filter(Boolean);
@@ -225,11 +225,11 @@
     E.full = h('button', { class:'btn ghost icon', type:'button', title:t('Full screen'), onclick:() => { document.body.classList.toggle('full-stage'); VM.rt.dirty = true; setTimeout(() => STAGE.renderMonitors(), 50); } }, '⛶');
     E.root = h('div', { class:'editor' },
       h('header', { class:'top' }, logo(),
-        h('button', { class:'btn ghost proj-btn', type:'button', onclick:projectSwitcher }, '🗂 ' + t('My Projects') + ' ▾'),
-        h('button', { class:'btn ghost', type:'button', title:t('New project'), onclick:newProject }, '＋ ' + t('New')),
+        h('button', { class:'btn ghost proj-btn', type:'button', onclick:projectSwitcher, title:t('My Projects') }, '🗂 ', h('span', { class:'lbl' }, t('My Projects')), ' ▾'),
+        h('button', { class:'btn ghost', type:'button', title:t('New project'), onclick:newProject }, '＋ ', h('span', { class:'lbl' }, t('New'))),
         E.title, E.status, h('span', { class:'grow' }),
-        h('button', { class:'btn ghost dl', type:'button', title:t('Save the code of every sprite as one PDF, to hand in'), onclick:downloadScript }, '⤓ ' + t('Download script')),
-        h('button', { class:'btn ghost hist-btn', type:'button', onclick:historyPanel }, '🕘 ' + t('History')),
+        h('button', { class:'btn ghost dl', type:'button', title:t('Save the code of every sprite as one PDF, to hand in'), onclick:downloadScript }, '⤓ ', h('span', { class:'lbl' }, t('Download script'))),
+        h('button', { class:'btn ghost hist-btn', type:'button', onclick:historyPanel, title:t('History') }, '🕘 ', h('span', { class:'lbl' }, t('History'))),
         h('button', { class:'btn ghost', type:'button', onclick:fileMenu }, '📁 ▾'),
         E.userBox = h('span', { class:'userbox' })),
       E.banner,
