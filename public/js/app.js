@@ -219,7 +219,8 @@
     E.tabs = h('div', { class:'tabs' });
     E.tabBtns = ['code','costumes','sounds'].map(k => h('button', { class:'tab', type:'button', 'data-tab':k, onclick:() => showTab(k) }));
     E.tabs.append(...E.tabBtns);
-    E.code = h('div', { class:'code-area' }, E.cats, E.pal, E.ws);
+    E.stabs = h('div', { class:'sprite-tabs', role:'tablist' });
+    E.code = h('div', { class:'code-area' }, E.cats, E.pal, h('div', { class:'ws-col' }, E.stabs, E.ws));
     E.small = h('button', { class:'btn ghost icon', type:'button', title:t('Small stage'), onclick:() => { document.body.classList.toggle('small-stage'); VM.rt.dirty = true; setTimeout(() => STAGE.renderMonitors(), 50); } }, '▭');
     E.full = h('button', { class:'btn ghost icon', type:'button', title:t('Full screen'), onclick:() => { document.body.classList.toggle('full-stage'); VM.rt.dirty = true; setTimeout(() => STAGE.renderMonitors(), 50); } }, '⛶');
     E.root = h('div', { class:'editor' },
@@ -270,9 +271,24 @@
     mounted.tabBtns[1].textContent = '🖌 ' + (tg && tg.isStage ? t('Backdrops') : t('Costumes'));
     mounted.tabBtns[2].textContent = '🔊 ' + t('Sounds');
   }
+  // one tab per sprite (and the stage) across the top of the script area
+  function spriteTabs(){
+    if(!mounted || !P) return;
+    const cur = EDITOR.target;
+    mounted.stabs.replaceChildren(...[...P.targets.slice(1), P.targets[0]].map(tg => {
+      const b = h('button', { type:'button', role:'tab', class:'stab' + (tg === cur ? ' on' : '') + (tg.isStage ? ' st' : ''),
+        'aria-selected':String(tg === cur), title:tg.isStage ? t('Stage') : tg.name, onclick:() => { if(tg !== EDITOR.target) select(tg); } },
+        h('img', { src:MEDIA.url(RENDER.costumeOf(tg).asset), alt:'', draggable:'false' }),
+        h('span', {}, tg.isStage ? t('Stage') : tg.name));
+      return b;
+    }));
+    const on = mounted.stabs.querySelector('.on');
+    if(on) on.scrollIntoView({ block:'nearest', inline:'nearest' });
+  }
   function select(tg){
     EDITOR.setTarget(tg);
     PANES.setTarget(tg);
+    spriteTabs();
     tabLabels();
     if(tab !== 'code') showTab(tab);
   }
@@ -313,6 +329,7 @@
     const first = P.targets[1] || P.targets[0];
     EDITOR.load(P, first, readOnly);
     PANES.load(P, first, readOnly);
+    spriteTabs();
     tabLabels();
     showTab('code');
     STAGE.renderMonitors();
@@ -323,7 +340,7 @@
   function changed(kind){
     if(readOnly) return;
     if(kind === 'monitors') STAGE.renderMonitors();
-    if(kind === 'sprite' || kind === 'costume') PANES.renderSprites();
+    if(kind === 'sprite' || kind === 'costume'){ PANES.renderSprites(); spriteTabs(); }
     if(kind === 'vars') STAGE.renderMonitors();
     SAVE.mark();
   }

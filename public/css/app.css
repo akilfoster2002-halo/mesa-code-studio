@@ -167,6 +167,17 @@ header.top h1{font-size:17px;margin:0 0 0 8px;font-weight:600}
 .pbtn:hover{background:#eef1fb}
 
 /* workspace */
+/* sprite tabs above the script area */
+.ws-col{display:flex;flex-direction:column;min-width:0;min-height:0}
+.ws-col>#ws{flex:1;min-height:0}
+.sprite-tabs{display:flex;gap:4px;padding:6px 8px 0;overflow-x:auto;flex:none;background:var(--code-panel,#1a1838);border-bottom:1px solid #34326a;scrollbar-width:thin}
+.stab{display:flex;align-items:center;gap:6px;flex:none;max-width:160px;padding:5px 12px 6px 6px;border:1px solid #4b4885;border-bottom:0;border-radius:8px 8px 0 0;background:#2a2757;color:#b9b5e0;font:600 13px var(--mono,monospace);cursor:pointer}
+.stab img{width:22px;height:22px;object-fit:contain;flex:none}
+.stab span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.stab:hover{background:#34306a;color:#fff}
+.stab.on{background:var(--code-bg,#15142b);color:#fff;border-color:#7b6cc4;box-shadow:inset 0 3px 0 #9d8cff}
+.stab.st{margin-left:auto}
+.stab:focus-visible{outline:3px solid #9db4ff;outline-offset:-2px}
 #ws{position:relative;overflow:auto;background-color:var(--ws);
   background-image:radial-gradient(circle,#dfe3ee 1px,transparent 1.2px);background-size:24px 24px}
 #ws.panning{cursor:grabbing}
