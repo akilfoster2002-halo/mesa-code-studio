@@ -167,9 +167,32 @@ window.PANES = (function(){
       readOnly ? null : h('button', { class:'btn', type:'button', onclick:() => edit(c, 'flip') }, '⇋ ' + t('Flip'))));
     const view = h('div', { class:'checker' }, h('img', { class:'big', src:MEDIA.url(c.asset), alt:c.name }));
     main.append(view);
+    if(!tg.isStage) main.append(facingRow(tg, c, view));
     main.append(h('div', { class:'tip' }, '💡 ' + t('PNG with a see-through background works best.') + ' ' + t('Drop pictures here') + '.'));
     if(c.opaque && !readOnly) main.append(h('div', { class:'tip warn' }, '⚠️ ' + t('This picture has a solid background.') + ' → 🪄'));
     box.append(side, main);
+  }
+  /* which way the picture points, so "point in direction 90" means "go right" even for art drawn facing up */
+  function facingRow(tg, c, view){
+    const f = () => c.facing == null ? 90 : c.facing;
+    const arrow = h('div', { class:'face-arrow' });
+    view.append(arrow);
+    const show = () => { arrow.style.transform = 'translateY(-50%) rotate(' + (f() - 90) + 'deg)'; };
+    const set = v => {
+      v = ((Math.round(Number(v)) + 180) % 360 + 360) % 360 - 180; if(v === -180) v = 180;
+      if(isNaN(v)) return;
+      c.facing = v; num.value = v; show();
+      row.querySelectorAll('.face-b').forEach(b => b.classList.toggle('on', Number(b.dataset.v) === v));
+      VM.rt.dirty = true; VM.rt.redraw = true; onChange('costume');
+    };
+    const num = h('input', { class:'inp sm', value:f(), style:{ width:'56px' }, disabled:readOnly, inputmode:'numeric', onchange:e => set(e.target.value) });
+    const btn = (v, icon, en) => h('button', { type:'button', class:'face-b' + (f() === v ? ' on' : ''), 'data-v':v, title:t(en), disabled:readOnly, onclick:() => set(v) }, icon);
+    const row = h('div', { class:'face-row' },
+      h('span', { class:'face-lbl' }, '🧭 ' + t('Front of picture')),
+      btn(0, '↑', 'Up'), btn(90, '→', 'Right'), btn(180, '↓', 'Down'), btn(-90, '←', 'Left'), num,
+      h('span', { class:'face-tip' }, t('Point the red arrow where your picture faces.')));
+    show();
+    return row;
   }
   function uniqueIn(list, name, self){
     const names = new Set(list.filter(x => x !== self).map(x => x.name));
@@ -206,7 +229,7 @@ window.PANES = (function(){
       const out = what === 'bg' ? await MEDIA.removeBackground(c.asset) : await MEDIA.flip(c.asset);
       document.dispatchEvent(new CustomEvent('cs-did', { detail:what }));
       c.asset = out.asset; delete c.opaque;
-      if(what === 'flip') c.cx = c.w - c.cx;
+      if(what === 'flip'){ c.cx = c.w - c.cx; if(c.facing != null) c.facing = c.facing === 0 || c.facing === 180 ? c.facing : -c.facing; }
       VM.rt.dirty = true; renderCostumes(); renderSprites(); onChange('costume');
       UI.toast('✓');
     } catch(e){ UI.toast(e.message, 'bad'); }

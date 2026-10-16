@@ -31,8 +31,10 @@ window.RENDER = (function(){
     const k = (s.isStage ? 1 : s.size / 100) / (c.res || 1);
     let rot = 0, sx = 1;
     if(!s.isStage){
-      if(s.rotationStyle === 'all around') rot = (s.direction - 90) * Math.PI / 180;
-      else if(s.rotationStyle === 'left-right' && s.direction < 0) sx = -1;
+      // facing: which way the picture itself points (90 = right, the default)
+      const f = c.facing == null ? 90 : c.facing;
+      if(s.rotationStyle === 'all around') rot = (s.direction - f) * Math.PI / 180;
+      else if(s.rotationStyle === 'left-right' && (s.direction < 0) !== (Math.sin(f * Math.PI / 180) < -0.01)) sx = -1;
     }
     const tx = s.isStage ? W/2 : W/2 + s.x, ty = s.isStage ? H/2 : H/2 - s.y;
     return { c, k, rot, sx, tx, ty };
