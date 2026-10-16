@@ -96,6 +96,8 @@ window.BLOCKS = (function(){
   gap('looks');
   B('looks_changesizeby','looks','stack','change size by [CHANGE]',{ CHANGE:num(10) },SP);
   B('looks_setsizeto','looks','stack','set size to [SIZE] %',{ SIZE:num(100) },SP);
+  B('looks_flipx','looks','stack','flip x ↔',{},SP);
+  B('looks_flipy','looks','stack','flip y ↕',{},SP);
   gap('looks');
   B('looks_changeeffectby','looks','stack','change [EFFECT] effect by [CHANGE]',{ EFFECT:menu('effect','color'), CHANGE:num(25) });
   B('looks_seteffectto','looks','stack','set [EFFECT] effect to [VALUE]',{ EFFECT:menu('effect','color'), VALUE:num(0) });
@@ -321,6 +323,8 @@ window.BLOCKS = (function(){
     looks_sayforsecs:'Shows a speech bubble, then hides it.',
     looks_switchcostumeto:'Changes the picture. Costumes are in the Costumes tab.',
     looks_nextcostume:'Goes to the next picture. Do it in a loop to animate.',
+    looks_flipx:'Mirrors the sprite left to right. Use it again to flip back.',
+    looks_flipy:'Turns the sprite upside down. Use it again to flip back.',
     looks_seteffectto:'ghost 100 is invisible; color shifts the colours.',
     control_forever:'Runs the blocks inside again and again, forever.',
     control_repeat:'Runs the blocks inside a number of times.',

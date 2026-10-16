@@ -36,14 +36,16 @@ window.RENDER = (function(){
       if(s.rotationStyle === 'all around') rot = (s.direction - f) * Math.PI / 180;
       else if(s.rotationStyle === 'left-right' && (s.direction < 0) !== (Math.sin(f * Math.PI / 180) < -0.01)) sx = -1;
     }
+    let sy = 1;
+    if(!s.isStage){ if(s.flipX) sx = -sx; if(s.flipY) sy = -1; }
     const tx = s.isStage ? W/2 : W/2 + s.x, ty = s.isStage ? H/2 : H/2 - s.y;
-    return { c, k, rot, sx, tx, ty };
+    return { c, k, rot, sx, sy, tx, ty };
   }
   function place(gc, s, ox=0, oy=0, scale=1){
     const m = matrix(s);
     gc.translate((m.tx - ox) * scale, (m.ty - oy) * scale);
     gc.rotate(m.rot);
-    gc.scale(m.sx * m.k * scale, m.k * scale);
+    gc.scale(m.sx * m.k * scale, m.sy * m.k * scale);
     gc.translate(-m.c.cx, -m.c.cy);
     return m;
   }
@@ -53,7 +55,7 @@ window.RENDER = (function(){
     const cos = Math.cos(m.rot), sin = Math.sin(m.rot);
     let l = Infinity, r = -Infinity, t = Infinity, b = -Infinity;
     for(const [px, py] of [[0,0],[c.w,0],[0,c.h],[c.w,c.h]]){
-      const x = (px - c.cx) * m.k * m.sx, y = (py - c.cy) * m.k;
+      const x = (px - c.cx) * m.k * m.sx, y = (py - c.cy) * m.k * m.sy;
       const X = m.tx + x*cos - y*sin, Y = m.ty + x*sin + y*cos;
       l = Math.min(l, X); r = Math.max(r, X); t = Math.min(t, Y); b = Math.max(b, Y);
     }

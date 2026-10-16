@@ -666,6 +666,8 @@ window.VM = (function(){
       case 'looks_setsizeto': if(!st) setSize(s, N(b,'SIZE',th)); return;
       case 'looks_changeeffectby': setEffect(s, b.args.EFFECT, (s._fx[b.args.EFFECT] || 0) + N(b,'CHANGE',th)); return;
       case 'looks_seteffectto': setEffect(s, b.args.EFFECT, N(b,'VALUE',th)); return;
+      case 'looks_flipx': if(!st){ s.flipX = !s.flipX; rt.redraw = true; rt.dirty = true; } return;
+      case 'looks_flipy': if(!st){ s.flipY = !s.flipY; rt.redraw = true; rt.dirty = true; } return;
       case 'looks_cleargraphiceffects': s._fx = {}; rt.redraw = true; rt.dirty = true; return;
       case 'looks_show': if(!st){ s.visible = true; rt.redraw = true; rt.dirty = true; } return;
       case 'looks_hide': if(!st){ s.visible = false; rt.redraw = true; rt.dirty = true; } return;
