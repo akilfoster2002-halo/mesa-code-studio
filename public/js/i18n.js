@@ -5,7 +5,7 @@ window.I18N = (function(){
   const ES = {
     'Block Helper':'Ayudante de bloques', 'Helper':'Ayudante', 'Questions this week':'Preguntas esta semana', 'No recipe yet':'Sin receta aún',
     'Still stuck':'Siguen atorados', 'Games described':'Juegos descritos', 'Questions with no recipe yet':'Preguntas sin receta aún',
-    'These are the recipes to write next.':'Estas son las recetas que hay que escribir.', 'Question':'Pregunta', 'When':'Cuándo',
+    'These are the recipes to write next.':'Estas son las recetas que hay que escribir.', 'AI answered':'Respuesta de la IA', 'AI':'IA', 'Question':'Pregunta', 'When':'Cuándo',
     'Recipes students were stuck on':'Recetas en las que se atoraron', 'Most used recipes':'Recetas más usadas',
     'What is in their games':'Qué hay en sus juegos', 'Inspired by':'Inspirados en', 'Game summaries':'Resúmenes de los juegos',
     'Project':'Proyecto', 'About the game':'De qué trata', 'Wants to add next':'Quiere agregar', 'Everything asked':'Todo lo preguntado',

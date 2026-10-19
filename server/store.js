@@ -273,7 +273,8 @@ class PgStore {
         kind     TEXT,
         created  TIMESTAMPTZ DEFAULT now()
       );
-      CREATE INDEX IF NOT EXISTS cs_helper_created ON cs_helper(created);`);
+      CREATE INDEX IF NOT EXISTS cs_helper_created ON cs_helper(created);
+      ALTER TABLE cs_helper ADD COLUMN IF NOT EXISTS answer TEXT;`);
     // projects saved before the dashboard counted blocks
     for(const r of (await this.q('SELECT id, data FROM cs_projects WHERE stats IS NULL')).rows)
       await this.q('UPDATE cs_projects SET stats=$2 WHERE id=$1', [r.id, projectStats(r.data)]);
@@ -379,8 +380,8 @@ class PgStore {
     return (await this.q('SELECT 1 FROM cs_assets WHERE id=$1', [id])).rowCount > 0;
   }
   async logHelper(e){
-    await this.q('INSERT INTO cs_helper (username,project,question,recipe,kind) VALUES ($1,$2,$3,$4,$5)',
-      [e.username, e.project, e.question, e.recipe, e.kind]);
+    await this.q('INSERT INTO cs_helper (username,project,question,recipe,kind,answer) VALUES ($1,$2,$3,$4,$5,$6)',
+      [e.username, e.project, e.question, e.recipe, e.kind, e.answer || null]);
   }
   async helperLog(limit){
     const r = await this.q('SELECT * FROM cs_helper ORDER BY created DESC LIMIT $1', [limit]);

@@ -6,6 +6,8 @@ const fs = require('fs'), os = require('os'), path = require('path');
 
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'cs-test-'));
 process.env.DATA_DIR = dir;
+process.env.OPENROUTER_KEY_FILE = path.join(dir, 'no-key');   // never the real key in private/
+delete process.env.OPENROUTER_API_KEY;
 delete process.env.DATABASE_URL;
 const { server, store, ready } = require('../server/index.js');
 const auth = require('../server/auth');
@@ -174,4 +176,41 @@ test('block helper: questions are kept for the teacher, with the game summaries'
   assert.deepStrictEqual(g.about, { story:'A dino that jumps over cactuses', has:['jump', 'obstacles'], like:['dino'], next:'make it duck' });
   assert.strictEqual(g.name, 'Ana');
   assert.strictEqual(g.projectName, 'Dino');
+});
+
+test('block helper AI: off without a key, answers and logs with one, never sends who asked', async () => {
+  await store.upsertUser({ username:'cy', name:'Cy', period:'2', role:'student', ...auth.makeHash('fox77') });
+  const ana = await login('ana', 'tiger42'), cy = await login('cy', 'fox77');
+  const about = { story:'A cat that dodges dogs', has:['enemies'], next:'make the dogs get faster', player:'s1' };
+  const p = await (await call(ana.cookie, '/projects', { method:'POST', body:JSON.stringify({ name:'Cat', data:{ v:1, targets:[{ id:'st', isStage:true, name:'Stage' }, { id:'s1', name:'Kitty' }, { id:'s2', name:'Dog' }], about } }) })).json();
+  const ask = (c, q) => call(c, '/helper/ask', { method:'POST', body:JSON.stringify({ q, project:p.id, lang:'en' }) });
+
+  delete process.env.OPENROUTER_API_KEY;
+  assert.strictEqual((await ask(ana.cookie, 'how do i make a shop')).status, 503);
+
+  process.env.OPENROUTER_API_KEY = 'test-key';
+  const real = global.fetch;
+  let sent = null;
+  global.fetch = async (url, opts) => {
+    if(!String(url).startsWith('https://openrouter.ai/')) return real(url, opts);
+    sent = JSON.parse(opts.body);
+    return new Response(JSON.stringify({ choices:[{ message:{ content:'Use `change x by (10)` in Kitty.' } }] }), { status:200 });
+  };
+  try {
+    const r = await ask(ana.cookie, 'how do i make a shop');
+    assert.strictEqual(r.status, 200);
+    assert.match((await r.json()).answer, /change x by/);
+    const prompt = JSON.stringify(sent.messages);
+    assert.match(prompt, /Kitty, Dog/);
+    assert.match(prompt, /A cat that dodges dogs/);
+    assert.match(prompt, /move \( \) steps/, 'the real block list is in the prompt');
+    assert.doesNotMatch(prompt, /\bAna\b|"ana"/, 'no name or username leaves the server');
+    assert.strictEqual((await ask(cy.cookie, 'hi there')).status, 404, 'only your own project');
+  } finally { global.fetch = real; delete process.env.OPENROUTER_API_KEY; }
+
+  const t = await login('teach', 'apple-pear');
+  const got = await (await call(t.cookie, '/admin/helper')).json();
+  const e = got.log.find(x => x.question === 'how do i make a shop' && x.answer);
+  assert.ok(e, 'the teacher sees the question and the AI answer');
+  assert.strictEqual(e.recipe, null, 'still counts as "no recipe yet"');
 });

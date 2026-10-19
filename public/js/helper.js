@@ -3,9 +3,8 @@
    (a round button that opens a chat window above it) that answers
    "how do I…?" questions with real Code Studio blocks.
 
-   No AI and nothing leaves the school's server: answers are the recipes
-   in recipes.js. The helper's job is to pick the right ones and make them
-   about THIS student's game:
+   Answers are the recipes in recipes.js. The helper's job is to pick the
+   right ones and make them about THIS student's game:
      • Before the first question, the student fills in "Tell me about your
        game" (required). It is kept with the project (project.about), so
        each game has its own, and the teacher's dashboard can read it.
@@ -17,6 +16,10 @@
        tell which sprite does a job.
      • Each answer is a hint first; "Show me the blocks" draws them; then
        why it works. Students drag the blocks in themselves.
+
+   A question no recipe answers goes to an AI on the server (server/ai.js),
+   if the server has a key; its answer is marked as a guess. Without a key,
+   or when the AI is busy, the student gets the old "ask your teacher".
 
    Every question is sent to the server's log, so the dashboard can show
    which questions had no recipe yet (and which recipes left students stuck).
@@ -162,13 +165,14 @@ window.HELPER = (function(){
 
   function ask(text, opts={}){
     if(!chat) renderChat();
-    said(opts.fromForm ? L('I want to add: ', 'Quiero agregar: ') + text : text);
+    if(!opts.quiet) said(opts.fromForm ? L('I want to add: ', 'Quiero agregar: ') + text : text);
     if(!opts.fromForm && words(text).every(w => HELLO.has(w))){
       bot(h('div', {}, h('p', {}, L('Hi! 👋 Tell me what you want your game to do, like “make my player jump”.', '¡Hola! 👋 Dime qué quieres que haga tu juego, como “hacer que mi jugador salte”.')), suggestions()));
       return;
     }
     const found = match(text);
     if(!found.length){
+      if(!opts.noAI && projectId && (me().role === 'student' || me().role === 'teacher')) return askAI(text, opts);
       log(text, null, 'ask');
       bot(h('div', {},
         h('p', {}, opts.fromForm ? L('I don’t have a recipe for that yet. I saved it so your teacher can see it and help you!', 'Aún no tengo una receta para eso. ¡La guardé para que tu maestro la vea y te ayude!')
@@ -181,6 +185,28 @@ window.HELPER = (function(){
     answer(found[0]);
     if(found.length > 1) bot(h('div', {}, h('p', {}, L('Or did you mean:', 'O tal vez buscabas:')),
       h('div', { class:'hsugg' }, found.slice(1).map(r => h('button', { type:'button', class:'hq-btn', onclick:() => pick(r) }, T2(r.title))))));
+  }
+  /* no recipe: the AI's best guess, as text (it cannot draw blocks) */
+  async function askAI(text, opts){
+    const wait = bot(h('p', { class:'hthink' }, '🤔 ' + L('No recipe for that yet. Let me think…', 'Aún no hay receta para eso. Déjame pensar…')));
+    let r = null;
+    try {
+      r = await fetch('/api/helper/ask', { method:'POST', credentials:'same-origin', headers:{ 'Content-Type':'application/json' },
+        body:JSON.stringify({ q:text, project:projectId, lang:I18N.lang }) });
+    } catch(e){}
+    const got = r && r.ok ? await r.json().catch(() => null) : null;
+    wait.remove();
+    if(!got || !got.answer) return ask(text, { ...opts, noAI:true, quiet:true });
+    bot(h('div', { class:'hai' },
+      h('div', { class:'htitle' }, '🤖 ' + L('My best guess', 'Mi mejor idea')),
+      aiText(got.answer),
+      h('p', { class:'muted' }, L('This answer is from an AI, so it can be wrong. If it does not work, ask your teacher — I saved your question for them.',
+        'Esta respuesta es de una IA y puede estar mal. Si no funciona, pregúntale a tu maestro — le guardé tu pregunta.'))));
+  }
+  /* the AI's text: one paragraph per line, `block words` as chips */
+  function aiText(s){
+    return h('div', { class:'haitext' }, String(s).split(/\n+/).map(line => line.trim()).filter(Boolean).map(line =>
+      h('p', {}, line.replace(/\*\*/g, '').split(/(`[^`]+`)/).map(part => /^`[^`]+`$/.test(part) ? h('code', { class:'hblk' }, part.slice(1, -1)) : part))));
   }
   function pick(r){
     said(fill(T2(r.ask)));

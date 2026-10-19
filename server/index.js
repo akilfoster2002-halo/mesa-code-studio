@@ -7,6 +7,7 @@
      GET /api/projects/:id/versions[/:vid]   POST /api/projects/:id/restore/:vid
      POST /api/assets (raw bytes)   GET /api/assets/:id
      POST /api/helper/log           a Block Helper question (or which recipe helped)
+     POST /api/helper/ask           a question no recipe answered, for the AI (server/ai.js)
      teacher only: GET /api/admin/overview, /api/admin/students/:u/projects,
                    GET /api/admin/helper (questions asked, game summaries),
                    POST /api/admin/users (add a student or teacher),
@@ -27,6 +28,7 @@ const crypto = require('crypto');
 const auth = require('./auth');
 const { open, projectStats } = require('./store');
 const names = require('./names');
+const ai = require('./ai');
 
 const PORT = Number(process.env.PORT) || 8790;
 const PUBLIC = path.join(__dirname, '..', 'public');
@@ -82,6 +84,21 @@ function helperBusy(username){
   return ++t.n > 200;
 }
 const HELPER_KINDS = ['ask', 'pick', 'stuck', 'worked'];
+
+/* AI answers are few on the free tier (about 50 a day for the whole
+   account), so one student gets 10 an hour and the class 50 a day */
+const aiHits = new Map();
+let aiDay = { day:'', n:0 };
+function aiBusy(username){
+  const day = new Date().toISOString().slice(0, 10);
+  if(aiDay.day !== day) aiDay = { day, n:0 };
+  if(aiDay.n >= (Number(process.env.AI_DAILY_LIMIT) || 50)) return 'day';
+  const t = aiHits.get(username);
+  if(t && Date.now() - t.start < 60*60*1000 && t.n >= 10) return 'hour';
+  if(!t || Date.now() - t.start >= 60*60*1000) aiHits.set(username, { start:Date.now(), n:1 }); else t.n++;
+  aiDay.n++;
+  return null;
+}
 
 /* --------------------------------------------------------------- static */
 const MIME = { '.html':'text/html; charset=utf-8', '.js':'text/javascript; charset=utf-8', '.css':'text/css; charset=utf-8',
@@ -165,6 +182,33 @@ async function api(req, res, url){
     if(helperBusy(user.username)) return send(res, 429, { error:'wait' });
     await store.logHelper({ username:user.username, project, question, recipe, kind: HELPER_KINDS.includes(b.kind) ? b.kind : 'ask' });
     return send(res, 200, { ok:true });
+  }
+  /* no recipe matched: ask the AI. The question is logged here (with the
+     answer) instead of through /helper/log, so the teacher sees both. */
+  if(p[0] === 'helper' && p[1] === 'ask' && m === 'POST'){
+    if(!ai.enabled()) return send(res, 503, { error:'off' });
+    const b = await readJSON(req, 4000);
+    const question = String(b.q == null ? '' : b.q).replace(/[\u0000-\u001f]/g, ' ').trim().slice(0, 300);
+    if(!question) return send(res, 400, { error:'empty' });
+    const pr = /^[\w-]{1,40}$/.test(b.project || '') ? await store.getProject(b.project) : null;
+    if(!pr || (pr.owner !== user.username && !teacher)) return send(res, 404, { error:'none' });
+    const busy = aiBusy(user.username);
+    if(busy) return send(res, 429, { error:busy });
+    const data = pr.data || {};
+    const sprites = (data.targets || []).filter(t => !t.isStage).map(t => cleanName(t.name)).slice(0, 30);
+    const a = data.about && typeof data.about === 'object' ? data.about : {};
+    const player = (data.targets || []).find(t => t.id === a.player);
+    const text = v => String(v == null ? '' : v).replace(/[\u0000-\u001f]/g, ' ').trim().slice(0, 200);
+    const about = { story:text(a.story), next:text(a.next), has:Array.isArray(a.has) ? a.has.filter(x => typeof x === 'string').slice(0, 20) : [],
+      playerName: player ? cleanName(player.name) : '' };
+    let answer;
+    try { answer = (await ai.ask(question, { about, sprites }, b.lang === 'es' ? 'es' : 'en')).slice(0, 2000); }
+    catch(e){
+      console.error('helper ai:', e.message);
+      return send(res, 502, { error:'ai' });
+    }
+    await store.logHelper({ username:user.username, project:pr.id, question, recipe:null, kind:'ask', answer });
+    return send(res, 200, { answer });
   }
 
   if(p[0] === 'assets' && m === 'POST'){

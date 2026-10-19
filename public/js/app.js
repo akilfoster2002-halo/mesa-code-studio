@@ -610,8 +610,8 @@
         h('section', { class:'hcard' }, h('h2', {}, '❓ ' + t('Questions with no recipe yet')),
           h('p', { class:'muted' }, t('These are the recipes to write next.')),
           missing.length ? h('div', { class:'twrap' }, h('table', { class:'ttable' },
-            h('thead', {}, h('tr', {}, h('th', {}, t('Question')), h('th', {}, t('Student')), h('th', {}, t('When')), h('th', {}))),
-            h('tbody', {}, missing.slice(0, 300).map(e => h('tr', {}, h('td', {}, '“' + e.question + '”'), who(e), h('td', {}, UI.ago(e.created)), h('td', {}, proj(e.project)))))))
+            h('thead', {}, h('tr', {}, h('th', {}, t('Question')), h('th', {}, '🤖 ' + t('AI answered')), h('th', {}, t('Student')), h('th', {}, t('When')), h('th', {}))),
+            h('tbody', {}, missing.slice(0, 300).map(e => h('tr', {}, h('td', {}, '“' + e.question + '”'), h('td', {}, e.answer ? h('div', { class:'hans' }, e.answer) : '—'), who(e), h('td', {}, UI.ago(e.created)), h('td', {}, proj(e.project)))))))
             : h('p', { class:'muted' }, '—')),
         h('div', { class:'hcols' },
           h('section', { class:'hcard' }, h('h2', {}, '😕 ' + t('Recipes students were stuck on')), bars(stuck, title)),
@@ -628,7 +628,7 @@
         h('section', { class:'hcard' }, h('h2', {}, '🗒 ' + t('Everything asked')),
           asked.length ? h('div', { class:'twrap' }, h('table', { class:'ttable' },
             h('thead', {}, h('tr', {}, h('th', {}, t('Question')), h('th', {}, t('Answered with')), h('th', {}, t('Student')), h('th', {}, t('When')))),
-            h('tbody', {}, asked.slice(0, 300).map(e => h('tr', {}, h('td', {}, '“' + e.question + '”'), h('td', {}, e.recipe ? title(e.recipe) : '—'), who(e), h('td', {}, UI.ago(e.created)))))))
+            h('tbody', {}, asked.slice(0, 300).map(e => h('tr', {}, h('td', {}, '“' + e.question + '”'), h('td', {}, e.recipe ? title(e.recipe) : e.answer ? '🤖 ' + t('AI') : '—'), who(e), h('td', {}, UI.ago(e.created)))))))
             : h('p', { class:'muted' }, '—')));
     }
     draw();
