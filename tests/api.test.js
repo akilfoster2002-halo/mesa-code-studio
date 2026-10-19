@@ -6,8 +6,8 @@ const fs = require('fs'), os = require('os'), path = require('path');
 
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'cs-test-'));
 process.env.DATA_DIR = dir;
-process.env.OPENROUTER_KEY_FILE = path.join(dir, 'no-key');   // never the real key in private/
-delete process.env.OPENROUTER_API_KEY;
+process.env.AI_KEY_DIR = dir;              // never the real keys in private/
+delete process.env.OPENROUTER_API_KEY; delete process.env.GROQ_API_KEY;
 delete process.env.DATABASE_URL;
 const { server, store, ready } = require('../server/index.js');
 const auth = require('../server/auth');
@@ -213,4 +213,35 @@ test('block helper AI: off without a key, answers and logs with one, never sends
   const e = got.log.find(x => x.question === 'how do i make a shop' && x.answer);
   assert.ok(e, 'the teacher sees the question and the AI answer');
   assert.strictEqual(e.recipe, null, 'still counts as "no recipe yet"');
+});
+
+test('block helper AI: Groq first, OpenRouter when Groq is out, and OpenRouter stops once its day is used up', async () => {
+  const ana = await login('ana', 'tiger42');
+  const p = await (await call(ana.cookie, '/projects', { method:'POST', body:JSON.stringify({ name:'Order', data:{ v:1, targets:[], about:{ story:'x', has:['jump'], next:'y' } } }) })).json();
+  const ask = q => call(ana.cookie, '/helper/ask', { method:'POST', body:JSON.stringify({ q, project:p.id }) });
+  const real = global.fetch;
+  let tried = [], groq = 'ok', router = 'ok';
+  const reply = text => new Response(JSON.stringify({ choices:[{ message:{ content:text } }] }), { status:200 });
+  global.fetch = async (url, opts) => {
+    const host = String(url).startsWith('https://api.groq.com/') ? 'groq' : String(url).startsWith('https://openrouter.ai/') ? 'openrouter' : null;
+    if(!host) return real(url, opts);
+    tried.push(host + ':' + JSON.parse(opts.body).model);
+    const state = host === 'groq' ? groq : router;
+    if(state === 'busy') return new Response('{"error":{"message":"Rate limit reached"}}', { status:429 });
+    if(state === 'day') return new Response('{"error":{"message":"Rate limit exceeded: free-models-per-day"}}', { status:429 });
+    return reply('from ' + host);
+  };
+  process.env.GROQ_API_KEY = 'g'; process.env.OPENROUTER_API_KEY = 'o';
+  try {
+    assert.strictEqual((await (await ask('q1')).json()).answer, 'from groq');
+    assert.deepStrictEqual(tried, ['groq:openai/gpt-oss-120b']);
+
+    tried = []; groq = 'busy';
+    assert.strictEqual((await (await ask('q2')).json()).answer, 'from openrouter');
+    assert.strictEqual(tried.filter(t => t.startsWith('groq')).length, 3, 'every Groq model is tried first');
+
+    tried = []; router = 'day';
+    assert.strictEqual((await ask('q3')).status, 502);
+    assert.strictEqual(tried.filter(t => t.startsWith('openrouter')).length, 1, 'no point asking other OpenRouter models');
+  } finally { global.fetch = real; delete process.env.GROQ_API_KEY; delete process.env.OPENROUTER_API_KEY; }
 });

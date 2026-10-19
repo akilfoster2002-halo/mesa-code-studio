@@ -206,7 +206,7 @@ window.HELPER = (function(){
   /* the AI's text: one paragraph per line, `block words` as chips */
   function aiText(s){
     return h('div', { class:'haitext' }, String(s).split(/\n+/).map(line => line.trim()).filter(Boolean).map(line =>
-      h('p', {}, line.replace(/\*\*/g, '').split(/(`[^`]+`)/).map(part => /^`[^`]+`$/.test(part) ? h('code', { class:'hblk' }, part.slice(1, -1)) : part))));
+      h('p', {}, line.replace(/\*\*?([^*]+)\*\*?/g, '$1').split(/(`[^`]+`)/).map(part => /^`[^`]+`$/.test(part) ? h('code', { class:'hblk' }, part.slice(1, -1)) : part))));
   }
   function pick(r){
     said(fill(T2(r.ask)));

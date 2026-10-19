@@ -85,14 +85,14 @@ function helperBusy(username){
 }
 const HELPER_KINDS = ['ask', 'pick', 'stuck', 'worked'];
 
-/* AI answers are few on the free tier (about 50 a day for the whole
-   account), so one student gets 10 an hour and the class 50 a day */
+/* AI answers are free but limited (see server/ai.js), so one student gets
+   10 an hour and the whole class 300 a day (AI_DAILY_LIMIT) */
 const aiHits = new Map();
 let aiDay = { day:'', n:0 };
 function aiBusy(username){
   const day = new Date().toISOString().slice(0, 10);
   if(aiDay.day !== day) aiDay = { day, n:0 };
-  if(aiDay.n >= (Number(process.env.AI_DAILY_LIMIT) || 50)) return 'day';
+  if(aiDay.n >= (Number(process.env.AI_DAILY_LIMIT) || 300)) return 'day';
   const t = aiHits.get(username);
   if(t && Date.now() - t.start < 60*60*1000 && t.n >= 10) return 'hour';
   if(!t || Date.now() - t.start >= 60*60*1000) aiHits.set(username, { start:Date.now(), n:1 }); else t.n++;
