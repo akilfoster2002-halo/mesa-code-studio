@@ -377,7 +377,7 @@ body.full-stage .stage-bar{width:min(100vw - 20px,(100vh - 70px) * 4 / 3)}
 .stage-col{width:96px;flex:none;background:#fff;border:1px solid var(--line);border-radius:10px;padding:8px;display:flex;flex-direction:column;gap:8px;align-items:stretch}
 .stage-tile img{width:72px;height:54px;object-fit:cover;border-radius:4px}
 .stage-tile small{font-size:10.5px;color:var(--muted)}
-.add-col{display:flex;gap:6px;justify-content:center}
+.add-col{display:flex;gap:6px;justify-content:center;flex-wrap:wrap}
 
 /* costumes and sounds tabs */
 .asset-tab{flex:1;min-height:0;display:flex;background:#fff;border:1px solid var(--line);border-radius:0 10px 10px 10px;overflow:hidden}
@@ -535,3 +535,30 @@ body.full-stage .hlaunch,body.full-stage .helper{display:none}
 .hwhy{background:#fff8e1;border-radius:8px;padding:8px 10px}
 .hask{display:flex;gap:6px;padding:10px;border-top:1px solid var(--line);flex:none;background:#fff}
 .hask .inp{flex:1}
+
+/* --------------------------------------------------------------- paint */
+.paint-back{position:fixed;inset:0;z-index:1400;background:rgba(30,30,60,.45);display:grid;place-items:center;padding:12px}
+.paint{background:#fff;border-radius:16px;width:min(1100px,100%);height:min(820px,100%);display:flex;flex-direction:column;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.3)}
+.paint-head{display:flex;align-items:center;gap:8px;padding:10px 14px;border-bottom:1px solid var(--line);font-size:16px}
+.paint-bar{display:flex;align-items:center;gap:6px;flex-wrap:wrap;padding:8px 14px;border-bottom:1px solid var(--line);background:var(--panel2)}
+.paint-bar .btn.on{background:#e3e8ff;border-color:var(--brand)}
+.paint-colors{display:flex;gap:5px;flex-wrap:wrap;align-items:center}
+.paint-color{width:26px;height:26px;border-radius:999px;border:2px solid #fff;box-shadow:0 0 0 1px #bbb;cursor:pointer;padding:0}
+.paint-color.on{box-shadow:0 0 0 3px var(--brand)}
+.paint-custom{width:32px;height:28px;border:0;padding:0;background:none;cursor:pointer}
+.paint-sep{width:1px;height:24px;background:var(--line);margin:0 4px}
+.paint-size{min-width:34px;justify-content:center}
+.paint-mid{flex:1;display:flex;min-height:0}
+.paint-tools{display:grid;grid-auto-rows:min-content;gap:4px;padding:10px 8px;border-right:1px solid var(--line);overflow:auto}
+.paint-tool{display:grid;justify-items:center;gap:1px;width:64px;padding:6px 2px;border:1px solid transparent;border-radius:10px;background:none;cursor:pointer;color:var(--ink)}
+.paint-tool:hover{background:var(--panel2)}
+.paint-tool.on{background:#e3e8ff;border-color:var(--brand)}
+.paint-tool .pi{font-size:20px;line-height:1.2;font-weight:700}
+.paint-tool small{font-size:11px}
+.paint-area{flex:1;display:grid;place-items:center;padding:14px;min-width:0;min-height:0;background:#eef1f8}
+.paint-frame{position:relative;height:100%;max-width:100%;max-height:100%;
+  background:repeating-conic-gradient(#e6e6e6 0 25%,#fff 0 50%) 0 0/20px 20px;box-shadow:0 2px 10px rgba(0,0,0,.15)}
+.paint-frame.bd{height:auto;width:100%}
+.paint-cv,.paint-over{position:absolute;inset:0;width:100%;height:100%}
+.paint-over{cursor:crosshair;touch-action:none}
+.paint-centre{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);color:rgba(91,91,214,.55);font-size:22px;pointer-events:none}

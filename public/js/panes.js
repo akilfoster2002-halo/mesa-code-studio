@@ -51,7 +51,8 @@ window.PANES = (function(){
     if(!readOnly){
       list.append(h('div', { class:'add-row' },
         h('button', { class:'btn add', type:'button', onclick:() => libraryPicker('sprite') }, '＋ ' + t('Choose a Sprite')),
-        h('button', { class:'btn add', type:'button', onclick:async () => uploadSprites(await UI.pickFiles('image/*,.svg')) }, '⤒ ' + t('Upload Sprite'))));
+        h('button', { class:'btn add', type:'button', onclick:async () => uploadSprites(await UI.pickFiles('image/*,.svg')) }, '⤒ ' + t('Upload Sprite')),
+        h('button', { class:'btn add', type:'button', onclick:paintSprite }, '🖌 ' + t('Paint'))));
     }
     // the stage, on the right
     const st = P.targets[0];
@@ -61,7 +62,8 @@ window.PANES = (function(){
       h('small', {}, t('Backdrops') + ' ' + st.costumes.length)));
     if(!readOnly) els.stageTile.append(h('div', { class:'add-col' },
       h('button', { class:'btn add sm', type:'button', title:t('Choose a Backdrop'), onclick:() => libraryPicker('backdrop') }, '＋'),
-      h('button', { class:'btn add sm', type:'button', title:t('Upload'), onclick:async () => { const f = await UI.pickFiles('image/*,.svg'); if(f.length){ onSelect(st); addCostumeFiles(f, st); } } }, '⤒')));
+      h('button', { class:'btn add sm', type:'button', title:t('Upload'), onclick:async () => { const f = await UI.pickFiles('image/*,.svg'); if(f.length){ onSelect(st); addCostumeFiles(f, st); } } }, '⤒'),
+      h('button', { class:'btn add sm', type:'button', title:t('Paint a backdrop'), onclick:() => { onSelect(st); paintCostume(st); } }, '🖌')));
   }
   function spriteMenu(e, s){
     if(readOnly) return;
@@ -153,7 +155,8 @@ window.PANES = (function(){
     });
     if(!readOnly) side.append(h('div', { class:'add-stack' },
       h('button', { class:'btn add', type:'button', onclick:async () => addCostumeFiles(await UI.pickFiles('image/*,.svg')) }, '⤒ ' + t('Upload')),
-      h('button', { class:'btn add', type:'button', onclick:() => libraryPicker(tg.isStage ? 'backdrop' : 'costume') }, '＋ ' + t('Library'))));
+      h('button', { class:'btn add', type:'button', onclick:() => libraryPicker(tg.isStage ? 'backdrop' : 'costume') }, '＋ ' + t('Library')),
+      h('button', { class:'btn add', type:'button', onclick:() => paintCostume(tg) }, '🖌 ' + t('Paint'))));
 
     const c = RENDER.costumeOf(tg);
     const main = h('div', { class:'asset-main' });
@@ -163,6 +166,7 @@ window.PANES = (function(){
           const v = e.target.value.trim(); if(!v) return;
           const old = c.name; c.name = uniqueIn(list, v, c);
           renameCostumeRefs(tg, old, c.name); renderCostumes(); onChange('costume'); } })),
+      readOnly ? null : h('button', { class:'btn', type:'button', onclick:() => paintEdit(tg, c) }, '✏️ ' + t('Edit')),
       readOnly ? null : h('button', { class:'btn', type:'button', title:t('Remove background'), onclick:() => edit(c, 'bg') }, '🪄 ' + t('Remove background')),
       readOnly ? null : h('button', { class:'btn', type:'button', onclick:() => edit(c, 'flip') }, '⇋ ' + t('Flip'))));
     const view = h('div', { class:'checker' }, h('img', { class:'big', src:MEDIA.url(c.asset), alt:c.name }));
@@ -232,6 +236,50 @@ window.PANES = (function(){
       if(what === 'flip'){ c.cx = c.w - c.cx; if(c.facing != null) c.facing = c.facing === 0 || c.facing === 180 ? c.facing : -c.facing; }
       VM.rt.dirty = true; renderCostumes(); renderSprites(); onChange('costume');
       UI.toast('✓');
+    } catch(e){ UI.toast(e.message, 'bad'); }
+  }
+
+  /* ------------------------------------------------------------ paint
+     A painted sprite or costume is drawn at twice stage size (res 2) so it
+     stays sharp; its centre is the middle of the paint canvas. */
+  async function painted(r, res){
+    UI.toast(t('Uploading…'));
+    const info = await MEDIA.canvasAsset(r.canvas);
+    return { asset:info.asset, w:info.w, h:info.h, cx:r.cx, cy:r.cy, res };
+  }
+  async function paintSprite(){
+    const r = await PAINT.open({ title:t('Paint a sprite') });
+    if(!r) return;
+    try {
+      const name = uniqueName(t('Sprite'));
+      const s = PROJECT.sprite(name, [{ id:PROJECT.uid(), name:t('costume') + '1', ...(await painted(r, 2)) }], { x:0, y:0 });
+      addSprite(s); UI.toast('✓ ' + name);
+      document.dispatchEvent(new CustomEvent('cs-did', { detail:'paint' }));
+    } catch(e){ UI.toast(e.message, 'bad'); }
+  }
+  async function paintCostume(tg){
+    const backdrop = tg.isStage;
+    const r = await PAINT.open({ backdrop, title:backdrop ? t('Paint a backdrop') : t('Paint a costume') });
+    if(!r) return;
+    try {
+      const c = { id:PROJECT.uid(), name:uniqueIn(tg.costumes, backdrop ? t('backdrop') + '1' : t('costume') + '1'), ...(await painted(r, 2)) };
+      tg.costumes.push(c); tg.currentCostume = tg.costumes.length - 1;
+      if(!tg.isStage) VM.setSize(tg, tg.size);
+      VM.rt.dirty = true;
+      if(target === tg) renderCostumes();
+      renderSprites(); EDITOR.renderPalette(); onChange('costume'); UI.toast('✓ ' + c.name);
+      document.dispatchEvent(new CustomEvent('cs-did', { detail:'paint' }));
+    } catch(e){ UI.toast(e.message, 'bad'); }
+  }
+  async function paintEdit(tg, c){
+    const img = await MEDIA.loadImage(c.asset);
+    if(!img){ UI.toast(t('Something went wrong loading this project.'), 'bad'); return; }
+    const r = await PAINT.open({ img, cx:c.cx, cy:c.cy, backdrop:tg.isStage, title:t('Edit') + ': ' + c.name });
+    if(!r) return;
+    try {
+      Object.assign(c, await painted(r, c.res || 1));
+      delete c.opaque;
+      VM.rt.dirty = true; renderCostumes(); renderSprites(); onChange('costume'); UI.toast('✓');
     } catch(e){ UI.toast(e.message, 'bad'); }
   }
 

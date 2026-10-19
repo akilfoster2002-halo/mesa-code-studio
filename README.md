@@ -21,6 +21,12 @@ student, auto-save, and history. This is the standard editor going forward.
   AVIF, SVG… PNG with a see-through background works best. Big pictures are shrunk to fit;
   a picture with a solid background gets a 🪄 **Remove background** button. Also ⇋ Flip and a
   built-in library.
+- **🖌 Paint**: draw a new sprite (under the sprite list), a new costume (Costumes tab), or a
+  backdrop (🖌 under the Stage), and **✏️ Edit** any costume. Brush, eraser, line, rectangle and
+  circle (outline or filled), paint bucket, text and a colour picker, 14 colours plus any colour,
+  4 sizes, undo/redo (also Ctrl/⌘-Z). Sprites are drawn on a see-through canvas at twice stage size
+  so they stay sharp; the ✛ in the middle is the costume's centre, and empty space round the
+  drawing is cut off. Editing a costume puts it back exactly where it was.
 - **Sounds**: ⤒ Upload MP3, WAV, OGG, M4A/AAC, FLAC, WebM, AIFF, or the sound out of an MP4/MOV
   video. MP3 is kept as is; everything else is saved as WAV so it plays on every computer.
   🎙 Record from the microphone, or pick from the library.

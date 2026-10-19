@@ -262,6 +262,6 @@ window.MEDIA = (function(){
     return c.toDataURL();
   }
 
-  return { audio, image, loadImage, loadAll, buffer, url, importImage, importSound, removeBackground, flip,
+  return { audio, image, loadImage, loadAll, buffer, url, importImage, importSound, removeBackground, flip, canvasAsset,
            record, libSound, isImage, isSound, baseName, thumb, toWav, set onLoad(f){ onLoad = f; } };
 })();
