@@ -29,6 +29,7 @@ window.EDITOR = (function(){
   const undo = new Map(), redo = new Map();
   let onChange = () => {};
   let eyedropper = null;
+  let viewing = false;     // drawing a picture of blocks (view), not the palette
 
   /* ------------------------------------------------------------ mount */
   function mount(opts){
@@ -519,7 +520,7 @@ window.EDITOR = (function(){
       l.dataset.key = key;
       lists[key] = { arr:b[which], owner:b, top:false };
       b[which].forEach((c, i) => { index[c.id] = { block:c, list:b[which], idx:i, parent:b }; l.append(blockEl(c, pal)); walkInputs(c); });
-    }
+    } else if(viewing) b[which].forEach(c => l.append(blockEl(c, pal)));
     m.append(l);
     return m;
   }
@@ -549,6 +550,14 @@ window.EDITOR = (function(){
       default:
         return h('span', { class:'f f-' + (t0 === 'num' ? 'num' : 'str'), 'data-slot':name, 'data-slot-type':t0, ...attrs }, String(v == null ? '' : v));
     }
+  }
+
+  /* a script drawn as a picture, in the editor's look, that cannot be
+     dragged or edited (the Block Helper's examples) */
+  function view(blocks){
+    viewing = true;
+    try { return h('div', { class:'script bview' }, h('div', { class:'list top' }, blocks.map(b => blockEl(b, true)))); }
+    finally { viewing = false; }
   }
 
   /* -------------------------------------------------------- workspace */
@@ -1085,6 +1094,6 @@ window.EDITOR = (function(){
   return {
     mount, load, setTarget, renderAll, renderPalette, renderWorkspace, updateGlow, doUndo, doRedo, renameSprite,
     takeEyedropper, get eyedropping(){ return !!eyedropper; }, get target(){ return target; }, makeBlockDialog,
-    get zoom(){ return zoom; }
+    get zoom(){ return zoom; }, view
   };
 })();

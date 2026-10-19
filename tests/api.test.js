@@ -19,7 +19,7 @@ test.before(async () => {
   await new Promise(r => server.listen(0, r));
   base = 'http://127.0.0.1:' + server.address().port;
 });
-test.after(() => { server.close(); fs.rmSync(dir, { recursive:true, force:true }); });
+test.after(() => { server.close(); store.flush(); fs.rmSync(dir, { recursive:true, force:true }); });
 
 async function login(u, p){
   const r = await fetch(base + '/api/login', { method:'POST', headers:{ 'Content-Type':'application/json' }, body:JSON.stringify({ username:u, password:p }) });
@@ -148,4 +148,30 @@ test('version history is thinned, never unbounded', () => {
   assert.strictEqual(vs.length, MAX_VERSIONS);
   assert.strictEqual(vs[0].id, '0', 'the first version stays');
   assert.strictEqual(vs[vs.length - 1].id, '199', 'the newest stays');
+});
+
+test('block helper: questions are kept for the teacher, with the game summaries', async () => {
+  const ana = await login('ana', 'tiger42');
+  const about = { story:'A dino that jumps over cactuses', has:['jump', 'obstacles', 'BAD ID', 7], like:['dino'], next:'make it duck', player:'x1' };
+  const p = await (await call(ana.cookie, '/projects', { method:'POST', body:JSON.stringify({ name:'Dino', data:{ v:1, targets:[], about } }) })).json();
+  assert.strictEqual((await call(ana.cookie, '/helper/log', { method:'POST', body:JSON.stringify({ q:'how do i make him duck', project:p.id }) })).status, 200);
+  await call(ana.cookie, '/helper/log', { method:'POST', body:JSON.stringify({ q:'jump', recipe:'jump', kind:'pick', project:p.id }) });
+  await call(ana.cookie, '/helper/log', { method:'POST', body:JSON.stringify({ recipe:'jump', kind:'<script>' }) });
+  assert.strictEqual((await call(ana.cookie, '/helper/log', { method:'POST', body:'{}' })).status, 400);
+  assert.strictEqual((await call(ana.cookie, '/admin/helper')).status, 403);
+  assert.strictEqual((await fetch(base + '/api/helper/log', { method:'POST', body:'{"q":"hi"}' })).status, 401);
+
+  const t = await login('teach', 'apple-pear');
+  const got = await (await call(t.cookie, '/admin/helper')).json();
+  const mine = got.log.filter(e => e.username === 'ana');
+  assert.strictEqual(mine.length, 3);
+  assert.strictEqual(mine[0].kind, 'ask', 'an unknown kind is kept as a question');
+  const duck = mine.find(e => e.question === 'how do i make him duck');
+  assert.strictEqual(duck.recipe, null);
+  assert.strictEqual(duck.name, 'Ana');
+  assert.strictEqual(duck.period, '2');
+  const g = got.games.find(x => x.id === p.id);
+  assert.deepStrictEqual(g.about, { story:'A dino that jumps over cactuses', has:['jump', 'obstacles'], like:['dino'], next:'make it duck' });
+  assert.strictEqual(g.name, 'Ana');
+  assert.strictEqual(g.projectName, 'Dino');
 });

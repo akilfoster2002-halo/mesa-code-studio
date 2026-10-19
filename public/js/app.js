@@ -6,6 +6,7 @@
      #/            My Projects (or the sign-in card)
      #/p/<id>      a project in the editor
      #/teacher     every student, by period (teacher account only)
+     #/teacher/helper  what students asked the Block Helper, and their games
 
    SAVING. Every change marks the project dirty; 1.5 s after the last
    change it is sent to the server. A copy also goes into this browser's
@@ -68,6 +69,7 @@
     const pm = hash.match(/^#\/p\/([^/]+)(\/edit)?$/);
     if(pm) return editorView(pm[1], !!pm[2]);
     if(hash === '#/teacher' && me.role === 'teacher') return teacherView();
+    if(hash === '#/teacher/helper' && me.role === 'teacher') return helperView();
     return projectsView();
   }
   addEventListener('hashchange', () => route());
@@ -239,6 +241,7 @@
           h('div', { class:'stage-bar' }, E.flag, E.stop, h('span', { class:'grow' }), E.small, E.full),
           E.wrap,
           h('div', { class:'below' }, h('div', { class:'sprite-pane' }, E.info, E.sprites), E.stageTile))));
+    E.root.append(...HELPER.mount({ me:() => me, onChange:() => changed('about') }));
     E.title.onchange = () => { if(readOnly) return; const v = E.title.value.trim() || t('Untitled'); E.title.value = v; projectMeta.name = v; SAVE.rename(v); };
     E.title.onkeydown = e => { if(e.key === 'Enter') E.title.blur(); };
 
@@ -334,6 +337,7 @@
     showTab('code');
     STAGE.renderMonitors();
     SAVE.open(id, readOnly);
+    HELPER.load(P, { id, readOnly });
     VM.rt.dirty = true;
   }
 
@@ -482,6 +486,7 @@
     EDITOR.load(P, P.targets[1] || P.targets[0], false);
     PANES.load(P, P.targets[1] || P.targets[0], false);
     STAGE.renderMonitors(); tabLabels(); showTab('code');
+    HELPER.load(P, { id:projectMeta.id, readOnly:false });
     SAVE.mark();
   }
 
@@ -495,6 +500,7 @@
     document.body.className = 'v-teacher';
     const main = h('main', { class:'tmain' }, h('div', { class:'loading' }, t('Loading…')));
     app.replaceChildren(h('header', { class:'top' }, logo(), h('h1', {}, '🍎 ' + t('Dashboard')), h('span', { class:'grow' }),
+      h('a', { class:'btn ghost', href:'#/teacher/helper' }, '💬 ' + t('Helper')),
       h('a', { class:'btn ghost', href:'#/' }, '🗂 ' + t('My Projects')), langBtn(), ...userBits()), main);
     let rows = [];
     async function load(){ rows = await api('/admin/overview'); draw(); }
@@ -561,6 +567,73 @@
     load();
   }
 
+  /* ------------------------------------------------- Block Helper page
+     What students asked and what had no recipe yet (to write next), which
+     recipes left them stuck, and what their games are about. */
+  let hdash = { period:'all' };
+  async function helperView(){
+    document.body.className = 'v-teacher';
+    const main = h('main', { class:'tmain hdash' }, h('div', { class:'loading' }, t('Loading…')));
+    app.replaceChildren(h('header', { class:'top' }, logo(), h('h1', {}, '💬 ' + t('Block Helper')), h('span', { class:'grow' }),
+      langBtn(), ...userBits()), main);
+    let data;
+    try { data = await api('/admin/helper'); } catch(e){ main.replaceChildren(h('p', {}, t('Something went wrong loading this project.'))); return; }
+    const title = id => { const r = RECIPES.of(id); return r ? (I18N.lang === 'es' ? r.title[1] : r.title[0]) : id; };
+    const count = (list, key) => { const m = new Map(); for(const x of list){ const k = key(x); if(k) m.set(k, (m.get(k) || 0) + 1); } return [...m].sort((a, b) => b[1] - a[1]); };
+    function draw(){
+      const periods = [...new Set([...data.log, ...data.games].map(x => x.period).filter(Boolean))].sort((a, b) => String(a).localeCompare(String(b), undefined, { numeric:true }));
+      const inP = x => hdash.period === 'all' || x.period === hdash.period;
+      const log = data.log.filter(inP), games = data.games.filter(inP);
+      const week = Date.now() - 7 * 86400000;
+      const asked = log.filter(e => e.kind === 'ask');
+      const missing = asked.filter(e => !e.recipe);
+      const stuck = count(log.filter(e => e.kind === 'stuck'), e => e.recipe);
+      const used = count(log.filter(e => e.kind === 'ask' || e.kind === 'pick'), e => e.recipe);
+      const feats = count(games.flatMap(g => g.about.has || []), x => x);
+      const likes = count(games.flatMap(g => g.about.like || []), x => x);
+      const featName = id => { const f = RECIPES.FEATURES.find(x => x[0] === id) || RECIPES.GAMES.find(x => x[0] === id); return f ? f[1] + ' ' + (I18N.lang === 'es' && f[3] ? f[3] : f[2]) : id; };
+      const stat = (icon, n, label) => h('div', { class:'stat' }, h('span', { class:'stat-ico' }, icon), h('b', {}, String(n)), h('small', {}, label));
+      const bars = (rows, name) => rows.length ? h('div', { class:'hbars' }, rows.map(([k, n]) => h('div', { class:'hbar' },
+        h('span', {}, name(k)), h('div', { class:'bar' }, h('i', { style:{ width:Math.round(n / rows[0][1] * 100) + '%' } }), h('span', {}, String(n))))))
+        : h('p', { class:'muted' }, '—');
+      const who = e => h('td', {}, h('b', {}, e.name), e.period ? h('small', { class:'muted' }, ' · ' + t('Period') + ' ' + e.period) : null);
+      const proj = id => id ? h('a', { class:'btn small', href:'#/p/' + id, title:t('Open') }, '👁') : null;
+      const sel = h('select', { class:'inp' }, h('option', { value:'all' }, t('All')), periods.map(p => h('option', { value:p }, t('Period') + ' ' + p)));
+      sel.value = hdash.period; sel.onchange = () => { hdash.period = sel.value; draw(); };
+      main.replaceChildren(
+        h('div', { class:'ptabs' }, h('span', { class:'muted' }, t('Show')), sel),
+        h('div', { class:'stats' },
+          stat('💬', asked.filter(e => Date.parse(e.created) > week).length, t('Questions this week')),
+          stat('❓', missing.length, t('No recipe yet')),
+          stat('😕', log.filter(e => e.kind === 'stuck').length, t('Still stuck')),
+          stat('🎮', games.length, t('Games described'))),
+        h('section', { class:'hcard' }, h('h2', {}, '❓ ' + t('Questions with no recipe yet')),
+          h('p', { class:'muted' }, t('These are the recipes to write next.')),
+          missing.length ? h('div', { class:'twrap' }, h('table', { class:'ttable' },
+            h('thead', {}, h('tr', {}, h('th', {}, t('Question')), h('th', {}, t('Student')), h('th', {}, t('When')), h('th', {}))),
+            h('tbody', {}, missing.slice(0, 300).map(e => h('tr', {}, h('td', {}, '“' + e.question + '”'), who(e), h('td', {}, UI.ago(e.created)), h('td', {}, proj(e.project)))))))
+            : h('p', { class:'muted' }, '—')),
+        h('div', { class:'hcols' },
+          h('section', { class:'hcard' }, h('h2', {}, '😕 ' + t('Recipes students were stuck on')), bars(stuck, title)),
+          h('section', { class:'hcard' }, h('h2', {}, '⭐ ' + t('Most used recipes')), bars(used.slice(0, 12), title))),
+        h('div', { class:'hcols' },
+          h('section', { class:'hcard' }, h('h2', {}, '🧩 ' + t('What is in their games')), bars(feats, featName)),
+          h('section', { class:'hcard' }, h('h2', {}, '🕹 ' + t('Inspired by')), bars(likes, featName))),
+        h('section', { class:'hcard' }, h('h2', {}, '🎮 ' + t('Game summaries')),
+          games.length ? h('div', { class:'twrap' }, h('table', { class:'ttable' },
+            h('thead', {}, h('tr', {}, h('th', {}, t('Student')), h('th', {}, t('Project')), h('th', {}, t('About the game')), h('th', {}, t('Wants to add next')), h('th', {}))),
+            h('tbody', {}, games.sort((a, b) => a.name.localeCompare(b.name)).map(g => h('tr', {}, who(g), h('td', {}, g.projectName || ''), h('td', {}, g.about.story),
+              h('td', {}, g.about.next), h('td', {}, proj(g.id)))))))
+            : h('p', { class:'muted' }, '—')),
+        h('section', { class:'hcard' }, h('h2', {}, '🗒 ' + t('Everything asked')),
+          asked.length ? h('div', { class:'twrap' }, h('table', { class:'ttable' },
+            h('thead', {}, h('tr', {}, h('th', {}, t('Question')), h('th', {}, t('Answered with')), h('th', {}, t('Student')), h('th', {}, t('When')))),
+            h('tbody', {}, asked.slice(0, 300).map(e => h('tr', {}, h('td', {}, '“' + e.question + '”'), h('td', {}, e.recipe ? title(e.recipe) : '—'), who(e), h('td', {}, UI.ago(e.created)))))))
+            : h('p', { class:'muted' }, '—')));
+    }
+    draw();
+  }
+
   async function studentProjects(s){
     const list = await api('/admin/students/' + s.username + '/projects');
     let close = null;
@@ -568,6 +641,7 @@
       h('a', { class:'pthumb', href:'#/p/' + p.id, onclick:() => close && close(false) }, p.thumb ? h('img', { src:p.thumb, alt:'' }) : h('span', { class:'pblank' }, '◆')),
       h('div', { class:'pfoot col' },
         h('span', { class:'pname' }, p.name),
+        p.stats && p.stats.about ? h('small', { class:'pabout', title:p.stats.about.next ? '➕ ' + p.stats.about.next : '' }, '🎮 ' + p.stats.about.story) : null,
         h('small', {}, UI.ago(p.updated) + (p.stats ? ' · 🧱 ' + p.stats.blocks + ' · 👾 ' + p.stats.sprites : '') + (p.edited_by ? ' · ✏️ ' + p.edited_by : '')),
         h('div', { class:'pbtns' },
           h('a', { class:'btn small', href:'#/p/' + p.id, onclick:() => close && close(false) }, '👁 ' + t('Open')),

@@ -18,6 +18,7 @@ const path = require('path');
 const crypto = require('crypto');
 
 const MAX_VERSIONS = 60;
+const MAX_HELPER = 5000;                    // Block Helper questions kept (file store)
 const VERSION_GAP_MS = 2 * 60 * 1000;      // at most one automatic version every 2 minutes
 
 const now = () => new Date().toISOString();
@@ -34,6 +35,7 @@ class FileStore {
     this._t = null;
   }
   async init(){
+    this.db.helper = this.db.helper || [];
     for(const p of Object.values(this.db.projects)) if(!p.stats) p.stats = projectStats(p.data);
   }
   _save(){
@@ -144,6 +146,18 @@ class FileStore {
     return { type: fs.readFileSync(f + '.type', 'utf8'), data: fs.readFileSync(f) };
   }
   async hasAsset(id){ return fs.existsSync(path.join(this.dir, 'assets', id)); }
+
+  /* the Block Helper: what students asked, and what their games are about */
+  async logHelper(e){
+    this.db.helper.push({ id:newId(), created:now(), ...e });
+    if(this.db.helper.length > MAX_HELPER) this.db.helper.splice(0, this.db.helper.length - MAX_HELPER);
+    this._save();
+  }
+  async helperLog(limit){ return this.db.helper.slice(-limit).reverse(); }
+  async gameSummaries(){
+    return Object.values(this.db.projects).filter(p => !p.deleted && p.stats && p.stats.about)
+      .map(p => ({ id:p.id, name:p.name, owner:p.owner, updated:p.updated, about:p.stats.about }));
+  }
 }
 
 /* what a project has in it, for the teacher's dashboard */
@@ -161,7 +175,18 @@ function projectStats(data){
     out.costumes += (t.costumes || []).length; out.sounds += (t.sounds || []).length;
     for(const sc of t.scripts || []){ out.scripts++; (sc.blocks || []).forEach(walk); }
   }
+  const about = cleanAbout(data && data.about);
+  if(about) out.about = about;
   return out;
+}
+/* "Tell me about your game" (the Block Helper's first card), cut down to
+   what the dashboard shows */
+function cleanAbout(a){
+  if(!a || typeof a !== 'object') return null;
+  const str = v => String(v == null ? '' : v).replace(/[\u0000-\u001f]/g, ' ').trim().slice(0, 200);
+  const ids = v => (Array.isArray(v) ? v : []).filter(x => typeof x === 'string' && /^[a-z0-9-]{1,20}$/.test(x)).slice(0, 30);
+  const out = { story:str(a.story), has:ids(a.has), like:ids(a.like), next:str(a.next) };
+  return out.story || out.has.length || out.next ? out : null;
 }
 function row(u, ps, recent){
   const best = ps.reduce((a, p) => Math.max(a, (p.stats && p.stats.blocks) || 0), 0);
@@ -238,7 +263,17 @@ class PgStore {
       ALTER TABLE cs_users ADD COLUMN IF NOT EXISTS disabled BOOLEAN NOT NULL DEFAULT false;
       ALTER TABLE cs_users ADD COLUMN IF NOT EXISTS tutorial TEXT;
       ALTER TABLE cs_projects ADD COLUMN IF NOT EXISTS stats JSONB;
-      ALTER TABLE cs_projects ADD COLUMN IF NOT EXISTS edited_by TEXT;`);
+      ALTER TABLE cs_projects ADD COLUMN IF NOT EXISTS edited_by TEXT;
+      CREATE TABLE IF NOT EXISTS cs_helper (
+        id       BIGSERIAL PRIMARY KEY,
+        username TEXT NOT NULL,
+        project  TEXT,
+        question TEXT,
+        recipe   TEXT,
+        kind     TEXT,
+        created  TIMESTAMPTZ DEFAULT now()
+      );
+      CREATE INDEX IF NOT EXISTS cs_helper_created ON cs_helper(created);`);
     // projects saved before the dashboard counted blocks
     for(const r of (await this.q('SELECT id, data FROM cs_projects WHERE stats IS NULL')).rows)
       await this.q('UPDATE cs_projects SET stats=$2 WHERE id=$1', [r.id, projectStats(r.data)]);
@@ -342,6 +377,19 @@ class PgStore {
   }
   async hasAsset(id){
     return (await this.q('SELECT 1 FROM cs_assets WHERE id=$1', [id])).rowCount > 0;
+  }
+  async logHelper(e){
+    await this.q('INSERT INTO cs_helper (username,project,question,recipe,kind) VALUES ($1,$2,$3,$4,$5)',
+      [e.username, e.project, e.question, e.recipe, e.kind]);
+  }
+  async helperLog(limit){
+    const r = await this.q('SELECT * FROM cs_helper ORDER BY created DESC LIMIT $1', [limit]);
+    return r.rows.map(x => ({ ...x, id:String(x.id), created:iso(x.created) }));
+  }
+  async gameSummaries(){
+    const r = await this.q(`SELECT id,name,owner,updated,stats->'about' AS about FROM cs_projects
+      WHERE deleted IS NULL AND stats->'about' IS NOT NULL`);
+    return r.rows.map(x => ({ ...x, updated:iso(x.updated) }));
   }
 }
 const iso = d => d instanceof Date ? d.toISOString() : d;

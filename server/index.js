@@ -6,7 +6,9 @@
      GET/POST /api/projects         GET/PUT/DELETE /api/projects/:id
      GET /api/projects/:id/versions[/:vid]   POST /api/projects/:id/restore/:vid
      POST /api/assets (raw bytes)   GET /api/assets/:id
+     POST /api/helper/log           a Block Helper question (or which recipe helped)
      teacher only: GET /api/admin/overview, /api/admin/students/:u/projects,
+                   GET /api/admin/helper (questions asked, game summaries),
                    POST /api/admin/users (add a student or teacher),
                    POST /api/admin/students/:u/password, /api/admin/students/:u/disable
      A teacher may also open, change and restore any student's project; the
@@ -71,6 +73,15 @@ function fail(key){
   if(!t || Date.now() - t.start > 10*60*1000) tries.set(key, { start:Date.now(), n:1 });
   else t.n++;
 }
+
+/* a student clicking very fast can log only so many helper questions */
+const helperHits = new Map();
+function helperBusy(username){
+  const t = helperHits.get(username);
+  if(!t || Date.now() - t.start > 60*60*1000){ helperHits.set(username, { start:Date.now(), n:1 }); return false; }
+  return ++t.n > 200;
+}
+const HELPER_KINDS = ['ask', 'pick', 'stuck', 'worked'];
 
 /* --------------------------------------------------------------- static */
 const MIME = { '.html':'text/html; charset=utf-8', '.js':'text/javascript; charset=utf-8', '.css':'text/css; charset=utf-8',
@@ -142,6 +153,19 @@ async function api(req, res, url){
     return send(res, 200, { ok:true });
   }
   if(p[0] === 'me') return send(res, 200, { username:user.username, name:user.name, role:user.role, period:user.period, tutorial:user.tutorial || null });
+
+  /* the Block Helper answers in the browser; the server only keeps what was
+     asked (so the teacher can see what has no answer yet) */
+  if(p[0] === 'helper' && p[1] === 'log' && m === 'POST'){
+    const b = await readJSON(req, 4000);
+    const question = String(b.q == null ? '' : b.q).replace(/[\u0000-\u001f]/g, ' ').trim().slice(0, 300);
+    const recipe = /^[a-z0-9-]{1,40}$/.test(b.recipe || '') ? b.recipe : null;
+    const project = /^[\w-]{1,40}$/.test(b.project || '') ? b.project : null;
+    if(!question && !recipe) return send(res, 400, { error:'empty' });
+    if(helperBusy(user.username)) return send(res, 429, { error:'wait' });
+    await store.logHelper({ username:user.username, project, question, recipe, kind: HELPER_KINDS.includes(b.kind) ? b.kind : 'ask' });
+    return send(res, 200, { ok:true });
+  }
 
   if(p[0] === 'assets' && m === 'POST'){
     const type = String(req.headers['content-type'] || '').split(';')[0].trim().toLowerCase();
@@ -217,6 +241,13 @@ async function api(req, res, url){
   if(p[0] === 'admin'){
     if(!teacher) return send(res, 403, { error:'teacher' });
     if((p[1] === 'overview' || p[1] === 'students') && !p[2]) return send(res, 200, await store.overview());
+    if(p[1] === 'helper' && m === 'GET'){
+      const users = Object.fromEntries((await store.listUsers()).map(u => [u.username, u]));
+      const who = o => { const u = users[o.owner || o.username]; return { name: u ? u.name : (o.owner || o.username), period: u ? u.period : '', role: u ? u.role : '' }; };
+      const log = (await store.helperLog(3000)).map(e => ({ ...e, ...who(e) })).filter(e => e.role !== 'teacher');
+      const games = (await store.gameSummaries()).map(g => ({ ...g, projectName:g.name, ...who(g) })).filter(g => g.role !== 'teacher');
+      return send(res, 200, { log, games });
+    }
     if(p[1] === 'users' && m === 'POST'){
       const b = await readJSON(req, 4000);
       const name = cleanName(b.name), role = b.role === 'teacher' ? 'teacher' : 'student';
