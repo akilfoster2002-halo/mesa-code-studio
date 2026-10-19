@@ -12,6 +12,8 @@
                    POST /api/admin/students/:u/password, /api/admin/students/:u/disable
      A teacher may also open, change and restore any student's project; the
      student's work from before the change is kept in its history.
+     Learn games (/learn): GET/PUT /api/learn (stars per level, best word-match time;
+       a save only ever adds: each level keeps its most stars); teacher: GET /api/admin/learn
      Game Design Studio (/design): GET/PUT /api/design (the student's own packet);
        teacher: GET /api/admin/designs, GET /api/admin/designs/:u,
                 POST /api/admin/designs/:u/approve (the "my idea is small enough" check)
@@ -100,6 +102,7 @@ const MIME = { '.html':'text/html; charset=utf-8', '.js':'text/javascript; chars
 function serveStatic(req, res, pathname){
   if(pathname === '/') pathname = '/index.html';
   if(pathname === '/design' || pathname === '/design/') pathname = '/design.html';
+  if(pathname === '/learn' || pathname === '/learn/') pathname = '/learn.html';
   const file = path.normalize(path.join(PUBLIC, decodeURIComponent(pathname)));
   if(!file.startsWith(PUBLIC)) return send(res, 403, 'forbidden');
   fs.stat(file, (err, st) => {
@@ -254,6 +257,17 @@ async function api(req, res, url){
     }
   }
 
+  if(p[0] === 'learn' && !p[1]){
+    if(m === 'GET'){ const d = await store.getLearn(user.username); return send(res, 200, { data:d ? d.data : null }); }
+    if(m === 'PUT'){
+      const b = await readJSON(req, 100000);
+      const old = (await store.getLearn(user.username) || {}).data || {};
+      const merged = mergeLearn(old, b.data || {});
+      await store.saveLearn(user.username, merged);
+      return send(res, 200, { data:merged });
+    }
+  }
+
   if(p[0] === 'design' && !p[1]){
     if(m === 'GET'){ const d = await store.getDesign(user.username); return send(res, 200, d ? { data:d.data, updated:d.updated } : { data:null }); }
     if(m === 'PUT'){
@@ -271,6 +285,18 @@ async function api(req, res, url){
 
   if(p[0] === 'admin'){
     if(!teacher) return send(res, 403, { error:'teacher' });
+    if(p[1] === 'learn' && !p[2] && m === 'GET'){
+      const users = (await store.listUsers()).filter(u => u.role === 'student');
+      const ls = Object.fromEntries((await store.listLearn()).map(d => [d.owner, d]));
+      return send(res, 200, users.map(u => {
+        const d = ls[u.username], lv = (d && d.data && d.data.levels) || {};
+        const byChapter = {};
+        for(const [id, v] of Object.entries(lv)){ const c = id.split('-')[0]; byChapter[c] = (byChapter[c] || 0) + 1; }
+        return { username:u.username, name:u.name, period:u.period, disabled:!!u.disabled, updated:d ? d.updated : null,
+          levels:Object.keys(lv).length, stars:Object.values(lv).reduce((n, v) => n + (v.stars || 0), 0), byChapter,
+          words: d && d.data && d.data.words ? d.data.words : null };
+      }));
+    }
     if(p[1] === 'designs' && !p[2] && m === 'GET'){
       const users = (await store.listUsers()).filter(u => u.role === 'student');
       const ds = Object.fromEntries((await store.listDesigns()).map(d => [d.owner, d]));
@@ -325,6 +351,21 @@ async function api(req, res, url){
     }
   }
   return send(res, 404, { error:'none' });
+}
+
+/* Learn progress only grows: a level keeps its most stars, the word game its
+   fastest time, so two computers (or an old tab) can never take stars away. */
+function mergeLearn(old, add){
+  const out = { levels:{ ...(old.levels || {}) }, words:old.words || null };
+  for(const [id, v] of Object.entries(add.levels || {})){
+    if(!/^[a-z]+-\d{1,2}$/.test(id)) continue;
+    const stars = Math.max(0, Math.min(3, Number(v && v.stars) || 0));
+    if(!out.levels[id] || out.levels[id].stars < stars) out.levels[id] = { stars };
+  }
+  const w = add.words;
+  if(w && Number.isFinite(w.secs) && w.secs > 0 && (!out.words || w.secs < out.words.secs))
+    out.words = { secs:Math.round(w.secs), mistakes:Math.max(0, Math.round(Number(w.mistakes) || 0)) };
+  return out;
 }
 
 /* ---------------------------------------------------------------- boot */

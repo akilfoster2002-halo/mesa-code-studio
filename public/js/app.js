@@ -42,6 +42,7 @@
     return [
       me.role === 'teacher' ? h('a', { class:'btn ghost', href:'#/teacher' }, '🍎 ' + t('Dashboard')) : null,
       h('a', { class:'btn ghost', href:'/design', title:t('Game design') }, '🎨 ', h('span', { class:'lbl' }, t('Game design'))),
+      h('a', { class:'btn ghost', href:'/learn', title:t('Learn') }, '🎮 ', h('span', { class:'lbl' }, t('Learn'))),
       h('button', { class:'btn tour-btn', type:'button', title:t('Tour'), onclick:() => TOUR.start() }, '❓ ' + t('Tour')),
       h('span', { class:'who', title:me.username }, '👤 ' + me.name),
       h('button', { class:'btn ghost', type:'button', onclick:logout }, t('Log out'))

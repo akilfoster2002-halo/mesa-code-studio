@@ -4,7 +4,7 @@
 window.I18N = (function(){
   const ES = {
     'Front of picture':'Frente del dibujo', 'Up':'Arriba', 'Right':'Derecha', 'Down':'Abajo', 'Left':'Izquierda', 'Point the red arrow where your picture faces.':'Pon la flecha roja hacia donde mira tu dibujo.',
-    'Game design':'Diseño de juego', 'Paint':'Pintar', 'Paint a sprite':'Pinta un objeto', 'Paint a costume':'Pinta un disfraz', 'Paint a backdrop':'Pinta un fondo',
+    'Game design':'Diseño de juego', 'Learn':'Aprende', 'Paint':'Pintar', 'Paint a sprite':'Pinta un objeto', 'Paint a costume':'Pinta un disfraz', 'Paint a backdrop':'Pinta un fondo',
     'Brush':'Pincel', 'Eraser':'Borrador', 'Line':'Línea', 'Rectangle':'Rectángulo', 'Circle':'Círculo', 'Fill':'Rellenar', 'Text':'Texto',
     'Pick a colour':'Tomar color', 'More colours':'Más colores', 'Outline':'Borde', 'Filled':'Relleno', 'Clear':'Borrar todo',
     'Close without saving?':'¿Cerrar sin guardar?', 'Close':'Cerrar', 'Centre':'Centro', 'Tour':'Recorrido', 'skipped':'saltado', 'Download script':'Descargar código', 'Save the code of every sprite as one PDF, to hand in':'Guarda el código de todos los objetos en un PDF para entregarlo',

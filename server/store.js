@@ -154,6 +154,14 @@ class FileStore {
     return ds[owner];
   }
   async listDesigns(){ return Object.values(this.db.designs || {}).map(d => ({ owner:d.owner, updated:d.updated, summary:designSummary(d.data) })); }
+
+  /* the Learn games: one progress record per student */
+  async getLearn(owner){ return (this.db.learn || {})[owner] || null; }
+  async saveLearn(owner, data){
+    const ls = this.db.learn || (this.db.learn = {});
+    ls[owner] = { owner, data, updated:now() }; this._save(); return ls[owner];
+  }
+  async listLearn(){ return Object.values(this.db.learn || {}); }
 }
 
 /* what a project has in it, for the teacher's dashboard */
@@ -255,6 +263,11 @@ class PgStore {
       ALTER TABLE cs_users ADD COLUMN IF NOT EXISTS tutorial TEXT;
       ALTER TABLE cs_projects ADD COLUMN IF NOT EXISTS stats JSONB;
       ALTER TABLE cs_projects ADD COLUMN IF NOT EXISTS edited_by TEXT;
+      CREATE TABLE IF NOT EXISTS cs_learn (
+        owner   TEXT PRIMARY KEY REFERENCES cs_users(username),
+        data    JSONB NOT NULL,
+        updated TIMESTAMPTZ DEFAULT now()
+      );
       CREATE TABLE IF NOT EXISTS cs_designs (
         owner   TEXT PRIMARY KEY REFERENCES cs_users(username),
         data    JSONB NOT NULL,
@@ -377,6 +390,19 @@ class PgStore {
   async listDesigns(){
     const r = await this.q('SELECT owner,data,updated FROM cs_designs');
     return r.rows.map(d => ({ owner:d.owner, updated:iso(d.updated), summary:designSummary(d.data) }));
+  }
+  async getLearn(owner){
+    const r = await this.q('SELECT owner,data,updated FROM cs_learn WHERE owner=$1', [owner]);
+    const d = r.rows[0]; return d ? { ...d, updated:iso(d.updated) } : null;
+  }
+  async saveLearn(owner, data){
+    const r = await this.q(`INSERT INTO cs_learn (owner,data,updated) VALUES ($1,$2,now())
+      ON CONFLICT (owner) DO UPDATE SET data=$2, updated=now() RETURNING owner,data,updated`, [owner, data]);
+    const d = r.rows[0]; return { ...d, updated:iso(d.updated) };
+  }
+  async listLearn(){
+    const r = await this.q('SELECT owner,data,updated FROM cs_learn');
+    return r.rows.map(d => ({ ...d, updated:iso(d.updated) }));
   }
 }
 const iso = d => d instanceof Date ? d.toISOString() : d;

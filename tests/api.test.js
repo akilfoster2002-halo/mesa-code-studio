@@ -280,3 +280,17 @@ test('game design packet: a save from an out-of-date copy is refused', async () 
   assert.strictEqual(stale.status, 409);
   assert.strictEqual((await stale.json()).data.answers.title, 'B');
 });
+
+test('learn progress only grows, and teachers see it', async () => {
+  const { cookie } = await login('ana', 'tiger42');
+  const put = data => call(cookie, '/learn', { method:'PUT', body:JSON.stringify({ data }) });
+  await put({ levels:{ 'steps-1':{ stars:3 }, 'steps-2':{ stars:1 } }, words:{ secs:90, mistakes:2 } });
+  await put({ levels:{ 'steps-1':{ stars:1 }, 'steps-2':{ stars:2 }, 'bad id':{ stars:3 } }, words:{ secs:120, mistakes:0 } });
+  const got = (await (await call(cookie, '/learn')).json()).data;
+  assert.deepStrictEqual(got.levels, { 'steps-1':{ stars:3 }, 'steps-2':{ stars:2 } });
+  assert.strictEqual(got.words.secs, 90);
+  assert.strictEqual((await call(cookie, '/admin/learn')).status, 403);
+  const t = await login('teach', 'apple-pear');
+  const row = (await (await call(t.cookie, '/admin/learn')).json()).find(r => r.username === 'ana');
+  assert.strictEqual(row.levels, 2); assert.strictEqual(row.stars, 5); assert.strictEqual(row.byChapter.steps, 2);
+});

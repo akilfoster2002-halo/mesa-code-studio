@@ -39,6 +39,24 @@ student, auto-save, and history. This is the standard editor going forward.
 - **My Projects**: all of a student's projects with pictures, plus rename, duplicate, delete
   (and 🗑 Recently deleted to bring one back). 📁 lets them download a project file or load one.
 
+## Learn (/learn)
+
+**https://mesa-code-studio.onrender.com/learn** (🎮 in the top bar): coding games for 3rd graders,
+same logins, English/Español, 🔊 read-aloud.
+
+- **Bit's maze**, 18 levels in 4 chapters, each with a 🧠 word: 🤖 *Steps in order* (sequence),
+  🔁 *Loops* (repeat, with a block limit so the loop is needed), 🐞 *Bug Hunt* (the code arrives
+  with one mistake; fix it), 🔀 *IF / THEN* (repeat until ⭐, if wall ahead / path left / path right /
+  💎 here). Tap a block to add it where the orange bar is; tap a gap to move the bar. ▶ Run acts it
+  out and lights up each block as it runs. Fewer blocks = more ⭐ (3 at the best answer).
+  Levels and their answers are in `public/js/learn-levels.js`; `tests/learn.test.js` solves every
+  level, so a new level that cannot be solved fails the tests.
+- **🧠 Code Words**: match 6 coding words to what they mean, against the clock.
+- Links to the MESA games (Bug Squad, Arcade, Dino Run, Pong, Asteroid Dodge, MESA CS 0.2) and free
+  sites (Blockly Games, Code.org, Scratch, Lightbot, CodeCombat).
+- Stars are saved per student (`cs_learn`) and only ever go up. Teachers: 🍎 **Learn progress**
+  shows stars and levels per chapter, by period.
+
 ## Game Design Studio (/design)
 
 **https://mesa-code-studio.onrender.com/design**: planning a game before building it, about an
