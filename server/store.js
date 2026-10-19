@@ -144,6 +144,16 @@ class FileStore {
     return { type: fs.readFileSync(f + '.type', 'utf8'), data: fs.readFileSync(f) };
   }
   async hasAsset(id){ return fs.existsSync(path.join(this.dir, 'assets', id)); }
+
+  /* game design packets: one per student */
+  async getDesign(owner){ return (this.db.designs || {})[owner] || null; }
+  async saveDesign(owner, data){
+    const ds = this.db.designs || (this.db.designs = {});
+    ds[owner] = { owner, data, updated:now() };
+    this._save();
+    return ds[owner];
+  }
+  async listDesigns(){ return Object.values(this.db.designs || {}).map(d => ({ owner:d.owner, updated:d.updated, summary:designSummary(d.data) })); }
 }
 
 /* what a project has in it, for the teacher's dashboard */
@@ -162,6 +172,12 @@ function projectStats(data){
     for(const sc of t.scripts || []){ out.scripts++; (sc.blocks || []).forEach(walk); }
   }
   return out;
+}
+/* how far a design packet has got, for the teacher's list */
+function designSummary(d){
+  d = d || {};
+  return { done: Array.isArray(d.done) ? d.done.length : 0, step: d.step || 0, title: String(d.answers && d.answers.title || '').slice(0, 60),
+    approved: !!d.approved };
 }
 function row(u, ps, recent){
   const best = ps.reduce((a, p) => Math.max(a, (p.stats && p.stats.blocks) || 0), 0);
@@ -238,7 +254,12 @@ class PgStore {
       ALTER TABLE cs_users ADD COLUMN IF NOT EXISTS disabled BOOLEAN NOT NULL DEFAULT false;
       ALTER TABLE cs_users ADD COLUMN IF NOT EXISTS tutorial TEXT;
       ALTER TABLE cs_projects ADD COLUMN IF NOT EXISTS stats JSONB;
-      ALTER TABLE cs_projects ADD COLUMN IF NOT EXISTS edited_by TEXT;`);
+      ALTER TABLE cs_projects ADD COLUMN IF NOT EXISTS edited_by TEXT;
+      CREATE TABLE IF NOT EXISTS cs_designs (
+        owner   TEXT PRIMARY KEY REFERENCES cs_users(username),
+        data    JSONB NOT NULL,
+        updated TIMESTAMPTZ DEFAULT now()
+      );`);
     // projects saved before the dashboard counted blocks
     for(const r of (await this.q('SELECT id, data FROM cs_projects WHERE stats IS NULL')).rows)
       await this.q('UPDATE cs_projects SET stats=$2 WHERE id=$1', [r.id, projectStats(r.data)]);
@@ -343,6 +364,20 @@ class PgStore {
   async hasAsset(id){
     return (await this.q('SELECT 1 FROM cs_assets WHERE id=$1', [id])).rowCount > 0;
   }
+
+  async getDesign(owner){
+    const r = await this.q('SELECT owner,data,updated FROM cs_designs WHERE owner=$1', [owner]);
+    const d = r.rows[0]; return d ? { ...d, updated:iso(d.updated) } : null;
+  }
+  async saveDesign(owner, data){
+    const r = await this.q(`INSERT INTO cs_designs (owner,data,updated) VALUES ($1,$2,now())
+      ON CONFLICT (owner) DO UPDATE SET data=$2, updated=now() RETURNING owner,data,updated`, [owner, data]);
+    const d = r.rows[0]; return { ...d, updated:iso(d.updated) };
+  }
+  async listDesigns(){
+    const r = await this.q('SELECT owner,data,updated FROM cs_designs');
+    return r.rows.map(d => ({ owner:d.owner, updated:iso(d.updated), summary:designSummary(d.data) }));
+  }
 }
 const iso = d => d instanceof Date ? d.toISOString() : d;
 
@@ -351,4 +386,4 @@ function open(){
   return new FileStore(process.env.DATA_DIR || path.join(__dirname, '..', 'data'));
 }
 
-module.exports = { open, FileStore, PgStore, thin, projectStats, MAX_VERSIONS, VERSION_GAP_MS };
+module.exports = { open, FileStore, PgStore, thin, projectStats, designSummary, MAX_VERSIONS, VERSION_GAP_MS };

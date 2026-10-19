@@ -12,6 +12,9 @@
                    POST /api/admin/students/:u/password, /api/admin/students/:u/disable
      A teacher may also open, change and restore any student's project; the
      student's work from before the change is kept in its history.
+     Game Design Studio (/design): GET/PUT /api/design (the student's own packet);
+       teacher: GET /api/admin/designs, GET /api/admin/designs/:u,
+                POST /api/admin/designs/:u/approve (the "my idea is small enough" check)
 
    Accounts live in the database. The class list (private/roster.json, made
    by tools/make-logins.js) is never in the repo: `npm run seed` adds any new
@@ -32,6 +35,7 @@ const PORT = Number(process.env.PORT) || 8790;
 const PUBLIC = path.join(__dirname, '..', 'public');
 const MAX_PROJECT = 3 * 1024 * 1024;        // project JSON (assets live elsewhere)
 const MAX_ASSET = 12 * 1024 * 1024;         // one picture or sound
+const MAX_DESIGN = 2 * 1024 * 1024;         // a design packet, sketches included
 
 const ASSET_TYPES = /^(image\/(png|jpeg|gif|webp|svg\+xml|bmp|avif)|audio\/[\w.+-]+|video\/(mp4|webm|ogg))$/;
 
@@ -95,6 +99,7 @@ const MIME = { '.html':'text/html; charset=utf-8', '.js':'text/javascript; chars
   '.ico':'image/x-icon', '.webmanifest':'application/manifest+json' };
 function serveStatic(req, res, pathname){
   if(pathname === '/') pathname = '/index.html';
+  if(pathname === '/design' || pathname === '/design/') pathname = '/design.html';
   const file = path.normalize(path.join(PUBLIC, decodeURIComponent(pathname)));
   if(!file.startsWith(PUBLIC)) return send(res, 403, 'forbidden');
   fs.stat(file, (err, st) => {
@@ -249,8 +254,43 @@ async function api(req, res, url){
     }
   }
 
+  if(p[0] === 'design' && !p[1]){
+    if(m === 'GET'){ const d = await store.getDesign(user.username); return send(res, 200, d ? { data:d.data, updated:d.updated } : { data:null }); }
+    if(m === 'PUT'){
+      const b = await readJSON(req, MAX_DESIGN);
+      if(!b.data || typeof b.data !== 'object' || Array.isArray(b.data)) return send(res, 400, { error:'data' });
+      const old = await store.getDesign(user.username);
+      const was = (old && old.data) || {};
+      // written from a copy that is out of date (the plan is open on another computer): send back the newer one
+      if(b.base !== undefined && old && (was.savedAt || 0) !== (b.base || 0)) return send(res, 409, { error:'newer', data:was, updated:old.updated });
+      const data = { ...b.data, approved: !!was.approved, approvedBy: was.approvedBy || null };    // only a teacher sets these
+      const d = await store.saveDesign(user.username, data);
+      return send(res, 200, { updated:d.updated });
+    }
+  }
+
   if(p[0] === 'admin'){
     if(!teacher) return send(res, 403, { error:'teacher' });
+    if(p[1] === 'designs' && !p[2] && m === 'GET'){
+      const users = (await store.listUsers()).filter(u => u.role === 'student');
+      const ds = Object.fromEntries((await store.listDesigns()).map(d => [d.owner, d]));
+      return send(res, 200, users.map(u => ({ username:u.username, name:u.name, period:u.period, disabled:!!u.disabled,
+        updated: ds[u.username] ? ds[u.username].updated : null, ...(ds[u.username] ? ds[u.username].summary : { done:0, step:0, title:'', approved:false }) })));
+    }
+    if(p[1] === 'designs' && p[2] && !p[3] && m === 'GET'){
+      const u = await store.getUser(p[2]);
+      if(!u) return send(res, 404, { error:'none' });
+      const d = await store.getDesign(u.username);
+      return send(res, 200, { username:u.username, name:u.name, period:u.period, data:d ? d.data : null, updated:d ? d.updated : null });
+    }
+    if(p[1] === 'designs' && p[3] === 'approve' && m === 'POST'){
+      const u = await store.getUser(p[2]);
+      if(!u) return send(res, 404, { error:'none' });
+      const b = await readJSON(req, 2000);
+      const d = await store.getDesign(u.username);
+      await store.saveDesign(u.username, { ...(d ? d.data : {}), approved: !!b.approved, approvedBy: b.approved ? user.username : null });
+      return send(res, 200, { ok:true });
+    }
     if((p[1] === 'overview' || p[1] === 'students') && !p[2]) return send(res, 200, await store.overview());
     if(p[1] === 'users' && m === 'POST'){
       const b = await readJSON(req, 4000);

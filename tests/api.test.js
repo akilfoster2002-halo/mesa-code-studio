@@ -245,3 +245,38 @@ test('block helper AI: Groq first, OpenRouter when Groq is out, and OpenRouter s
     assert.strictEqual(ai.sent.filter(s => s.host === 'openrouter').length, 1, 'no point asking other OpenRouter models');
   } finally { ai.restore(); delete process.env.GROQ_API_KEY; delete process.env.OPENROUTER_API_KEY; }
 });
+
+test('game design packet: save, read back, only a teacher approves', async () => {
+  const { cookie } = await login('ana', 'tiger42');
+  assert.deepStrictEqual(await (await call(cookie, '/design')).json(), { data:null });
+  const put = await call(cookie, '/design', { method:'PUT', body:JSON.stringify({ data:{ step:2, done:['research'], answers:{ title:'Space Cats' }, approved:true } }) });
+  assert.strictEqual(put.status, 200);
+  let got = await (await call(cookie, '/design')).json();
+  assert.strictEqual(got.data.answers.title, 'Space Cats');
+  assert.strictEqual(got.data.approved, false);                       // a student cannot approve their own idea
+  assert.strictEqual((await call(cookie, '/admin/designs')).status, 403);
+
+  const t = await login('teach', 'apple-pear');
+  const list = await (await call(t.cookie, '/admin/designs')).json();
+  const row = list.find(r => r.username === 'ana');
+  assert.strictEqual(row.title, 'Space Cats');
+  assert.strictEqual(row.done, 1);
+  await call(t.cookie, '/admin/designs/ana/approve', { method:'POST', body:JSON.stringify({ approved:true }) });
+  const one = await (await call(t.cookie, '/admin/designs/ana')).json();
+  assert.strictEqual(one.data.approved, true);
+
+  await call(cookie, '/design', { method:'PUT', body:JSON.stringify({ data:{ step:3, answers:{ title:'Space Cats 2' } } }) });
+  got = await (await call(cookie, '/design')).json();
+  assert.strictEqual(got.data.approved, true);                        // the student's next save keeps it
+  assert.strictEqual(got.data.answers.title, 'Space Cats 2');
+});
+
+test('game design packet: a save from an out-of-date copy is refused', async () => {
+  const { cookie } = await login('ana', 'tiger42');
+  const put = (data, base) => call(cookie, '/design', { method:'PUT', body:JSON.stringify({ data, base }) });
+  assert.strictEqual((await put({ savedAt:100, answers:{ title:'A' } }, 0)).status, 200);
+  assert.strictEqual((await put({ savedAt:200, answers:{ title:'B' } }, 100)).status, 200);       // computer 1 keeps going
+  const stale = await put({ savedAt:150, answers:{ title:'old' } }, 100);                        // computer 2 still has the first copy
+  assert.strictEqual(stale.status, 409);
+  assert.strictEqual((await stale.json()).data.answers.title, 'B');
+});

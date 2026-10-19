@@ -33,6 +33,31 @@ student, auto-save, and history. This is the standard editor going forward.
 - **My Projects**: all of a student's projects with pictures, plus rename, duplicate, delete
   (and 🗑 Recently deleted to bring one back). 📁 lets them download a project file or load one.
 
+## Game Design Studio (/design)
+
+**https://mesa-code-studio.onrender.com/design**: planning a game before building it, about an
+hour of work, at a 3rd-grade reading level, in English and Spanish. It uses the **same logins**
+(signing in to either site signs in to both), and the 🎨 button in Code Studio's top bar opens it.
+
+It follows the Game Design Packet, one step per page (about 65 min in all):
+👋 You are a game designer (keep it small) · 🔍 Research (play 2 of the arcade games at
+arcade-blocks.onrender.com and answer player / goal / what stops you) · 💡 Big idea (game type,
+idea mixer, title, pitch sentence, teacher check) · 🕹 Player (keys → actions, drawing) · 🎯 Goal ·
+⚙️ Mechanics · 🔁 Core loop · 📏 IF / THEN rules · 👾 Challenge (drawing) · 🏁 Win & lose ·
+⭐ Feedback · ⚖️ Balance · 🧠 Code plan (ideas filled in from the student's own answers) ·
+🖼 Screen sketch with labels · 🎉 Checklist → **Build it in Code Studio**.
+
+Every step has a 🧠 **Learn** card with one computer-science word (input, loop, conditional,
+variable, algorithm, prototype, iterate…), a hidden 🟡 Pac-Man example, and 🔊 read-aloud on every
+question. Some steps have a quick ❓ check question; a step is ✅ once its ⭐ boxes are filled.
+📄 **My plan** shows the whole packet on one page to print.
+
+Teachers: 🍎 **Game designs** lists every student by period (game title, steps done, last saved)
+with the ⬜/✅ **Idea OK** check (the packet's "teacher initials" box) and 📄 to open or print
+any student's plan. Plans save like projects (a copy in the browser first, then the server) into
+the `cs_designs` table. A save from a copy that is out of date (the plan was changed on another
+computer) is refused, and that page loads the newer copy.
+
 ## Logins
 
 Every student in periods 2–6 (from the "Comp Sci Grade/HW input" sheet, 128 students) has an
