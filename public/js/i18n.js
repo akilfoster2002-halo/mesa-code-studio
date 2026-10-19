@@ -3,13 +3,6 @@
    t('Save') → 'Guardar' when the page is in Spanish. {n} fills in. */
 window.I18N = (function(){
   const ES = {
-    'Block Helper':'Ayudante de bloques', 'Helper':'Ayudante', 'Questions this week':'Preguntas esta semana', 'No recipe yet':'Sin receta aún',
-    'Still stuck':'Siguen atorados', 'Games described':'Juegos descritos', 'Questions with no recipe yet':'Preguntas sin receta aún',
-    'These are the recipes to write next.':'Estas son las recetas que hay que escribir.', 'AI answered':'Respuesta de la IA', 'AI':'IA', 'Question':'Pregunta', 'When':'Cuándo',
-    'Recipes students were stuck on':'Recetas en las que se atoraron', 'Most used recipes':'Recetas más usadas',
-    'What is in their games':'Qué hay en sus juegos', 'Inspired by':'Inspirados en', 'Game summaries':'Resúmenes de los juegos',
-    'Project':'Proyecto', 'About the game':'De qué trata', 'Wants to add next':'Quiere agregar', 'Everything asked':'Todo lo preguntado',
-    'Answered with':'Respondido con',
     'Front of picture':'Frente del dibujo', 'Up':'Arriba', 'Right':'Derecha', 'Down':'Abajo', 'Left':'Izquierda', 'Point the red arrow where your picture faces.':'Pon la flecha roja hacia donde mira tu dibujo.',
     'Tour':'Recorrido', 'skipped':'saltado', 'Download script':'Descargar código', 'Save the code of every sprite as one PDF, to hand in':'Guarda el código de todos los objetos en un PDF para entregarlo',
     'Block code':'Código de bloques', 'Student:':'Estudiante:', 'Username:':'Usuario:', 'Period:':'Período:', 'Date:':'Fecha:',

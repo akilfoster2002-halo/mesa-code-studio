@@ -152,96 +152,96 @@ test('version history is thinned, never unbounded', () => {
   assert.strictEqual(vs[vs.length - 1].id, '199', 'the newest stays');
 });
 
-test('block helper: questions are kept for the teacher, with the game summaries', async () => {
-  const ana = await login('ana', 'tiger42');
-  const about = { story:'A dino that jumps over cactuses', has:['jump', 'obstacles', 'BAD ID', 7], like:['dino'], next:'make it duck', player:'x1' };
-  const p = await (await call(ana.cookie, '/projects', { method:'POST', body:JSON.stringify({ name:'Dino', data:{ v:1, targets:[], about } }) })).json();
-  assert.strictEqual((await call(ana.cookie, '/helper/log', { method:'POST', body:JSON.stringify({ q:'how do i make him duck', project:p.id }) })).status, 200);
-  await call(ana.cookie, '/helper/log', { method:'POST', body:JSON.stringify({ q:'jump', recipe:'jump', kind:'pick', project:p.id }) });
-  await call(ana.cookie, '/helper/log', { method:'POST', body:JSON.stringify({ recipe:'jump', kind:'<script>' }) });
-  assert.strictEqual((await call(ana.cookie, '/helper/log', { method:'POST', body:'{}' })).status, 400);
-  assert.strictEqual((await call(ana.cookie, '/admin/helper')).status, 403);
-  assert.strictEqual((await fetch(base + '/api/helper/log', { method:'POST', body:'{"q":"hi"}' })).status, 401);
+/* the Block Helper's AI, with a pretend Groq/OpenRouter in place of fetch */
+const GAME = { targets:[
+  { name:'Stage', isStage:true, costumes:['sky'], sounds:['pop'], vars:['score'], lists:[], messages:['message1'], scripts:[] },
+  { name:'Kitty', costumes:['cat-a', 'cat-b'], sounds:['meow'], vars:[], lists:[],
+    scripts:[[{ op:'event_whenflagclicked', args:{}, inputs:{} }, { op:'motion_gotoxy', args:{ X:0, Y:-100 }, inputs:{} }]] },
+  { name:'Dog', costumes:['dog'], sounds:[], vars:[], lists:[], scripts:[] }] };
+function fakeAI(handler){
+  const real = global.fetch, sent = [];
+  global.fetch = async (url, opts) => {
+    const host = String(url).startsWith('https://api.groq.com/') ? 'groq' : String(url).startsWith('https://openrouter.ai/') ? 'openrouter' : null;
+    if(!host) return real(url, opts);
+    const body = JSON.parse(opts.body);
+    sent.push({ host, ...body });
+    const r = handler(host, body, sent.length);
+    if(typeof r === 'number') return new Response(r === 429 && host === 'openrouter' ? '{"error":{"message":"free-models-per-day"}}' : '{}', { status:r });
+    return new Response(JSON.stringify({ choices:[{ message:{ content: typeof r === 'string' ? r : JSON.stringify(r) } }] }), { status:200 });
+  };
+  return { sent, restore(){ global.fetch = real; } };
+}
+const askAI = (cookie, q, extra={}) => call(cookie, '/helper/ask', { method:'POST', body:JSON.stringify({ q, game:GAME, sprite:'Kitty', lang:'en', ...extra }) });
 
-  const t = await login('teach', 'apple-pear');
-  const got = await (await call(t.cookie, '/admin/helper')).json();
-  const mine = got.log.filter(e => e.username === 'ana');
-  assert.strictEqual(mine.length, 3);
-  assert.strictEqual(mine[0].kind, 'ask', 'an unknown kind is kept as a question');
-  const duck = mine.find(e => e.question === 'how do i make him duck');
-  assert.strictEqual(duck.recipe, null);
-  assert.strictEqual(duck.name, 'Ana');
-  assert.strictEqual(duck.period, '2');
-  const g = got.games.find(x => x.id === p.id);
-  assert.deepStrictEqual(g.about, { story:'A dino that jumps over cactuses', has:['jump', 'obstacles'], like:['dino'], next:'make it duck' });
-  assert.strictEqual(g.name, 'Ana');
-  assert.strictEqual(g.projectName, 'Dino');
+test('block helper AI: off without a key; the model sees the blocks and the project, never who asked', async () => {
+  const ana = await login('ana', 'tiger42');
+  assert.strictEqual((await askAI(ana.cookie, 'how do i jump')).status, 503);
+  assert.strictEqual((await fetch(base + '/api/helper/ask', { method:'POST', body:'{"q":"hi"}' })).status, 401);
+
+  process.env.GROQ_API_KEY = 'g';
+  const ai = fakeAI(() => ({ text:'Jump with the space key.', tip:'Change 80 to jump higher.', steps:[{ sprite:'Kitty', say:'Jump up and come back down.', script:[
+    { op:'event_whenkeypressed', KEY_OPTION:'space' },
+    { op:'motion_changeyby', DY:80 }, { op:'control_wait', DURATION:0.3 }, { op:'motion_changeyby', DY:-80 }] }] }));
+  try {
+    const r = await askAI(ana.cookie, 'how do i make kitty jump', { history:[{ q:'hello', a:'Hi!' }] });
+    assert.strictEqual(r.status, 200);
+    const a = await r.json();
+    assert.strictEqual(a.text, 'Jump with the space key.');
+    assert.strictEqual(a.steps[0].sprite, 'Kitty');
+    assert.deepStrictEqual(a.steps[0].blocks.map(b => b.op), ['event_whenkeypressed', 'motion_changeyby', 'control_wait', 'motion_changeyby']);
+    assert.strictEqual(a.steps[0].blocks[1].args.DY, '80');
+    const prompt = JSON.stringify(ai.sent[0].messages);
+    assert.match(prompt, /motion_movesteps \(stack\): move \[STEPS:num\] steps/, 'every block, with its slots');
+    assert.match(prompt, /Sprite \\"Kitty\\" \(open in the editor now\)/);
+    assert.match(prompt, /cat-a, cat-b/);
+    assert.match(prompt, /when ⚑ clicked \/ go to x: \(0\) y: \(-100\)/, 'the scripts already there');
+    assert.match(prompt, /variables for all sprites: score/);
+    assert.strictEqual(ai.sent[0].messages[1].content, 'hello', 'the chat so far');
+    assert.doesNotMatch(prompt, /\bAna\b|"ana"/, 'no name or username leaves the server');
+  } finally { ai.restore(); delete process.env.GROQ_API_KEY; }
 });
 
-test('block helper AI: off without a key, answers and logs with one, never sends who asked', async () => {
-  await store.upsertUser({ username:'cy', name:'Cy', period:'2', role:'student', ...auth.makeHash('fox77') });
-  const ana = await login('ana', 'tiger42'), cy = await login('cy', 'fox77');
-  const about = { story:'A cat that dodges dogs', has:['enemies'], next:'make the dogs get faster', player:'s1' };
-  const p = await (await call(ana.cookie, '/projects', { method:'POST', body:JSON.stringify({ name:'Cat', data:{ v:1, targets:[{ id:'st', isStage:true, name:'Stage' }, { id:'s1', name:'Kitty' }, { id:'s2', name:'Dog' }], about } }) })).json();
-  const ask = (c, q) => call(c, '/helper/ask', { method:'POST', body:JSON.stringify({ q, project:p.id, lang:'en' }) });
-
-  delete process.env.OPENROUTER_API_KEY;
-  assert.strictEqual((await ask(ana.cookie, 'how do i make a shop')).status, 503);
-
-  process.env.OPENROUTER_API_KEY = 'test-key';
-  const real = global.fetch;
-  let sent = null;
-  global.fetch = async (url, opts) => {
-    if(!String(url).startsWith('https://openrouter.ai/')) return real(url, opts);
-    sent = JSON.parse(opts.body);
-    return new Response(JSON.stringify({ choices:[{ message:{ content:'Use `change x by (10)` in Kitty.' } }] }), { status:200 });
-  };
+test('block helper AI: made-up blocks are sent back once to fix, and what is still wrong is left out', async () => {
+  const ana = await login('ana', 'tiger42');
+  process.env.GROQ_API_KEY = 'g';
+  const bad = { text:'x', steps:[{ sprite:'Kitty', script:[
+    { op:'event_whenflagclicked' },
+    { op:'motion_jump', HEIGHT:10 },                                      // no such block
+    { op:'control_if', CONDITION:'yes', do:[{ op:'motion_xposition' }] },  // text in a true/false hole; a reporter on its own
+    { op:'event_whenkeypressed', KEY_OPTION:'space' },                    // a hat in the middle
+    { op:'control_forever', do:[{ op:'motion_movesteps', STEPS:{ op:'sensing_mousex' }, SPEED:2 },  // no SPEED slot
+      { op:'control_stop', STOP_OPTION:'everything' }] },                 // not a menu choice
+    { op:'looks_show' }] }] };                                            // nothing goes under forever
+  const ai = fakeAI((host, body, n) => n === 1 ? bad : 'Sure! ' + JSON.stringify(bad));
   try {
-    const r = await ask(ana.cookie, 'how do i make a shop');
-    assert.strictEqual(r.status, 200);
-    assert.match((await r.json()).answer, /change x by/);
-    const prompt = JSON.stringify(sent.messages);
-    assert.match(prompt, /Kitty, Dog/);
-    assert.match(prompt, /A cat that dodges dogs/);
-    assert.match(prompt, /move \( \) steps/, 'the real block list is in the prompt');
-    assert.doesNotMatch(prompt, /\bAna\b|"ana"/, 'no name or username leaves the server');
-    assert.strictEqual((await ask(cy.cookie, 'hi there')).status, 404, 'only your own project');
-  } finally { global.fetch = real; delete process.env.OPENROUTER_API_KEY; }
-
-  const t = await login('teach', 'apple-pear');
-  const got = await (await call(t.cookie, '/admin/helper')).json();
-  const e = got.log.find(x => x.question === 'how do i make a shop' && x.answer);
-  assert.ok(e, 'the teacher sees the question and the AI answer');
-  assert.strictEqual(e.recipe, null, 'still counts as "no recipe yet"');
+    const a = await (await askAI(ana.cookie, 'jump')).json();
+    assert.strictEqual(ai.sent.length, 2, 'asked once to fix it');
+    assert.match(ai.sent[1].messages.at(-1).content, /there is no block "motion_jump"/);
+    const ops = []; (function walk(l){ for(const b of l){ ops.push(b.op); Object.values(b.inputs).forEach(x => walk([x])); walk(b.body || []); } })(a.steps[0].blocks);
+    assert.deepStrictEqual(ops, ['event_whenflagclicked', 'control_if', 'control_forever', 'motion_movesteps', 'sensing_mousex', 'control_stop']);
+    const forever = a.steps[0].blocks[2];
+    assert.ok(!('SPEED' in forever.body[0].args));
+    assert.ok(!('STOP_OPTION' in forever.body[1].args), 'a bad menu choice is dropped (the editor puts the default)');
+    assert.strictEqual(a.steps[0].blocks.length, 3);
+  } finally { ai.restore(); delete process.env.GROQ_API_KEY; }
 });
 
 test('block helper AI: Groq first, OpenRouter when Groq is out, and OpenRouter stops once its day is used up', async () => {
   const ana = await login('ana', 'tiger42');
-  const p = await (await call(ana.cookie, '/projects', { method:'POST', body:JSON.stringify({ name:'Order', data:{ v:1, targets:[], about:{ story:'x', has:['jump'], next:'y' } } }) })).json();
-  const ask = q => call(ana.cookie, '/helper/ask', { method:'POST', body:JSON.stringify({ q, project:p.id }) });
-  const real = global.fetch;
-  let tried = [], groq = 'ok', router = 'ok';
-  const reply = text => new Response(JSON.stringify({ choices:[{ message:{ content:text } }] }), { status:200 });
-  global.fetch = async (url, opts) => {
-    const host = String(url).startsWith('https://api.groq.com/') ? 'groq' : String(url).startsWith('https://openrouter.ai/') ? 'openrouter' : null;
-    if(!host) return real(url, opts);
-    tried.push(host + ':' + JSON.parse(opts.body).model);
-    const state = host === 'groq' ? groq : router;
-    if(state === 'busy') return new Response('{"error":{"message":"Rate limit reached"}}', { status:429 });
-    if(state === 'day') return new Response('{"error":{"message":"Rate limit exceeded: free-models-per-day"}}', { status:429 });
-    return reply('from ' + host);
-  };
+  const ok = host => ({ text:'from ' + host, steps:[] });
+  let groq = 200, router = 200;
+  const ai = fakeAI(host => (host === 'groq' ? groq : router) === 200 ? ok(host) : (host === 'groq' ? groq : router));
   process.env.GROQ_API_KEY = 'g'; process.env.OPENROUTER_API_KEY = 'o';
   try {
-    assert.strictEqual((await (await ask('q1')).json()).answer, 'from groq');
-    assert.deepStrictEqual(tried, ['groq:openai/gpt-oss-120b']);
+    assert.strictEqual((await (await askAI(ana.cookie, 'q1')).json()).text, 'from groq');
+    assert.deepStrictEqual(ai.sent.map(s => s.model), ['openai/gpt-oss-120b']);
 
-    tried = []; groq = 'busy';
-    assert.strictEqual((await (await ask('q2')).json()).answer, 'from openrouter');
-    assert.strictEqual(tried.filter(t => t.startsWith('groq')).length, 3, 'every Groq model is tried first');
+    ai.sent.length = 0; groq = 429;
+    assert.strictEqual((await (await askAI(ana.cookie, 'q2')).json()).text, 'from openrouter');
+    assert.strictEqual(ai.sent.filter(s => s.host === 'groq').length, 3, 'every Groq model is tried first');
 
-    tried = []; router = 'day';
-    assert.strictEqual((await ask('q3')).status, 502);
-    assert.strictEqual(tried.filter(t => t.startsWith('openrouter')).length, 1, 'no point asking other OpenRouter models');
-  } finally { global.fetch = real; delete process.env.GROQ_API_KEY; delete process.env.OPENROUTER_API_KEY; }
+    ai.sent.length = 0; router = 429;
+    assert.strictEqual((await askAI(ana.cookie, 'q3')).status, 502);
+    assert.strictEqual(ai.sent.filter(s => s.host === 'openrouter').length, 1, 'no point asking other OpenRouter models');
+  } finally { ai.restore(); delete process.env.GROQ_API_KEY; delete process.env.OPENROUTER_API_KEY; }
 });
