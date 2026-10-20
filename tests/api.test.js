@@ -294,3 +294,11 @@ test('learn progress only grows, and teachers see it', async () => {
   const row = (await (await call(t.cookie, '/admin/learn')).json()).find(r => r.username === 'ana');
   assert.strictEqual(row.levels, 2); assert.strictEqual(row.stars, 5); assert.strictEqual(row.byChapter.steps, 2);
 });
+
+test('block helper AI: blocks nested inside a hat are moved under it', () => {
+  const ai = require('../server/ai');
+  const r = ai.check({ text:'x', steps:[{ sprite:'Alien', script:[{ op:'event_whenflagclicked', do:[{ op:'looks_show' }, { op:'control_forever', do:[{ op:'motion_movesteps', STEPS:2 }] }] }] }] });
+  assert.deepStrictEqual(r.errors, []);
+  assert.deepStrictEqual(r.answer.steps[0].blocks.map(b => b.op), ['event_whenflagclicked', 'looks_show', 'control_forever']);
+  assert.strictEqual(r.answer.steps[0].blocks[2].body[0].op, 'motion_movesteps');
+});
