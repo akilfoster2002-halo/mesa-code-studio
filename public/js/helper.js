@@ -145,7 +145,11 @@ window.HELPER = (function(){
     const vars = known('vars'), lists = known('lists');
     const make = [
       ...((a.make && a.make.vars) || []).filter(v => !vars.has(v)).map(v => L('Make a variable called ', 'Crea una variable llamada ') + '“' + v + '” ' + L('(Variables → Make a Variable).', '(Variables → Crear una variable).')),
-      ...((a.make && a.make.lists) || []).filter(v => !lists.has(v)).map(v => L('Make a list called ', 'Crea una lista llamada ') + '“' + v + '”.')
+      ...((a.make && a.make.lists) || []).filter(v => !lists.has(v)).map(v => L('Make a list called ', 'Crea una lista llamada ') + '“' + v + '”.'),
+      ...((a.make && a.make.sprites) || []).map(v => L('Make a sprite called ', 'Crea un objeto llamado ') + '“' + v + '” ' + L('(with the sprite list).', '(en la lista de objetos).')),
+      ...((a.make && a.make.costumes) || []).map(v => { const [who, c] = v.split(': '); return L('Give ', 'Dale a ') + '“' + who + '” ' + L('a costume called ', 'un disfraz llamado ') + '“' + c + '” ' + L('(Costumes tab).', '(pestaña Disfraces).'); }),
+      ...((a.make && a.make.sounds) || []).map(v => { const [who, c] = v.split(': '); return L('Give ', 'Dale a ') + '“' + who + '” ' + L('a sound called ', 'un sonido llamado ') + '“' + c + '” ' + L('(Sounds tab).', '(pestaña Sonidos).'); }),
+      ...((a.make && a.make.backdrops) || []).map(v => L('Add a backdrop called ', 'Agrega un fondo llamado ') + '“' + v + '”.')
     ];
     into.replaceChildren(
       make.length ? h('div', { class:'hstep' }, h('div', { class:'hwhere' }, '✨ ' + L('First:', 'Primero:')), make.map(m => h('p', {}, m))) : null,

@@ -180,7 +180,7 @@ test('block helper AI: off without a key; the model sees the blocks and the proj
 
   process.env.GROQ_API_KEY = 'g';
   const ai = fakeAI(() => ({ text:'Jump with the space key.', tip:'Change 80 to jump higher.', steps:[{ sprite:'Kitty', say:'Jump up and come back down.', script:[
-    { op:'event_whenkeypressed', KEY_OPTION:'space' },
+    { op:'event_whenflagclicked' },
     { op:'motion_changeyby', DY:80 }, { op:'control_wait', DURATION:0.3 }, { op:'motion_changeyby', DY:-80 }] }] }));
   try {
     const r = await askAI(ana.cookie, 'how do i make kitty jump', { history:[{ q:'hello', a:'Hi!' }] });
@@ -188,7 +188,7 @@ test('block helper AI: off without a key; the model sees the blocks and the proj
     const a = await r.json();
     assert.strictEqual(a.text, 'Jump with the space key.');
     assert.strictEqual(a.steps[0].sprite, 'Kitty');
-    assert.deepStrictEqual(a.steps[0].blocks.map(b => b.op), ['event_whenkeypressed', 'motion_changeyby', 'control_wait', 'motion_changeyby']);
+    assert.deepStrictEqual(a.steps[0].blocks.map(b => b.op), ['event_whenflagclicked', 'motion_changeyby', 'control_wait', 'motion_changeyby']);
     assert.strictEqual(a.steps[0].blocks[1].args.DY, '80');
     const prompt = JSON.stringify(ai.sent[0].messages);
     assert.match(prompt, /motion_movesteps \(stack\): move \[STEPS:num\] steps/, 'every block, with its slots');
@@ -301,4 +301,29 @@ test('block helper AI: blocks nested inside a hat are moved under it', () => {
   assert.deepStrictEqual(r.errors, []);
   assert.deepStrictEqual(r.answer.steps[0].blocks.map(b => b.op), ['event_whenflagclicked', 'looks_show', 'control_forever']);
   assert.strictEqual(r.answer.steps[0].blocks[2].body[0].op, 'motion_movesteps');
+});
+
+test('block helper AI: names are held to the project, and "when key pressed" is never suggested', () => {
+  const ai = require('../server/ai');
+  const r = ai.check({ text:'x', newSprites:['Coin'], steps:[{ sprite:'kitty', script:[
+    { op:'event_whenflagclicked' },
+    { op:'looks_switchcostumeto', COSTUME:'Cat B' },                                                  // -> cat-b
+    { op:'control_if', CONDITION:{ op:'sensing_touchingobject', TOUCHINGOBJECTMENU:'dog' } },        // -> Dog
+    { op:'control_if', CONDITION:{ op:'sensing_touchingobject', TOUCHINGOBJECTMENU:'Coin' } },       // to make, and said so
+    { op:'control_if', CONDITION:{ op:'sensing_touchingobject', TOUCHINGOBJECTMENU:'Bird' } },       // made up
+    { op:'sound_play', SOUND_MENU:'boing' },                                                          // Kitty has meow
+    { op:'data_changevariableby', VARIABLE:'Score', VALUE:1 }] },                                     // -> score
+    { sprite:'Laser', script:[{ op:'event_whenkeypressed', KEY_OPTION:'space' }, { op:'looks_show' }] }] }, GAME);
+  const [kitty, laser] = r.answer.steps;
+  assert.strictEqual(kitty.sprite, 'Kitty');
+  assert.strictEqual(kitty.blocks[1].args.COSTUME, 'cat-b');
+  assert.strictEqual(kitty.blocks[2].inputs.CONDITION.args.TOUCHINGOBJECTMENU, 'Dog');
+  assert.strictEqual(kitty.blocks[6].args.VARIABLE, 'score');
+  assert.ok(r.errors.some(e => /no sprite "Bird"/.test(e)));
+  assert.ok(r.errors.some(e => /Kitty has no sound "boing" \(it has: meow\)/.test(e)));
+  assert.ok(!r.errors.some(e => /"Coin"/.test(e)), 'a sprite the answer says to make is fine');
+  assert.ok(r.errors.some(e => /no block "event_whenkeypressed"/.test(e)));
+  assert.deepStrictEqual(laser.blocks.map(b => b.op), ['looks_show']);
+  assert.deepStrictEqual(r.answer.make.sprites.sort(), ['Bird', 'Coin']);
+  assert.ok(!require('../server/ai').blockCatalog().includes('event_whenkeypressed'));
 });

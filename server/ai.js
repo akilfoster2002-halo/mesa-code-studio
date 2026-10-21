@@ -68,9 +68,10 @@ function blocks(){
   return B = ctx.window.BLOCKS;
 }
 /* what the AI may use: the blocks games are made of. Every token here is
-   sent with every question, and Groq's free tier allows 8000 a minute. */
+   sent with every question, and Groq's free tier allows 8000 a minute.
+   No "when key pressed": this class checks keys with if, inside forever. */
 const SKIP_CATS = new Set(['myblocks', 'music', 'tts', 'pen', 'lists']);
-const SKIP_OPS = new Set(['sensing_loudness', 'sensing_current', 'sensing_dayssince2000', 'sensing_username', 'sensing_setdragmode',
+const SKIP_OPS = new Set(['event_whenkeypressed', 'sensing_loudness', 'sensing_current', 'sensing_dayssince2000', 'sensing_username', 'sensing_setdragmode',
   'sensing_coloristouchingcolor', 'event_whengreaterthan', 'sound_changeeffectby', 'sound_seteffectto', 'sound_cleareffects',
   'looks_goforwardbackwardlayers', 'looks_switchbackdroptoandwait', 'event_broadcastandwait', 'operator_mathop']);
 const usable = spec => spec && !SKIP_CATS.has(spec.cat) && !SKIP_OPS.has(spec.op) && (spec.palette !== false || spec.op === 'data_variable');
@@ -158,7 +159,8 @@ Reply with ONLY a JSON object, no other text:
       "say": "one short sentence: what these blocks do",
       "script": [ BLOCK, BLOCK, ... ] }
   ],
-  "tip": "one short sentence: why it works, or what number to change to make it feel different"
+  "tip": "one short sentence: why it works, or what number to change to make it feel different",
+  "newSprites": [ "the name of each sprite the student must make first, if any (none: [])" ]
 }
 A BLOCK is { "op": "<block code>", "<SLOT>": value, ... }. C blocks (if, repeat, forever) put the blocks inside them in "do": [ ... ], and if-else puts the else part in "else": [ ... ].
 A slot value is a number or text, or a reporter BLOCK, e.g.
@@ -169,8 +171,8 @@ A slot value is a number or text, or a reporter BLOCK, e.g.
 Rules:
 - Only use block codes and slot names from the list below. Menu slots take one of the values listed after the colon (SPRITE, COSTUME, BACKDROP, SOUND, VARIABLE, LIST and MESSAGE mean a name from the project, or a new one the text tells them to make).
 - BOOLEAN BLOCK slots take a bool block (touching, key pressed, =, <, >, and, or, not).
-- Every script starts with a hat block (shape hat), like event_whenflagclicked or event_whenkeypressed.
-- Use the student's own sprite, costume, sound and variable names. Never translate them. Build on scripts they already have instead of repeating them.
+- Every script starts with a hat block: when ⚑ clicked, when I start as a clone, or when I receive. There is no "when key pressed": keys are always checked with if <key (space) pressed?> then, inside a forever.
+- Sprite, costume, sound, backdrop and variable names must be spelled exactly as they are in the project (it is listed after the question). Never translate them or make them up. If the student must make a new sprite first, put its name in "newSprites" and say so in "text". Build on scripts they already have instead of repeating them.
 - If something must be made first (a variable, a costume, a sprite, a message), say so in "text".
 - Facts: direction 90 is right, -90 left, 0 up, 180 down. The stage is x -240 to 240, y -180 to 180.
 - Keep it small: usually 1 to 3 steps and under 15 blocks in all. Answer only what was asked.
@@ -181,11 +183,11 @@ Rules:
 How this class codes (the teacher's way; always follow it):
 - One script, one job. A sprite with two jobs gets two scripts, and "say" names each job.
 - A sprite's main script is: when ⚑ clicked → go to its start spot (and reset its variables) → forever, with the checks inside as "if … then" blocks.
-- Moving with keys: inside that forever, "if key (left arrow) pressed? then change x by (-5)", one if per key. Not "when key pressed" hats for movement.
+- Keys, always: inside that forever, "if key (left arrow) pressed? then change x by (-5)", one if per key.
 - Keep a sprite on the screen with "if (x position) > (220) then set x to (220)", and the same for the other side.
-- Jumping and falling: if touching the ground then (if the jump key is pressed then repeat a few times: change y by a little), else change y by a small negative number. That else is the gravity.
+- Jumping is always exactly the shape of Example 1, nested like this: forever → if <touching (Ground)?> then → if <key (space) pressed?> then → repeat (20) → change y by (5); and the else of the touching if → change y by (-3) (the gravity). Use the student's own sprite names; only the numbers may change.
 - Things that appear again and again (obstacles, enemies, falling items, bullets): the original sprite hides and makes copies; each copy does the moving. "when I start as a clone" → go to where it starts → show → repeat until it is off the screen (change x or y a little each time) → delete this clone.
-- Shooting, all in the bullet sprite, no broadcast: when ⚑ clicked → hide. when (space) key pressed → go to (the shooter) → create clone of (myself). when I start as a clone → show → repeat until <<touching (the target)?> or <off the screen>> → change x (or y) by 10 → then delete this clone.
+- Shooting, all in the bullet sprite, no broadcast: when ⚑ clicked → hide → forever → if <key (space) pressed?> then → go to (the shooter) → create clone of (myself) → wait until <not <key (space) pressed?>> (one shot per press). when I start as a clone → show → repeat until <<touching (the target)?> or <off the screen>> → change x (or y) by 10 → then delete this clone.
 - Code goes in the sprite it is about: a coin, an alien or a brick checks if it is touching the player (or the laser), changes the score, and hides or deletes itself. The player does not hide other sprites.
 - Hitting something: "if touching (Cactus)? then" inside the forever. Points: change the score variable (and set it to 0 at the green flag). Game over: put stop (all) right inside that if, or take away a life and stop all when lives = 0.
 - Use broadcast only when another sprite must react, with a clear message name like "game over" (never message1).
@@ -193,14 +195,29 @@ How this class codes (the teacher's way; always follow it):
 - Small, steady numbers: change x/y by 2 to 8 each time round the forever; speeds and directions that change go in variables.
 
 Example 1. Question: "how do i make my dino jump" (project has sprites Dino and Ground)
-{"text":"Your dino should only jump when it is on the ground, and fall back down when it is not. Make sure your ground sprite is called Ground.","steps":[{"sprite":"Dino","say":"Start on the left. On the ground, space makes it jump; in the air, it falls.","script":[{"op":"event_whenflagclicked"},{"op":"motion_gotoxy","X":-180,"Y":-100},{"op":"control_forever","do":[{"op":"control_if_else","CONDITION":{"op":"sensing_touchingobject","TOUCHINGOBJECTMENU":"Ground"},"do":[{"op":"control_if","CONDITION":{"op":"sensing_keypressed","KEY_OPTION":"space"},"do":[{"op":"control_repeat","TIMES":20,"do":[{"op":"motion_changeyby","DY":5}]}]}],"else":[{"op":"motion_changeyby","DY":-3}]}]}]}],"tip":"Bigger repeat = higher jump. The -3 is gravity: make it -5 to fall faster."}
+{"text":"Your dino should only jump when it is on the ground, and fall back down when it is not. Make sure your ground sprite is called Ground.","steps":[{"sprite":"Dino","say":"Start on the left. On the ground, space makes it jump; in the air, it falls.","script":[{"op":"event_whenflagclicked"},{"op":"motion_gotoxy","X":-180,"Y":-100},{"op":"control_forever","do":[{"op":"control_if_else","CONDITION":{"op":"sensing_touchingobject","TOUCHINGOBJECTMENU":"Ground"},"do":[{"op":"control_if","CONDITION":{"op":"sensing_keypressed","KEY_OPTION":"space"},"do":[{"op":"control_repeat","TIMES":20,"do":[{"op":"motion_changeyby","DY":5}]}]}],"else":[{"op":"motion_changeyby","DY":-3}]}]}]}],"tip":"Bigger repeat = higher jump. The -3 is gravity: make it -5 to fall faster.","newSprites":[]}
 
 Example 2. Question: "how do i make cactuses keep coming" (project has a sprite Cactus)
-{"text":"Two scripts, two jobs: the original Cactus hides and makes copies, and each copy slides across and disappears.","steps":[{"sprite":"Cactus","say":"The original's job: make a copy every second.","script":[{"op":"event_whenflagclicked"},{"op":"looks_hide"},{"op":"control_forever","do":[{"op":"control_wait","DURATION":1},{"op":"control_create_clone_of","CLONE_OPTION":"_myself_"}]}]},{"sprite":"Cactus","say":"Each clone's job: start on the right, slide left, then disappear.","script":[{"op":"control_start_as_clone"},{"op":"motion_gotoxy","X":240,"Y":-100},{"op":"looks_show"},{"op":"control_repeat_until","CONDITION":{"op":"operator_lt","OPERAND1":{"op":"motion_xposition"},"OPERAND2":-240},"do":[{"op":"motion_changexby","DX":-3}]},{"op":"control_delete_this_clone"}]}],"tip":"Change wait (1) to make them come more or less often, and -3 to make them faster."}
+{"text":"Two scripts, two jobs: the original Cactus hides and makes copies, and each copy slides across and disappears.","steps":[{"sprite":"Cactus","say":"The original's job: make a copy every second.","script":[{"op":"event_whenflagclicked"},{"op":"looks_hide"},{"op":"control_forever","do":[{"op":"control_wait","DURATION":1},{"op":"control_create_clone_of","CLONE_OPTION":"_myself_"}]}]},{"sprite":"Cactus","say":"Each clone's job: start on the right, slide left, then disappear.","script":[{"op":"control_start_as_clone"},{"op":"motion_gotoxy","X":240,"Y":-100},{"op":"looks_show"},{"op":"control_repeat_until","CONDITION":{"op":"operator_lt","OPERAND1":{"op":"motion_xposition"},"OPERAND2":-240},"do":[{"op":"motion_changexby","DX":-3}]},{"op":"control_delete_this_clone"}]}],"tip":"Change wait (1) to make them come more or less often, and -3 to make them faster.","newSprites":[]}
 
 Blocks (code (shape): words [SLOT:values]):
 ${blockCatalog()}`;
 }
+
+/* ------------------------------------------------------------ the names
+   Every sprite, costume, sound, backdrop and variable in the project, so
+   an answer can be held to them. "dino duck" finds "dino-duck". */
+const key_ = s => String(s || '').toLowerCase().replace(/[\s_\-.]+/g, '');
+function nameBook(game){
+  const book = new Map();
+  for(const t of (Array.isArray(game && game.targets) ? game.targets : []).slice(0, 30)){
+    const list = l => new Map(names(l).map(n => [key_(n), n]));
+    book.set(t.isStage ? '\u0000stage' : key_(t.name), { name:t.isStage ? 'Stage' : clean(t.name), stage:!!t.isStage,
+      costumes:list(t.costumes), sounds:list(t.sounds), vars:list(t.vars) });
+  }
+  return book;
+}
+const SPRITE_MENUS = new Set(['goto', 'pointto', 'touching', 'clone', 'distance', 'oftarget']);
 
 /* ---------------------------------------------------------------- checks
    -> { block, errors } with the block in the editor's shape
@@ -234,7 +251,14 @@ function checkBlock(x, where, errors, ctx){
       } else if(a.menu === 'key'){
         s = s.toLowerCase();
         if(!fixed.some(o => o[1] === s)){ errors.push(where + ': "' + s + '" is not a key'); continue; }
-      } else s = ALIAS[s.toLowerCase()] || s;
+      } else {
+        s = ALIAS[s.toLowerCase()] || s;
+        if(ctx.book && !/^_\w+_$/.test(s)) s = checkName(a.menu, s, where + ' ' + x.op + '.' + k, errors, ctx);
+      }
+    }
+    if(a.t === 'var' && s && ctx.book){
+      const own = ctx.book.get(key_(ctx.sprite)), stage = ctx.book.get('\u0000stage');
+      s = (own && own.vars.get(key_(s))) || (stage && stage.vars.get(key_(s))) || s;
     }
     if((a.t === 'var' || a.t === 'list') && s) ctx[a.t === 'var' ? 'vars' : 'lists'].add(s);
     b.args[k] = s;
@@ -242,6 +266,32 @@ function checkBlock(x, where, errors, ctx){
   if(blocks().isC(spec.shape)) b.body = checkList(x.do, where + ' ' + x.op + '.do', errors, ctx);
   if(spec.shape === 'c2') b.body2 = checkList(x.else, where + ' ' + x.op + '.else', errors, ctx);
   return b;
+}
+/* a sprite, costume, sound or backdrop name -> its exact spelling in the
+   project; one that is not there is an error, unless it is a sprite the
+   answer says the student must make */
+function checkName(menu, s, where, errors, ctx){
+  const book = ctx.book, k = key_(s);
+  if(SPRITE_MENUS.has(menu)){
+    const hit = book.get(k);
+    if(hit && !hit.stage) return hit.name;
+    if(ctx.newSprites.has(k)){ ctx.make.sprites.add(ctx.newSprites.get(k)); return ctx.newSprites.get(k); }
+    const all = [...book.values()].filter(t => !t.stage).map(t => t.name);
+    errors.push(where + ': there is no sprite "' + s + '" (the sprites are: ' + (all.join(', ') || 'none') + '). Use one of them, or put it in "newSprites" if the student must make it');
+    ctx.make.sprites.add(s);
+    return s;
+  }
+  const kind = menu === 'costume' ? 'costumes' : menu === 'sound' ? 'sounds' : (menu === 'backdrop' || menu === 'backdropname') ? 'backdrops' : null;
+  if(!kind) return s;
+  if(kind === 'backdrops' && /^(next|previous|random) backdrop$/.test(s)) return s;
+  const owner = kind === 'backdrops' ? book.get('\u0000stage') : book.get(key_(ctx.sprite));
+  if(!owner) return s;                                    // a new sprite: it has nothing yet
+  const list = kind === 'sounds' ? owner.sounds : owner.costumes;
+  if(list.get(k)) return list.get(k);
+  const what = kind === 'backdrops' ? 'backdrop' : kind.slice(0, -1);
+  errors.push(where + ': ' + owner.name + ' has no ' + what + ' "' + s + '" (it has: ' + ([...list.values()].join(', ') || 'none') + ')');
+  ctx.make[kind].push(kind === 'backdrops' ? s : owner.name + ': ' + s);
+  return s;
 }
 function checkList(list, where, errors, ctx, top){
   const out = [];
@@ -261,15 +311,34 @@ function checkList(list, where, errors, ctx, top){
   });
   return out;
 }
-/* the model's JSON -> { text, tip, steps:[{ sprite, say, blocks }], make:{ vars, lists } } and what was wrong */
-function check(reply){
+/* the model's JSON (and the project, to check names against) ->
+   { text, tip, steps:[{ sprite, say, blocks }], make:{ vars, lists, sprites, costumes, sounds, backdrops } }
+   and what was wrong */
+function check(reply, game){
   const errors = [];
-  const ctx = { vars:new Set(), lists:new Set() };
+  const book = game ? nameBook(game) : null;
+  const ctx = { vars:new Set(), lists:new Set(), book, newSprites:new Map(),
+    make:{ sprites:new Set(), costumes:[], sounds:[], backdrops:[] } };
+  for(const n of (Array.isArray(reply.newSprites) ? reply.newSprites : []).map(x => clean(x)).filter(Boolean)) ctx.newSprites.set(key_(n), n);
+  if(book) for(const s of Array.isArray(reply.steps) ? reply.steps : []){      // a step can be "a new sprite called …"
+    const n = clean(s && s.sprite), hit = book.get(key_(n));
+    if(n && key_(n) !== 'stage' && !(hit && !hit.stage)) ctx.newSprites.set(key_(n), n);
+  }
   const steps = (Array.isArray(reply.steps) ? reply.steps : []).slice(0, 6).map((s, i) => {
+    let sprite = clean(s && s.sprite) || 'Stage';
+    if(key_(sprite) === 'stage') sprite = 'Stage';
+    else if(book){
+      const hit = book.get(key_(sprite));
+      if(hit && !hit.stage) sprite = hit.name;
+    }
+    ctx.sprite = sprite;
     const blocksOut = checkList(s && s.script, 'step ' + (i + 1), errors, ctx, true);
-    return { sprite:clean(s && s.sprite) || 'Stage', say:clean(s && s.say, 300), blocks:blocksOut };
+    return { sprite, say:clean(s && s.say, 300), blocks:blocksOut };
   }).filter(s => s.blocks.length);
-  return { errors, answer:{ text:clean(reply.text, 600), tip:clean(reply.tip, 300), steps, make:{ vars:[...ctx.vars], lists:[...ctx.lists] } } };
+  const stepSprites = new Set(steps.map(s => key_(s.sprite)));
+  const make = { vars:[...ctx.vars], lists:[...ctx.lists], sprites:[...ctx.make.sprites].filter(n => !stepSprites.has(key_(n))),
+    costumes:[...new Set(ctx.make.costumes)], sounds:[...new Set(ctx.make.sounds)], backdrops:[...new Set(ctx.make.backdrops)] };
+  return { errors, answer:{ text:clean(reply.text, 600), tip:clean(reply.tip, 300), steps, make } };
 }
 /* the JSON in a reply, even with a sentence or a <think> around it */
 function parse(s){
@@ -329,14 +398,14 @@ async function ask({ q, game, current, history, lang }){
   }
   messages.push({ role:'user', content:q + '\n\n--- The project right now ---\n' + projectText(game, current) });
   let got = await first(messages);
-  let { errors, answer } = check(got.reply);
+  let { errors, answer } = check(got.reply, game);
   if(errors.length){
     // one chance to fix it, with the same model
     messages.push({ role:'assistant', content:got.raw }, { role:'user', content:'Some blocks are wrong:\n- ' + errors.slice(0, 12).join('\n- ') +
       '\nReply with the whole JSON again, fixed. Only use block codes, slots and values from the list.' });
     try {
       const again = await first(messages, got);
-      const second = check(again.reply);
+      const second = check(again.reply, game);
       if(second.errors.length < errors.length) ({ errors, answer } = second);
     } catch(e){}
     if(errors.length) console.error('helper ai: left out ' + errors.length + ': ' + errors.slice(0, 3).join('; '));
