@@ -57,6 +57,7 @@ class FileStore {
 
   async setLogin(username){ const u = this.db.users[username]; if(u){ u.last_login = now(); this._save(); } }
   async setTutorial(username, v){ const u = this.db.users[username]; if(u){ u.tutorial = v; this._save(); } }
+  async setTip(username, v){ const u = this.db.users[username]; if(u){ u.helper_tip = v || null; this._save(); } }
   async setDisabled(username, v){ const u = this.db.users[username]; if(u){ u.disabled = !!v; this._save(); } }
   async lastVersionLabel(id){ const vs = this.db.versions[id] || []; return vs.length ? vs[vs.length-1].label : null; }
   /* one row per account: how far each student has got */
@@ -190,7 +191,7 @@ function designSummary(d){
 function row(u, ps, recent){
   const best = ps.reduce((a, p) => Math.max(a, (p.stats && p.stats.blocks) || 0), 0);
   const last = ps.reduce((a, p) => !a || p.updated > a ? p.updated : a, null);
-  return { username:u.username, name:u.name, period:u.period, role:u.role, disabled:!!u.disabled, tutorial:u.tutorial || null,
+  return { username:u.username, name:u.name, period:u.period, role:u.role, disabled:!!u.disabled, tutorial:u.tutorial || null, tip:u.helper_tip || null,
     last_login: u.last_login ? iso(u.last_login) : null, projects:ps.length, updated: last ? iso(last) : null,
     blocks:best, recent };
 }
@@ -261,6 +262,7 @@ class PgStore {
       ALTER TABLE cs_users ADD COLUMN IF NOT EXISTS last_login TIMESTAMPTZ;
       ALTER TABLE cs_users ADD COLUMN IF NOT EXISTS disabled BOOLEAN NOT NULL DEFAULT false;
       ALTER TABLE cs_users ADD COLUMN IF NOT EXISTS tutorial TEXT;
+      ALTER TABLE cs_users ADD COLUMN IF NOT EXISTS helper_tip TEXT;   -- a teacher's note, first in the student's Block Helper
       ALTER TABLE cs_projects ADD COLUMN IF NOT EXISTS stats JSONB;
       ALTER TABLE cs_projects ADD COLUMN IF NOT EXISTS edited_by TEXT;
       CREATE TABLE IF NOT EXISTS cs_learn (
@@ -289,6 +291,7 @@ class PgStore {
   }
   async setLogin(username){ await this.q('UPDATE cs_users SET last_login=now() WHERE username=$1', [username]); }
   async setTutorial(username, v){ await this.q('UPDATE cs_users SET tutorial=$2 WHERE username=$1', [username, v]); }
+  async setTip(username, v){ await this.q('UPDATE cs_users SET helper_tip=$2 WHERE username=$1', [username, v || null]); }
   async setDisabled(username, v){ await this.q('UPDATE cs_users SET disabled=$2 WHERE username=$1', [username, !!v]); }
   async lastVersionLabel(id){
     const r = await this.q('SELECT label FROM cs_versions WHERE project=$1 ORDER BY created DESC LIMIT 1', [id]);

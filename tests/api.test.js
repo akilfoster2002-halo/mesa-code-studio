@@ -100,6 +100,14 @@ test('dashboard: progress per student, add accounts, turn one off', async () => 
   await call(t.cookie, '/admin/students/anal/disable', { method:'POST', body:'{"disabled":false}' });
   assert.strictEqual((await login('anal', made.password)).status, 200);
   assert.strictEqual((await call(t.cookie, '/admin/students/teach/disable', { method:'POST', body:'{"disabled":true}' })).status, 400);
+  // a Block Helper tip: only a teacher sets it, the student reads it from /me, empty clears it
+  const anal = (await login('anal', made.password)).cookie;
+  assert.strictEqual((await call(anal, '/admin/students/anal/tip', { method:'POST', body:'{"tip":"x"}' })).status, 403);
+  await call(t.cookie, '/admin/students/anal/tip', { method:'POST', body:JSON.stringify({ tip:'Try a glide block.\nWhat is your y on the ground?' }) });
+  assert.strictEqual((await (await call(anal, '/me')).json()).tip, 'Try a glide block.\nWhat is your y on the ground?');
+  assert.strictEqual((await (await call(t.cookie, '/admin/overview')).json()).find(r => r.username === 'anal').tip, 'Try a glide block.\nWhat is your y on the ground?');
+  await call(t.cookie, '/admin/students/anal/tip', { method:'POST', body:'{"tip":""}' });
+  assert.strictEqual((await (await call(anal, '/me')).json()).tip, null);
 });
 
 test('deleted projects can be brought back', async () => {

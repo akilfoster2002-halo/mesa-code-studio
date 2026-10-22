@@ -555,6 +555,7 @@
             h('td', {}, r.tutorial === 'done' ? '✅' : r.tutorial === 'skipped' ? '⏭ ' + t('skipped') : r.tutorial ? (Number(r.tutorial) + 1) + ' / ' + TOUR.STEPS.length : '—'),
             h('td', { class:'tact' },
               h('button', { class:'btn small', type:'button', disabled:!r.projects, title:t('Projects'), onclick:() => studentProjects(r) }, '🗂'),
+              h('button', { class:'btn small' + (r.tip ? ' on' : ''), type:'button', title:t('Block Helper tip'), onclick:() => editTip(r) }, r.tip ? '💬✓' : '💬'),
               h('button', { class:'btn small', type:'button', title:t('Reset password'), onclick:() => resetPassword(r) }, '🔑'),
               r.username === me.username ? null : h('button', { class:'btn small', type:'button', title:r.disabled ? t('Turn on') : t('Turn off'),
                 onclick:async () => {
@@ -603,6 +604,17 @@
       done();
     } catch(e){ UI.toast(e.message === 'period' ? t('Period') + '?' : e.message === 'name' ? t('Name') + '?' : e.message, 'bad'); }
   }
+  /* a teacher's note that shows first in the student's Block Helper */
+  async function editTip(s){
+    const box = UI.h('textarea', { class:'inp', rows:8, maxlength:2000, style:{ width:'100%' }, placeholder:t('Hints for this student. They see it when they open Block Helper.') });
+    box.value = s.tip || '';
+    const ok = await UI.dialog({ title:'💬 ' + t('Block Helper tip') + ' — ' + s.name, wide:true,
+      body:UI.h('div', {}, box, UI.h('p', { class:'muted' }, t('Leave it empty to remove the tip.'))), ok:t('Save') });
+    if(!ok) return;
+    try { await api('/admin/students/' + s.username + '/tip', { method:'POST', body:json({ tip:box.value }) }); UI.toast('✓ ' + t('Saved')); s.tip = box.value.trim() || null; }
+    catch(e){ UI.toast(e.message, 'bad'); }
+  }
+
   async function resetPassword(s){
     const words = ['apple','bear','bird','boat','cake','cloud','duck','fish','frog','kite','lemon','lion','moon','owl','panda','pizza','robot','rocket','star','sun','taco','tiger','train','tree','turtle','whale','zebra'];
     const suggest = words[Math.floor(Math.random() * words.length)] + (10 + Math.floor(Math.random() * 90));

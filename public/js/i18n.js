@@ -59,6 +59,7 @@ window.I18N = (function(){
     'Download to your computer':'Descargar a tu computadora', 'Load from your computer':'Cargar desde tu computadora',
     'Delete this project?':'¿Borrar este proyecto?', 'Recently deleted':'Borrados recientemente',
     'Students':'Estudiantes', 'Teacher':'Maestro', 'Period':'Período', 'Projects':'Proyectos', 'Last saved':'Último guardado',
+    'Block Helper tip':'Consejo para el Ayudante', 'Hints for this student. They see it when they open Block Helper.':'Pistas para este estudiante. Las ve al abrir el Ayudante de bloques.', 'Leave it empty to remove the tip.':'Déjalo vacío para quitar el consejo.',
     'New password':'Nueva contraseña', 'Reset password':'Cambiar contraseña', 'Password changed.':'Contraseña cambiada.',
     'Viewing {n}\'s project':'Viendo el proyecto de {n}', 'Back':'Atrás', 'Full screen':'Pantalla completa',
     'Delete this sprite?':'¿Borrar este objeto?', 'export':'exportar', 'Allow the microphone to record.':'Permite el micrófono para grabar.',

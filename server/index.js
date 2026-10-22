@@ -9,7 +9,8 @@
      POST /api/helper/ask           a Block Helper question, answered by the AI (server/ai.js)
      teacher only: GET /api/admin/overview, /api/admin/students/:u/projects,
                    POST /api/admin/users (add a student or teacher),
-                   POST /api/admin/students/:u/password, /api/admin/students/:u/disable
+                   POST /api/admin/students/:u/password, /api/admin/students/:u/disable,
+                   POST /api/admin/students/:u/tip (a note shown first in their Block Helper; empty clears it)
      A teacher may also open, change and restore any student's project; the
      student's work from before the change is kept in its history.
      Learn games (/learn): GET/PUT /api/learn (stars per level, best word-match time;
@@ -141,7 +142,7 @@ async function api(req, res, url){
     tries.delete('u:'+username);
     await store.setLogin(u.username);
     auth.setCookie(res, { u:u.username, role:u.role });
-    return send(res, 200, { username:u.username, name:u.name, role:u.role, period:u.period, tutorial:u.tutorial || null });
+    return send(res, 200, { username:u.username, name:u.name, role:u.role, period:u.period, tutorial:u.tutorial || null, tip:u.helper_tip || null });
   }
   if(p[0] === 'logout' && m === 'POST'){ auth.clearCookie(res); return send(res, 200, { ok:true }); }
 
@@ -166,7 +167,7 @@ async function api(req, res, url){
     await store.setTutorial(user.username, v);
     return send(res, 200, { ok:true });
   }
-  if(p[0] === 'me') return send(res, 200, { username:user.username, name:user.name, role:user.role, period:user.period, tutorial:user.tutorial || null });
+  if(p[0] === 'me') return send(res, 200, { username:user.username, name:user.name, role:user.role, period:user.period, tutorial:user.tutorial || null, tip:user.helper_tip || null });
 
   /* the Block Helper: the browser sends the question with the project as
      it is on screen (names and scripts only) and the chat so far */
@@ -339,6 +340,13 @@ async function api(req, res, url){
       const pw = String(b.password || '').trim().toLowerCase();
       if(pw.length < 4) return send(res, 400, { error:'short' });
       await store.upsertUser({ ...u, ...auth.makeHash(pw) });
+      return send(res, 200, { ok:true });
+    }
+    if(p[1] === 'students' && p[3] === 'tip' && m === 'POST'){
+      const u = await store.getUser(p[2]);
+      if(!u) return send(res, 404, { error:'none' });
+      const b = await readJSON(req, 8000);
+      await store.setTip(u.username, String(b.tip || '').replace(/\r/g, '').trim().slice(0, 2000));
       return send(res, 200, { ok:true });
     }
     if(p[1] === 'students' && p[3] === 'disable' && m === 'POST'){

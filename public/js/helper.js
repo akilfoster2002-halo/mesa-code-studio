@@ -71,6 +71,8 @@ window.HELPER = (function(){
         h('p', {}, (firstName() ? L('Hi ', '¡Hola, ') + firstName() + '! ' : '') + L('I can help you build your game with blocks. I can see your sprites and scripts.', 'Te puedo ayudar a hacer tu juego con bloques. Puedo ver tus objetos y programas.')),
         h('p', {}, L('Ask me anything, like:', 'Pregúntame lo que sea, como:')),
         h('div', { class:'hsugg' }, examples.map(q => h('button', { type:'button', class:'hq-btn', onclick:() => ask(q) }, q)))));
+      if(me().tip) bot(h('div', { class:'htip' }, h('p', {}, h('b', {}, '📌 ' + L('A tip from your teacher', 'Un consejo de tu maestro'))),
+        ...String(me().tip).split(/\n+/).filter(Boolean).map(line => h('p', {}, line))));
     }
     const input = h('input', { class:'inp', maxlength:300, placeholder:L('Ask a question…', 'Haz una pregunta…'), 'aria-label':L('Ask a question', 'Haz una pregunta') });
     const form = h('form', { class:'hask' }, input, h('button', { class:'btn primary', type:'submit' }, L('Ask', 'Preguntar')));
