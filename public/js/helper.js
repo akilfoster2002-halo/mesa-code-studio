@@ -85,9 +85,13 @@ window.HELPER = (function(){
   function tipLine(line){
     const parts = line.split(/\[\[\s*([a-z0-9_]+)\s*\]\]/);
     const blocks = [];
-    parts.forEach((x, i) => { if(i % 2 && BLOCKS.of(x)) blocks.push(EDITOR.view([PROJECT.block(x)])); });
+    parts.forEach((x, i) => { if(i % 2 && BLOCKS.of(x)) blocks.push(h('div', { class:'htipblock' }, EDITOR.view([PROJECT.block(x)]), copyBtn(() => [PROJECT.block(x)]))); });
     const text = parts.map((x, i) => i % 2 ? (BLOCKS.of(x) ? '' : x) : x).join('').replace(/\s+/g, ' ').trim();
     return h('div', { class:'htipline' }, text ? h('p', {}, text) : null, blocks.length ? h('div', { class:'hblocks htipblocks' }, blocks) : null);
+  }
+  function copyBtn(make){
+    return h('button', { class:'btn small ghost hcopy', type:'button', title:L('Copy these blocks, then paste them in your scripts', 'Copia estos bloques y pégalos en tus programas'),
+      onclick:() => EDITOR.copyBlocks(make()) }, '📋 ' + L('Copy', 'Copiar'));
   }
   function scroll(){ if(chat) requestAnimationFrame(() => chat.log.scrollTop = chat.log.scrollHeight); }
   function bot(content){ const m = h('div', { class:'hm bot' }, content); chat.log.append(m); scroll(); return m; }
@@ -171,7 +175,8 @@ window.HELPER = (function(){
         return h('div', { class:'hstep' },
           h('div', { class:'hwhere' }, '📍 ' + label),
           step.say ? h('p', {}, step.say) : null,
-          h('div', { class:'hblocks' }, EDITOR.view(step.blocks.map(build))));
+          h('div', { class:'hblocks' }, EDITOR.view(step.blocks.map(build))),
+          copyBtn(() => step.blocks.map(build)));
       }),
       a.tip ? h('p', { class:'hwhy' }, '💡 ' + a.tip) : null,
       h('p', { class:'muted hnote-ai' }, L('This answer is from an AI, so it can be wrong. If it does not work, tell me what happened!', 'Esta respuesta es de una IA y puede estar mal. Si no funciona, ¡dime qué pasó!')));

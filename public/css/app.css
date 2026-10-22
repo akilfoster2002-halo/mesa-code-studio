@@ -522,6 +522,8 @@ body.full-stage .hlaunch,body.full-stage .helper{display:none}
 .htipline{margin:6px 0 8px}
 .htipblocks{display:flex;flex-wrap:wrap;gap:6px;align-items:flex-start}
 .htipblocks .bview{margin:0}
+.htipblock{display:flex;flex-direction:column;align-items:flex-start;gap:3px}
+.hcopy{margin-top:4px}
 .hsugg{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
 .hq-btn{border:1px solid #c9cdf5;background:#eef0ff;color:var(--brand-d);border-radius:14px;padding:5px 10px;font-size:13px;cursor:pointer;
   text-align:left;font-family:inherit;display:inline-flex;align-items:center;gap:6px}

@@ -57,6 +57,32 @@ window.EDITOR = (function(){
     }, { passive:false });
     els.pal.addEventListener('scroll', () => highlightCat());
     addEventListener('keydown', keys);
+    // where the mouse is over the scripts, for Ctrl+C / Ctrl+V
+    els.ws.addEventListener('pointermove', e => { mouse = { x:e.clientX, y:e.clientY }; overEl = e.target.closest('.b'); });
+    els.ws.addEventListener('pointerleave', () => { overEl = null; });
+  }
+
+  /* ------------------------------------------------- copy and paste
+     The clipboard is kept in this browser, so blocks can go to another
+     sprite or another project (and Block Helper can put blocks on it). */
+  let mouse = null, overEl = null;
+  const CLIP = 'cs_clip';
+  function getClip(){ try { const c = JSON.parse(localStorage.getItem(CLIP)); return Array.isArray(c) && c.length ? c : null; } catch(e){ return null; } }
+  function copyBlocks(blocks){
+    try { localStorage.setItem(CLIP, JSON.stringify(blocks)); } catch(e){ return UI.toast(t('Could not copy.'), 'bad'); }
+    UI.toast('📋 ' + t('Copied! Right-click the scripts area and choose Paste, or press Ctrl+V.'));
+  }
+  function copyInfo(info){ copyBlocks(info.slot ? [info.block] : info.list.slice(info.idx)); }
+  function paste(x, y){
+    const clip = getClip();
+    if(!clip || readOnly) return;
+    remember();
+    const r = els.ws.getBoundingClientRect();
+    const p = x != null ? toCanvas(x, y) : toCanvas(r.left + 40, r.top + 40);
+    const fresh = PROJECT.copy(clip);
+    // a loose reporter or condition is its own script, the same as one dragged out
+    target.scripts.push({ id:PROJECT.uid(), x:Math.round(p.x), y:Math.round(p.y), blocks:fresh });
+    renderWorkspace(); renderPalette(); changed();
   }
 
   function load(project, tg, ro){
@@ -107,6 +133,12 @@ window.EDITOR = (function(){
     if(typing || readOnly) return;
     if((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z'){ e.preventDefault(); e.shiftKey ? doRedo() : doUndo(); }
     else if((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'y'){ e.preventDefault(); doRedo(); }
+    else if((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'c' && overEl && !String(getSelection()).length){
+      const info = index[overEl.dataset.id]; if(info){ e.preventDefault(); copyInfo(info); }
+    }
+    else if((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'v' && getClip()){
+      e.preventDefault(); mouse && overWs(mouse) ? paste(mouse.x, mouse.y) : paste();
+    }
   }
 
   /* ------------------------------------------------------ categories */
@@ -716,6 +748,7 @@ window.EDITOR = (function(){
     b.op === 'procedures_definition' ? 'hat' : b.op === 'procedures_call' ? 'stack' : (BLOCKS.of(b.op) || {}).shape;
 
   /* screen point -> canvas units */
+  function overWs(p){ const r = els.ws.getBoundingClientRect(); return p.x >= r.left && p.x <= r.right && p.y >= r.top && p.y <= r.bottom; }
   function toCanvas(x, y){
     const r = els.wsc.getBoundingClientRect();
     return { x:(x - r.left) / zoom, y:(y - r.top) / zoom };
@@ -1010,7 +1043,7 @@ window.EDITOR = (function(){
     if(bEl && !bEl.classList.contains('argtpl')){
       const info = index[bEl.dataset.id]; if(!info) return;
       const b = info.block;
-      const items = [{ label:t('Duplicate'), value:'dup' }];
+      const items = [{ label:t('Duplicate'), value:'dup' }, { label:'📋 ' + t('Copy'), value:'copy' }];
       if(b.op === 'procedures_definition') items.push({ label:t('Edit'), value:'edit' });
       if(b.op === 'procedures_call') items.push({ label:t('Edit'), value:'editcall' });
       items.push({ label:t('Delete Block'), value:'del', danger:true });
@@ -1018,6 +1051,7 @@ window.EDITOR = (function(){
       if(help) items.push({ sep:true }, { label:'? ' + help, value:'help' });
       UI.menu(e.clientX, e.clientY, items, v => {
         if(v === 'dup') return duplicate(info, bEl);
+        if(v === 'copy') return copyInfo(info);
         if(v === 'del') return deleteBlock(info);
         if(v === 'edit') return makeBlockDialog(b);
         if(v === 'editcall'){ const d = PROJECT.procs(target)[b.proc.code]; if(d) makeBlockDialog(d.def); }
@@ -1025,9 +1059,10 @@ window.EDITOR = (function(){
       return;
     }
     UI.menu(e.clientX, e.clientY, [
+      ...(getClip() ? [{ label:'📋 ' + t('Paste'), value:'paste' }, { sep:true }] : []),
       { label:t('Undo'), value:'undo' }, { label:t('Redo'), value:'redo' }, { sep:true },
       { label:t('Clean up blocks'), value:'clean' }, { label:t('Make a Block'), value:'proc' }
-    ], v => { if(v === 'undo') doUndo(); if(v === 'redo') doRedo(); if(v === 'clean') cleanUp(); if(v === 'proc') makeBlockDialog(); }, { className:'ctx' });
+    ], v => { if(v === 'paste') paste(e.clientX, e.clientY); if(v === 'undo') doUndo(); if(v === 'redo') doRedo(); if(v === 'clean') cleanUp(); if(v === 'proc') makeBlockDialog(); }, { className:'ctx' });
   }
   function palContext(e){
     e.preventDefault();
@@ -1094,6 +1129,6 @@ window.EDITOR = (function(){
   return {
     mount, load, setTarget, renderAll, renderPalette, renderWorkspace, updateGlow, doUndo, doRedo, renameSprite,
     takeEyedropper, get eyedropping(){ return !!eyedropper; }, get target(){ return target; }, makeBlockDialog,
-    get zoom(){ return zoom; }, view
+    get zoom(){ return zoom; }, view, copyBlocks, paste
   };
 })();
