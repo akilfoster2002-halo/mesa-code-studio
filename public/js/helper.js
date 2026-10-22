@@ -72,7 +72,7 @@ window.HELPER = (function(){
         h('p', {}, L('Ask me anything, like:', 'Pregúntame lo que sea, como:')),
         h('div', { class:'hsugg' }, examples.map(q => h('button', { type:'button', class:'hq-btn', onclick:() => ask(q) }, q)))));
       if(me().tip) bot(h('div', { class:'htip' }, h('p', {}, h('b', {}, '📌 ' + L('A tip from your teacher', 'Un consejo de tu maestro'))),
-        ...String(me().tip).split(/\n+/).filter(Boolean).map(line => h('p', {}, line))));
+        ...String(me().tip).split(/\n+/).filter(Boolean).map(tipLine)));
     }
     const input = h('input', { class:'inp', maxlength:300, placeholder:L('Ask a question…', 'Haz una pregunta…'), 'aria-label':L('Ask a question', 'Haz una pregunta') });
     const form = h('form', { class:'hask' }, input, h('button', { class:'btn primary', type:'submit' }, L('Ask', 'Preguntar')));
@@ -80,6 +80,14 @@ window.HELPER = (function(){
     main.replaceChildren(chat.log, form);
     scroll();
     input.focus();
+  }
+  /* a teacher tip line: [[op]] draws that one block, loose — a hint, not a script */
+  function tipLine(line){
+    const parts = line.split(/\[\[\s*([a-z0-9_]+)\s*\]\]/);
+    const blocks = [];
+    parts.forEach((x, i) => { if(i % 2 && BLOCKS.of(x)) blocks.push(EDITOR.view([PROJECT.block(x)])); });
+    const text = parts.map((x, i) => i % 2 ? (BLOCKS.of(x) ? '' : x) : x).join('').replace(/\s+/g, ' ').trim();
+    return h('div', { class:'htipline' }, text ? h('p', {}, text) : null, blocks.length ? h('div', { class:'hblocks htipblocks' }, blocks) : null);
   }
   function scroll(){ if(chat) requestAnimationFrame(() => chat.log.scrollTop = chat.log.scrollHeight); }
   function bot(content){ const m = h('div', { class:'hm bot' }, content); chat.log.append(m); scroll(); return m; }

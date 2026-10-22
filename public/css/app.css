@@ -519,6 +519,9 @@ body.full-stage .hlaunch,body.full-stage .helper{display:none}
 .hm.me{background:var(--brand);color:#fff;align-self:flex-end;max-width:85%;border-bottom-right-radius:4px}
 .htip{background:#fff8e1;border:1px solid #f3dd9b;border-radius:10px;padding:6px 10px;margin:-2px 0}
 .htip p{margin:4px 0}
+.htipline{margin:6px 0 8px}
+.htipblocks{display:flex;flex-wrap:wrap;gap:6px;align-items:flex-start}
+.htipblocks .bview{margin:0}
 .hsugg{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
 .hq-btn{border:1px solid #c9cdf5;background:#eef0ff;color:var(--brand-d);border-radius:14px;padding:5px 10px;font-size:13px;cursor:pointer;
   text-align:left;font-family:inherit;display:inline-flex;align-items:center;gap:6px}

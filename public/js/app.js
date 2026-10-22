@@ -609,7 +609,7 @@
     const box = UI.h('textarea', { class:'inp', rows:8, maxlength:2000, style:{ width:'100%' }, placeholder:t('Hints for this student. They see it when they open Block Helper.') });
     box.value = s.tip || '';
     const ok = await UI.dialog({ title:'💬 ' + t('Block Helper tip') + ' — ' + s.name, wide:true,
-      body:UI.h('div', {}, box, UI.h('p', { class:'muted' }, t('Leave it empty to remove the tip.'))), ok:t('Save') });
+      body:UI.h('div', {}, box, UI.h('p', { class:'muted' }, t('Show a block by writing its name in double brackets, like [[event_whenkeypressed]] or [[motion_glidesecstoxy]].')), UI.h('p', { class:'muted' }, t('Leave it empty to remove the tip.'))), ok:t('Save') });
     if(!ok) return;
     try { await api('/admin/students/' + s.username + '/tip', { method:'POST', body:json({ tip:box.value }) }); UI.toast('✓ ' + t('Saved')); s.tip = box.value.trim() || null; }
     catch(e){ UI.toast(e.message, 'bad'); }
