@@ -122,6 +122,13 @@ window.VM = (function(){
         if(running.length){
           if(!restart) continue;
           running.forEach(stopThread);
+          // restart it in its old place in the line, like Scratch: pushed to the back, a
+          // script restarted every frame (broadcast in a forever) would never get to run
+          const th = startThread(tg, s, s.blocks);
+          rt.threads.pop();
+          rt.threads.splice(rt.threads.indexOf(running[0]), 0, th);
+          started.push(th);
+          continue;
         }
         started.push(startThread(tg, s, s.blocks));
       }
@@ -145,7 +152,9 @@ window.VM = (function(){
     rt.redraw = false;
     do {
       let active = 0, awake = 0;
-      for(const th of rt.threads.slice()){
+      // the live list, like Scratch: a script started or restarted this frame runs this frame too
+      for(let i = 0; i < rt.threads.length; i++){
+        const th = rt.threads[i];
         if(th.done) continue;
         active++;
         th.sleeping = false;
