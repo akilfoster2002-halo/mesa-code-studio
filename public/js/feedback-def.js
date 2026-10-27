@@ -8,22 +8,17 @@
    ===================================================================== */
 (function(root){
   const FEEDBACK = {
-    // what works when you play it (the rubric, level by level)
+    // play it, then write what you saw (the rubric, level by level)
     checks: [
-      { id:'moves',   icon:'🕹', level:1, en:'The player moves with the keys or the mouse.',          es:'El jugador se mueve con las teclas o el ratón.' },
-      { id:'enemy',   icon:'👾', level:2, en:'An enemy or obstacle moves by itself.',                  es:'Un enemigo u obstáculo se mueve solo.' },
-      { id:'lose',    icon:'💀', level:3, en:'I can lose (game over).',                                es:'Puedo perder (fin del juego).' },
-      { id:'win',     icon:'🏆', level:3, en:'I can win.',                                             es:'Puedo ganar.' },
-      { id:'score',   icon:'🔢', level:4, en:'A score, lives or timer shows and changes.',            es:'Se ven puntos, vidas o tiempo que cambian.' },
-      { id:'restart', icon:'🚩', level:4, en:'The green flag starts it over fresh.',                  es:'La bandera verde lo empieza de nuevo.' },
-      { id:'more',    icon:'📈', level:4, en:'It gets harder, or has a start screen or a next level.', es:'Se pone más difícil, o tiene pantalla de inicio u otro nivel.' }
+      { id:'moves',   icon:'🕹', level:1, en:'How does the player move? Which keys or mouse?',         es:'¿Cómo se mueve el jugador? ¿Con qué teclas o ratón?' },
+      { id:'enemy',   icon:'👾', level:2, en:'What does the enemy or obstacle do?',                    es:'¿Qué hace el enemigo u obstáculo?' },
+      { id:'lose',    icon:'💀', level:3, en:'How do you lose? What happens then?',                    es:'¿Cómo pierdes? ¿Qué pasa entonces?' },
+      { id:'win',     icon:'🏆', level:3, en:'How do you win?',                                        es:'¿Cómo ganas?' },
+      { id:'score',   icon:'🔢', level:4, en:'What does the score, lives or timer count?',             es:'¿Qué cuentan los puntos, vidas o tiempo?' },
+      { id:'restart', icon:'🚩', level:4, en:'What happens when you press the green flag again?',      es:'¿Qué pasa al presionar la bandera verde otra vez?' },
+      { id:'more',    icon:'📈', level:4, en:'What makes it harder, or what start screen or next level does it have?', es:'¿Qué lo hace más difícil, o qué pantalla de inicio u otro nivel tiene?' }
     ],
-    // how well each check works: three steps, not just yes or no
-    answers: [
-      { id:'yes',  icon:'✅', en:'Works great',     es:'Funciona bien' },
-      { id:'some', icon:'🟡', en:'Kind of / buggy', es:'Más o menos / con errores' },
-      { id:'no',   icon:'❌', en:'Not yet',         es:'Todavía no' }
-    ],
+    CHECK_TEXT: 160,
     // 1–4 stars
     ratings: [
       { id:'fun',  icon:'🎉', en:'Fun to play',   es:'Divertido de jugar' },
@@ -47,7 +42,7 @@
 
     /* the level the checks add up to: each level needs all of the ones below */
     suggestLevel(checks){
-      const ok = id => checks && checks[id] === 'yes';
+      const ok = id => checks && typeof checks[id] === 'string' && checks[id].trim().length > 0;
       if(!ok('moves')) return 0;
       if(!ok('enemy')) return 1;
       if(!(ok('lose') && ok('win'))) return 2;
@@ -59,7 +54,7 @@
     clean(d){
       d = d && typeof d === 'object' ? d : {};
       const out = { checks:{}, ratings:{}, texts:{} };
-      for(const c of FEEDBACK.checks){ const v = d.checks && d.checks[c.id]; if(FEEDBACK.answers.some(a => a.id === v)) out.checks[c.id] = v; }
+      for(const c of FEEDBACK.checks){ const v = d.checks && d.checks[c.id]; if(typeof v === 'string' && v.trim()) out.checks[c.id] = v.replace(/[\u0000-\u001f]/g, ' ').trim().slice(0, FEEDBACK.CHECK_TEXT); }
       for(const r of FEEDBACK.ratings){ const v = Number(d.ratings && d.ratings[r.id]); if(v >= 1 && v <= 4 && Math.round(v) === v) out.ratings[r.id] = v; }
       const lv = Number(d.level);
       if(d.level !== undefined && d.level !== null && d.level !== '' && lv >= 0 && lv <= 4 && Math.round(lv) === lv) out.level = lv;

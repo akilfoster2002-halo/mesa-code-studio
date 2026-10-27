@@ -88,8 +88,7 @@ window.CLASSGAMES = (function(){
         h('small', {}, (showOwner ? L('by ', 'de ') + f.ownerName + ' · ' : '') + L('from ', 'por ') + f.reviewerName + ' · ' + UI.ago(f.updated))),
       !f.complete ? h('div', { class:'cg-partial' }, '⚠️ ' + L('Not finished', 'Sin terminar')) : null,
       h('div', { class:'cg-checks' },
-        ...F.answers.flatMap(a => F.checks.filter(c => d.checks && d.checks[c.id] === a.id)
-          .map(c => h('span', { class:'cg-' + a.id, title:L(a.en, a.es) }, a.icon + ' ' + c.icon + ' ' + L(c.en, c.es))))),
+        ...F.checks.map(c => h('p', { class:'cg-text' }, h('b', {}, c.icon + ' ' + L(c.en, c.es) + ' '), (d.checks && d.checks[c.id]) || '—'))),
       h('div', { class:'cg-row' },
         ...F.ratings.map(r => h('span', {}, r.icon + ' ' + L(r.en, r.es) + ': ' + (d.ratings && d.ratings[r.id] ? '★'.repeat(d.ratings[r.id]) + '☆'.repeat(4 - d.ratings[r.id]) : '—'))),
         h('span', {}, '📊 ' + L('Level', 'Nivel') + ': ' + (d.level !== undefined ? d.level : '—'))),
@@ -134,20 +133,17 @@ window.CLASSGAMES = (function(){
     }
     const levelBtns = [];
     function markLevel(){
-      const s = F.suggestLevel(data.checks);
-      levelBtns.forEach(b => { const n = Number(b.dataset.n); b.classList.toggle('on', data.level === n); b.classList.toggle('hint', data.level === undefined && n === s); });
+      levelBtns.forEach(b => { const n = Number(b.dataset.n); b.classList.toggle('on', data.level === n);  });
     }
     const choice = (on, icon, cls, pickFn, words) => {
       const b = h('button', { type:'button', class:'fb-choice ' + cls + (on ? ' on' : ''), title:words, onclick:() => { pickFn(); } }, icon, h('small', {}, words));
       return b;
     };
     const checkRows = F.checks.map(c => {
-      const row = h('div', { class:'fb-check' });
-      const draw = () => row.replaceChildren(
-        h('span', { class:'fb-q' }, h('span', { class:'fb-ico' }, c.icon), h('span', {}, L(c.en, c.es), h('small', {}, L(c.es, c.en)))),
-        h('span', { class:'fb-yn' },
-          ...F.answers.map(a => choice(data.checks[c.id] === a.id, h('span', { class:'fb-a-ico' }, a.icon), a.id, () => { data.checks[c.id] = a.id; draw(); markLevel(); save(); }, L(a.en, a.es)))));
-      draw(); return row;
+      const ta = h('textarea', { class:'inp fb-ta', rows:2, maxlength:F.CHECK_TEXT, placeholder:L('Write what you saw…', 'Escribe lo que viste…') });
+      ta.value = data.checks[c.id] || '';
+      ta.oninput = () => { if(ta.value.trim()) data.checks[c.id] = ta.value; else delete data.checks[c.id]; markLevel(); save(); };
+      return h('label', { class:'fb-text' }, h('span', {}, c.icon + ' ' + L(c.en, c.es), h('small', {}, ' · ' + L(c.es, c.en))), ta);
     });
     const ratingRows = F.ratings.map(r => {
       const row = h('div', { class:'fb-check' });
@@ -174,7 +170,7 @@ window.CLASSGAMES = (function(){
       h('div', { class:'fb-body' },
         h('p', { class:'fb-who' }, '🎮 ', h('b', {}, gameName), ' — ' + L('by ', 'de ') + ownerName),
         h('p', { class:'muted' }, L('Copy your paper slip. Play the game to check each one.', 'Copia tu tarjeta de papel. Juega para revisar cada una.')),
-        h('h3', {}, '1 · ' + L('Does it work? How well?', '¿Funciona? ¿Qué tan bien?')), ...checkRows,
+        h('h3', {}, '1 · ' + L('Play it and write what you saw', 'Juega y escribe lo que viste')), ...checkRows,
         h('h3', {}, '2 · ' + L('Stars', 'Estrellas')), ...ratingRows,
         h('h3', {}, '3 · ' + L('I think this game is at level…', 'Creo que este juego está en el nivel…')), levelRow,
         h('h3', {}, '4 · ' + L('Comments', 'Comentarios')), ...textRows,

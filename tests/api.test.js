@@ -360,7 +360,7 @@ test('Class Games: a classmate can play your game read-only and leave one feedba
     texts:{ liked:'The frog jumps!', next:'Add a snake that chases', bug:'' }, extra:'x' };
   assert.strictEqual((await call(b.cookie, '/feedback/' + p.id, { method:'PUT', body:JSON.stringify({ data:slip }) })).status, 200);
   const back = await (await call(b.cookie, '/feedback/' + p.id)).json();
-  assert.deepStrictEqual(back.data, { checks:{ moves:'yes', enemy:'no' }, ratings:{ fun:4 }, texts:{ liked:'The frog jumps!', next:'Add a snake that chases' }, level:1 });
+  assert.deepStrictEqual(back.data, { checks:{ moves:'yes', enemy:'no', lose:'maybe' }, ratings:{ fun:4 }, texts:{ liked:'The frog jumps!', next:'Add a snake that chases' }, level:1 });
   await call(b.cookie, '/feedback/' + p.id, { method:'PUT', body:JSON.stringify({ data:{ ...slip, level:2 } }) });
   assert.strictEqual((await (await call(b.cookie, '/class/games')).json()).people.find(u => u.username === 'ana').projects.find(x => x.id === p.id).slips, 1);
   // not on your own game, not from another period
