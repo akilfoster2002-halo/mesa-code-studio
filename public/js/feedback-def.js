@@ -8,7 +8,7 @@
    ===================================================================== */
 (function(root){
   const FEEDBACK = {
-    // yes / no: what works when you play it (the rubric, level by level)
+    // what works when you play it (the rubric, level by level)
     checks: [
       { id:'moves',   icon:'🕹', level:1, en:'The player moves with the keys or the mouse.',          es:'El jugador se mueve con las teclas o el ratón.' },
       { id:'enemy',   icon:'👾', level:2, en:'An enemy or obstacle moves by itself.',                  es:'Un enemigo u obstáculo se mueve solo.' },
@@ -17,6 +17,12 @@
       { id:'score',   icon:'🔢', level:4, en:'A score, lives or timer shows and changes.',            es:'Se ven puntos, vidas o tiempo que cambian.' },
       { id:'restart', icon:'🚩', level:4, en:'The green flag starts it over fresh.',                  es:'La bandera verde lo empieza de nuevo.' },
       { id:'more',    icon:'📈', level:4, en:'It gets harder, or has a start screen or a next level.', es:'Se pone más difícil, o tiene pantalla de inicio u otro nivel.' }
+    ],
+    // how well each check works: three steps, not just yes or no
+    answers: [
+      { id:'yes',  icon:'✅', en:'Works great',     es:'Funciona bien' },
+      { id:'some', icon:'🟡', en:'Kind of / buggy', es:'Más o menos / con errores' },
+      { id:'no',   icon:'❌', en:'Not yet',         es:'Todavía no' }
     ],
     // 1–4 stars
     ratings: [
@@ -53,7 +59,7 @@
     clean(d){
       d = d && typeof d === 'object' ? d : {};
       const out = { checks:{}, ratings:{}, texts:{} };
-      for(const c of FEEDBACK.checks){ const v = d.checks && d.checks[c.id]; if(v === 'yes' || v === 'no') out.checks[c.id] = v; }
+      for(const c of FEEDBACK.checks){ const v = d.checks && d.checks[c.id]; if(FEEDBACK.answers.some(a => a.id === v)) out.checks[c.id] = v; }
       for(const r of FEEDBACK.ratings){ const v = Number(d.ratings && d.ratings[r.id]); if(v >= 1 && v <= 4 && Math.round(v) === v) out.ratings[r.id] = v; }
       const lv = Number(d.level);
       if(d.level !== undefined && d.level !== null && d.level !== '' && lv >= 0 && lv <= 4 && Math.round(lv) === lv) out.level = lv;

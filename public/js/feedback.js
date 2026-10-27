@@ -83,15 +83,13 @@ window.CLASSGAMES = (function(){
   /* one slip, read only */
   function slipCard(f, showOwner){
     const d = f.data || {};
-    const yes = F.checks.filter(c => d.checks && d.checks[c.id] === 'yes');
-    const no = F.checks.filter(c => d.checks && d.checks[c.id] === 'no');
     return h('article', { class:'cg-slip' + (f.complete ? '' : ' partial') },
       h('header', {}, h('b', {}, '🎮 ' + f.game), h('span', { class:'grow' }),
         h('small', {}, (showOwner ? L('by ', 'de ') + f.ownerName + ' · ' : '') + L('from ', 'por ') + f.reviewerName + ' · ' + UI.ago(f.updated))),
       !f.complete ? h('div', { class:'cg-partial' }, '⚠️ ' + L('Not finished', 'Sin terminar')) : null,
       h('div', { class:'cg-checks' },
-        ...yes.map(c => h('span', { class:'cg-yes' }, '✓ ' + c.icon + ' ' + L(c.en, c.es))),
-        ...no.map(c => h('span', { class:'cg-no' }, '✗ ' + c.icon + ' ' + L(c.en, c.es)))),
+        ...F.answers.flatMap(a => F.checks.filter(c => d.checks && d.checks[c.id] === a.id)
+          .map(c => h('span', { class:'cg-' + a.id, title:L(a.en, a.es) }, a.icon + ' ' + c.icon + ' ' + L(c.en, c.es))))),
       h('div', { class:'cg-row' },
         ...F.ratings.map(r => h('span', {}, r.icon + ' ' + L(r.en, r.es) + ': ' + (d.ratings && d.ratings[r.id] ? '★'.repeat(d.ratings[r.id]) + '☆'.repeat(4 - d.ratings[r.id]) : '—'))),
         h('span', {}, '📊 ' + L('Level', 'Nivel') + ': ' + (d.level !== undefined ? d.level : '—'))),
@@ -139,8 +137,8 @@ window.CLASSGAMES = (function(){
       const s = F.suggestLevel(data.checks);
       levelBtns.forEach(b => { const n = Number(b.dataset.n); b.classList.toggle('on', data.level === n); b.classList.toggle('hint', data.level === undefined && n === s); });
     }
-    const choice = (on, label, cls, pickFn) => {
-      const b = h('button', { type:'button', class:'fb-choice ' + cls + (on ? ' on' : ''), onclick:() => { pickFn(); } }, label);
+    const choice = (on, icon, cls, pickFn, words) => {
+      const b = h('button', { type:'button', class:'fb-choice ' + cls + (on ? ' on' : ''), title:words, onclick:() => { pickFn(); } }, icon, h('small', {}, words));
       return b;
     };
     const checkRows = F.checks.map(c => {
@@ -148,8 +146,7 @@ window.CLASSGAMES = (function(){
       const draw = () => row.replaceChildren(
         h('span', { class:'fb-q' }, h('span', { class:'fb-ico' }, c.icon), h('span', {}, L(c.en, c.es), h('small', {}, L(c.es, c.en)))),
         h('span', { class:'fb-yn' },
-          choice(data.checks[c.id] === 'yes', '✓ ' + L('Yes', 'Sí'), 'yes', () => { data.checks[c.id] = 'yes'; draw(); markLevel(); save(); }),
-          choice(data.checks[c.id] === 'no', '✗ ' + L('No', 'No'), 'no', () => { data.checks[c.id] = 'no'; draw(); markLevel(); save(); })));
+          ...F.answers.map(a => choice(data.checks[c.id] === a.id, h('span', { class:'fb-a-ico' }, a.icon), a.id, () => { data.checks[c.id] = a.id; draw(); markLevel(); save(); }, L(a.en, a.es)))));
       draw(); return row;
     });
     const ratingRows = F.ratings.map(r => {
@@ -177,7 +174,7 @@ window.CLASSGAMES = (function(){
       h('div', { class:'fb-body' },
         h('p', { class:'fb-who' }, '🎮 ', h('b', {}, gameName), ' — ' + L('by ', 'de ') + ownerName),
         h('p', { class:'muted' }, L('Copy your paper slip. Play the game to check each one.', 'Copia tu tarjeta de papel. Juega para revisar cada una.')),
-        h('h3', {}, '1 · ' + L('Does it work?', '¿Funciona?')), ...checkRows,
+        h('h3', {}, '1 · ' + L('Does it work? How well?', '¿Funciona? ¿Qué tan bien?')), ...checkRows,
         h('h3', {}, '2 · ' + L('Stars', 'Estrellas')), ...ratingRows,
         h('h3', {}, '3 · ' + L('I think this game is at level…', 'Creo que este juego está en el nivel…')), levelRow,
         h('h3', {}, '4 · ' + L('Comments', 'Comentarios')), ...textRows,

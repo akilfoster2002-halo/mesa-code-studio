@@ -640,3 +640,15 @@ body.peer .dl{display:none}
 .fb-levels .fb-level{grid-column:auto;width:auto;margin:0;padding:6px 2px;text-align:center}
 .btn.primary.fb-submit{background:var(--ok);border-color:var(--ok);color:#fff}
 body.peer .hlaunch{display:none}
+
+.fb-check{flex-wrap:wrap}
+.fb-yn{gap:4px}
+.fb-choice{display:flex;flex-direction:column;align-items:center;gap:1px;width:74px;padding:5px 2px;line-height:1.1}
+.fb-choice small{font-size:10px;color:var(--muted)}
+.fb-a-ico{font-size:18px}
+.fb-choice.yes.on{background:#e3f6e8;border-color:var(--ok);color:inherit;box-shadow:0 0 0 2px var(--ok)}
+.fb-choice.some.on{background:#fff6d6;border-color:#e0a800;box-shadow:0 0 0 2px #e0a800}
+.fb-choice.no.on{background:#fde7e7;border-color:var(--bad);color:inherit;box-shadow:0 0 0 2px var(--bad)}
+.fb-choice.on small{color:var(--ink,#1f2340);font-weight:700}
+.cg-some{font-size:12px;border-radius:999px;padding:2px 8px;background:#fff6d6;color:#6b4e00}
+.fb-check .fb-yn{width:100%;padding-left:30px}

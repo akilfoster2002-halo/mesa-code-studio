@@ -29,7 +29,9 @@
   td.q{font-size:12px;line-height:1.15}
   td.q small{color:var(--muted);font-size:10px;display:block}
   td.ico{width:24px;font-size:15px;text-align:center}
-  td.yn{width:118px;text-align:right;white-space:nowrap;font-size:12px}
+  .ans{margin-left:6px}.ans .box{margin:0 2px 0 0}
+  .key{margin:1px 0 2px}
+  td.yn{width:140px;text-align:right;white-space:nowrap;font-size:12px}
   .box{display:inline-block;width:14px;height:14px;border:1.5px solid var(--ink);border-radius:3px;vertical-align:-3px;margin:0 3px 0 8px}
   .stars{font-size:17px;letter-spacing:4px;color:#9aa0b8;white-space:nowrap;text-align:right}
   .levels{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;text-align:center}
@@ -64,9 +66,10 @@
     return `<section class="slip">
       <div class="top"><h1>💬 Game Feedback Slip</h1><small>Tarjeta de comentarios del juego</small></div>
       <div class="who"><div>Me · Yo:</div><div>Game · Juego:</div><div>Made by · Hecho por:</div></div>
-      <h2>1 · Does it work? Play to check · ¿Funciona? Juega para revisar</h2>
+      <h2>1 · Does it work? How well? · ¿Funciona? ¿Qué tan bien?</h2>
+      <p class="tip key">Check one box: ${F.answers.map(a => `${a.icon} ${esc(a.en)} · ${esc(a.es)}`).join(' &nbsp; ')}</p>
       <table>${F.checks.map(c => `<tr><td class="ico">${c.icon}</td><td class="q">${esc(c.en)}<small>${esc(c.es)}</small></td>
-        <td class="yn">Yes<span class="box"></span> No<span class="box"></span></td></tr>`).join('')}</table>
+        <td class="yn">${F.answers.map(a => `<span class="ans"><span class="box"></span>${a.icon}</span>`).join('')}</td></tr>`).join('')}</table>
       <h2>2 · Stars — color in 1 to 4 · Estrellas — colorea de 1 a 4</h2>
       <table>${F.ratings.map(r => `<tr><td class="ico">${r.icon}</td><td class="q">${esc(r.en)}<small>${esc(r.es)}</small></td>
         <td class="stars">☆☆☆☆</td></tr>`).join('')}</table>
