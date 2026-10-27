@@ -41,6 +41,7 @@
     if(!me) return [];
     return [
       me.role === 'teacher' ? h('a', { class:'btn ghost', href:'#/teacher' }, '🍎 ' + t('Dashboard')) : null,
+      h('a', { class:'btn ghost', href:'#/class', title:t('Class Games') }, '🏅 ', h('span', { class:'lbl' }, t('Class Games'))),
       h('a', { class:'btn ghost', href:'/design', title:t('Game design') }, '🎨 ', h('span', { class:'lbl' }, t('Game design'))),
       h('a', { class:'btn ghost', href:'/learn', title:t('Learn') }, '🎮 ', h('span', { class:'lbl' }, t('Learn'))),
       h('button', { class:'btn tour-btn', type:'button', title:t('Tour'), onclick:() => TOUR.start() }, '❓ ' + t('Tour')),
@@ -62,6 +63,7 @@
     if(current.startsWith('#/p/') && hash !== current && SAVE.dirty) await SAVE.flush();
     current = hash;
     UI.closeMenu();
+    CLASSGAMES.closePanel();
     if(!me){
       try { me = await api('/me'); } catch(e){ me = null; }
     }
@@ -70,6 +72,9 @@
     const pm = hash.match(/^#\/p\/([^/]+)(\/edit)?$/);
     if(pm) return editorView(pm[1], !!pm[2]);
     if(hash === '#/teacher' && me.role === 'teacher') return teacherView();
+    const top = title => h('header', { class:'top' }, logo(), h('h1', {}, title), h('span', { class:'grow' }), langBtn(), ...userBits());
+    if(hash === '#/class/mine') return CLASSGAMES.mineView(app, me, top);
+    if(hash === '#/class') return CLASSGAMES.classView(app, me, top);
     return projectsView();
   }
   addEventListener('hashchange', () => route());
@@ -319,9 +324,12 @@
     E.banner.classList.toggle('editing', someoneElse && !readOnly);
     E.banner.replaceChildren();
     if(someoneElse){
-      const back = me.role === 'teacher' ? h('a', { class:'btn small', href:'#/teacher' }, '← ' + t('Dashboard')) : null;
+      const back = me.role === 'teacher' ? h('a', { class:'btn small', href:'#/teacher' }, '← ' + t('Dashboard'))
+        : h('a', { class:'btn small', href:'#/class' }, '← ' + t('Class Games'));
+      const give = me.role === 'student' && readOnly
+        ? h('button', { class:'btn small primary fb-give', type:'button', onclick:() => CLASSGAMES.openPanel(id, pr.name, pr.ownerName || pr.owner) }, '💬 ' + t('Give feedback')) : null;
       if(readOnly) E.banner.append(h('span', {}, '👁 ' + t('Viewing {n}\'s project', { n:pr.ownerName || pr.owner }) + ' — ' + t('Read only')),
-        h('span', { class:'grow' }), pr.canEdit ? h('a', { class:'btn small primary', href:'#/p/' + id + '/edit' }, '✏️ ' + t('Edit this project')) : null, back);
+        h('span', { class:'grow' }), give, pr.canEdit ? h('a', { class:'btn small primary', href:'#/p/' + id + '/edit' }, '✏️ ' + t('Edit this project')) : null, back);
       else E.banner.append(h('span', {}, '✏️ ' + t('Editing {n}\'s project — changes save to their account. Their work from before is kept in History.', { n:pr.ownerName || pr.owner })),
         h('span', { class:'grow' }), h('a', { class:'btn small', href:'#/p/' + id }, '✓ ' + t('Done')), back);
     }

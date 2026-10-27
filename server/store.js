@@ -163,6 +163,24 @@ class FileStore {
     ls[owner] = { owner, data, updated:now() }; this._save(); return ls[owner];
   }
   async listLearn(){ return Object.values(this.db.learn || {}); }
+
+  /* Class Games feedback: one slip per reviewer per game */
+  async getFeedback(project, reviewer){ return (this.db.feedback || {})[project + '|' + reviewer] || null; }
+  async saveFeedback(project, reviewer, owner, data){
+    const fb = this.db.feedback || (this.db.feedback = {});
+    fb[project + '|' + reviewer] = { project, reviewer, owner, data, updated:now() }; this._save();
+    return fb[project + '|' + reviewer];
+  }
+  async listFeedback(filter={}){
+    return Object.values(this.db.feedback || {}).filter(f => (!filter.owner || f.owner === filter.owner) &&
+      (!filter.reviewer || f.reviewer === filter.reviewer) && (!filter.project || f.project === filter.project))
+      .sort((a, b) => b.updated.localeCompare(a.updated));
+  }
+  async classGames(period){
+    const users = Object.values(this.db.users).filter(u => u.role === 'student' && u.period === period && !u.disabled);
+    return users.map(u => ({ username:u.username, name:u.name, projects:Object.values(this.db.projects)
+      .filter(p => p.owner === u.username && !p.deleted).map(({ data, ...meta }) => meta) }));
+  }
 }
 
 /* what a project has in it, for the teacher's dashboard */
@@ -274,7 +292,16 @@ class PgStore {
         owner   TEXT PRIMARY KEY REFERENCES cs_users(username),
         data    JSONB NOT NULL,
         updated TIMESTAMPTZ DEFAULT now()
-      );`);
+      );
+      CREATE TABLE IF NOT EXISTS cs_feedback (
+        project  TEXT NOT NULL REFERENCES cs_projects(id),
+        reviewer TEXT NOT NULL REFERENCES cs_users(username),
+        owner    TEXT NOT NULL REFERENCES cs_users(username),
+        data     JSONB NOT NULL,
+        updated  TIMESTAMPTZ DEFAULT now(),
+        PRIMARY KEY (project, reviewer)
+      );
+      CREATE INDEX IF NOT EXISTS cs_feedback_owner ON cs_feedback(owner);`);
     // projects saved before the dashboard counted blocks
     for(const r of (await this.q('SELECT id, data FROM cs_projects WHERE stats IS NULL')).rows)
       await this.q('UPDATE cs_projects SET stats=$2 WHERE id=$1', [r.id, projectStats(r.data)]);
@@ -406,6 +433,28 @@ class PgStore {
   async listLearn(){
     const r = await this.q('SELECT owner,data,updated FROM cs_learn');
     return r.rows.map(d => ({ ...d, updated:iso(d.updated) }));
+  }
+  async getFeedback(project, reviewer){
+    const r = await this.q('SELECT * FROM cs_feedback WHERE project=$1 AND reviewer=$2', [project, reviewer]);
+    const d = r.rows[0]; return d ? { ...d, updated:iso(d.updated) } : null;
+  }
+  async saveFeedback(project, reviewer, owner, data){
+    const r = await this.q(`INSERT INTO cs_feedback (project,reviewer,owner,data,updated) VALUES ($1,$2,$3,$4,now())
+      ON CONFLICT (project,reviewer) DO UPDATE SET data=$4, updated=now() RETURNING *`, [project, reviewer, owner, data]);
+    const d = r.rows[0]; return { ...d, updated:iso(d.updated) };
+  }
+  async listFeedback(filter={}){
+    const where = [], args = [];
+    for(const k of ['owner', 'reviewer', 'project']) if(filter[k]){ args.push(filter[k]); where.push(k + '=$' + args.length); }
+    const r = await this.q('SELECT * FROM cs_feedback' + (where.length ? ' WHERE ' + where.join(' AND ') : '') + ' ORDER BY updated DESC', args);
+    return r.rows.map(d => ({ ...d, updated:iso(d.updated) }));
+  }
+  async classGames(period){
+    const us = (await this.q(`SELECT username,name FROM cs_users WHERE role='student' AND period=$1 AND NOT disabled ORDER BY name`, [period])).rows;
+    if(!us.length) return [];
+    const ps = (await this.q(`SELECT id,owner,name,thumb,stats,edited_by,created,updated,deleted FROM cs_projects
+      WHERE owner = ANY($1) AND deleted IS NULL ORDER BY updated DESC`, [us.map(u => u.username)])).rows.map(x => this.meta(x));
+    return us.map(u => ({ username:u.username, name:u.name, projects:ps.filter(p => p.owner === u.username) }));
   }
 }
 const iso = d => d instanceof Date ? d.toISOString() : d;

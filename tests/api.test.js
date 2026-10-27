@@ -17,6 +17,8 @@ test.before(async () => {
   await ready;
   await store.upsertUser({ username:'ana', name:'Ana', period:'2', role:'student', ...auth.makeHash('tiger42') });
   await store.upsertUser({ username:'ben', name:'Ben', period:'2', role:'student', ...auth.makeHash('owl11') });
+  await store.upsertUser({ username:'dev', name:'Dev', period:'2', role:'student', ...auth.makeHash('bear55') });
+  await store.upsertUser({ username:'cara', name:'Cara', period:'3', role:'student', ...auth.makeHash('fox77') });
   await store.upsertUser({ username:'teach', name:'T', period:'', role:'teacher', ...auth.makeHash('apple-pear') });
   await new Promise(r => server.listen(0, r));
   base = 'http://127.0.0.1:' + server.address().port;
@@ -60,8 +62,8 @@ test('create, save, version, restore', async () => {
   assert.ok(after.some(v => v.label === 'before restore'), 'the replaced work is kept');
 });
 
-test('another student cannot see or change your project; a teacher can open and fix it', async () => {
-  const a = await login('ana', 'tiger42'), b = await login('ben', 'owl11'), t = await login('teach', 'apple-pear');
+test('a student in another period cannot see or change your project; a teacher can open and fix it', async () => {
+  const a = await login('ana', 'tiger42'), b = await login('cara', 'fox77'), t = await login('teach', 'apple-pear');
   const p = await (await call(a.cookie, '/projects', { method:'POST', body:JSON.stringify({ name:'Secret', data:{ s:1 } }) })).json();
   assert.strictEqual((await call(b.cookie, '/projects/' + p.id)).status, 404);
   assert.strictEqual((await call(b.cookie, '/projects/' + p.id, { method:'PUT', body:'{"data":{}}' })).status, 404);
@@ -334,4 +336,43 @@ test('block helper AI: names are held to the project, and "when key pressed" is 
   assert.deepStrictEqual(laser.blocks.map(b => b.op), ['looks_show']);
   assert.deepStrictEqual(r.answer.make.sprites.sort(), ['Bird', 'Coin']);
   assert.ok(!require('../server/ai').blockCatalog().includes('event_whenkeypressed'));
+});
+
+test('Class Games: a classmate can play your game read-only and leave one feedback slip', async () => {
+  const a = await login('ana', 'tiger42'), b = await login('dev', 'bear55'), c = await login('cara', 'fox77'), t = await login('teach', 'apple-pear');
+  const p = await (await call(a.cookie, '/projects', { method:'POST', body:JSON.stringify({ name:'Frog Run',
+    data:{ targets:[{ isStage:true, scripts:[] }, { scripts:[{ blocks:[{ op:'event_whenflagclicked' }] }] }] } }) })).json();
+  // dev (same period) sees it in Class Games and can open it, read only
+  const cls = await (await call(b.cookie, '/class/games')).json();
+  assert.strictEqual(cls.period, '2');
+  assert.ok(cls.people.find(u => u.username === 'ana').projects.some(x => x.id === p.id));
+  assert.ok(!cls.people.some(u => u.username === 'cara'), 'only my period');
+  const seen = await (await call(b.cookie, '/projects/' + p.id)).json();
+  assert.strictEqual(seen.readOnly, true);
+  assert.strictEqual(seen.canEdit, false);
+  // ...but can never change it, see its history, or delete it
+  assert.strictEqual((await call(b.cookie, '/projects/' + p.id, { method:'PUT', body:'{"data":{}}' })).status, 404);
+  assert.strictEqual((await call(b.cookie, '/projects/' + p.id, { method:'DELETE' })).status, 404);
+  assert.strictEqual((await call(b.cookie, '/projects/' + p.id + '/versions')).status, 404);
+  assert.deepStrictEqual((await (await call(a.cookie, '/projects/' + p.id)).json()).data.targets.length, 2, 'unchanged');
+  // a feedback slip: saved cleaned, one per reviewer (a second save replaces it)
+  const slip = { checks:{ moves:'yes', enemy:'no', lose:'maybe' }, ratings:{ fun:4, look:9 }, level:1,
+    texts:{ liked:'The frog jumps!', next:'Add a snake that chases', bug:'' }, extra:'x' };
+  assert.strictEqual((await call(b.cookie, '/feedback/' + p.id, { method:'PUT', body:JSON.stringify({ data:slip }) })).status, 200);
+  const back = await (await call(b.cookie, '/feedback/' + p.id)).json();
+  assert.deepStrictEqual(back.data, { checks:{ moves:'yes', enemy:'no' }, ratings:{ fun:4 }, texts:{ liked:'The frog jumps!', next:'Add a snake that chases' }, level:1 });
+  await call(b.cookie, '/feedback/' + p.id, { method:'PUT', body:JSON.stringify({ data:{ ...slip, level:2 } }) });
+  assert.strictEqual((await (await call(b.cookie, '/class/games')).json()).people.find(u => u.username === 'ana').projects.find(x => x.id === p.id).slips, 1);
+  // not on your own game, not from another period
+  assert.strictEqual((await call(a.cookie, '/feedback/' + p.id, { method:'PUT', body:JSON.stringify({ data:slip }) })).status, 400);
+  assert.strictEqual((await call(c.cookie, '/feedback/' + p.id, { method:'PUT', body:JSON.stringify({ data:slip }) })).status, 403);
+  // ana reads what she got, with names; the teacher sees the period
+  const got = await (await call(a.cookie, '/feedback/received')).json();
+  assert.strictEqual(got.length, 1);
+  assert.strictEqual(got[0].reviewerName, 'Dev');
+  assert.strictEqual(got[0].game, 'Frog Run');
+  assert.strictEqual(got[0].data.level, 2);
+  assert.strictEqual(got[0].complete, false);
+  assert.strictEqual((await (await call(t.cookie, '/admin/feedback?period=2')).json()).length, 1);
+  assert.strictEqual((await call(b.cookie, '/admin/feedback')).status, 403);
 });

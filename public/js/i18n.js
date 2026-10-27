@@ -24,7 +24,7 @@ window.I18N = (function(){
     'Too many tries. Wait a few minutes.':'Demasiados intentos. Espera unos minutos.',
     'Could not reach the server.':'No se pudo conectar con el servidor.',
     'My Projects':'Mis proyectos', 'New project':'Proyecto nuevo', 'New':'Nuevo', 'Open':'Abrir',
-    'Rename':'Renombrar', 'Duplicate':'Duplicar', 'Copy':'Copiar', 'Paste':'Pegar', 'Could not copy.':'No se pudo copiar.', 'Copied! Right-click the scripts area and choose Paste, or press Ctrl+V.':'¡Copiado! Haz clic derecho en el área de programas y elige Pegar, o presiona Ctrl+V.', 'Delete':'Borrar', 'Restore':'Restaurar',
+    'Rename':'Renombrar', 'Duplicate':'Duplicar', 'Class Games':'Juegos de la clase', 'Give feedback':'Dar comentarios', 'Copy':'Copiar', 'Paste':'Pegar', 'Could not copy.':'No se pudo copiar.', 'Copied! Right-click the scripts area and choose Paste, or press Ctrl+V.':'¡Copiado! Haz clic derecho en el área de programas y elige Pegar, o presiona Ctrl+V.', 'Delete':'Borrar', 'Restore':'Restaurar',
     'Untitled':'Sin título', 'Saved':'Guardado', 'Saving…':'Guardando…', 'Not saved yet':'Aún no guardado',
     'Offline — kept on this computer':'Sin conexión — guardado en esta computadora',
     'Read only':'Solo lectura', 'History':'Historial', 'Save now':'Guardar ahora',

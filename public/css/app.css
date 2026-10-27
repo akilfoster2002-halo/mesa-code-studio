@@ -569,3 +569,64 @@ body.full-stage .hlaunch,body.full-stage .helper{display:none}
 .paint-cv,.paint-over{position:absolute;inset:0;width:100%;height:100%}
 .paint-over{cursor:crosshair;touch-action:none}
 .paint-centre{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);color:rgba(91,91,214,.55);font-size:22px;pointer-events:none}
+
+/* ------------------------------------------------ Class Games (feedback.js) */
+.cg-main{max-width:1100px;margin:0 auto}
+.cg-intro{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:0 0 14px}
+.cg-intro p{margin:0;font-size:15px}
+.cg-period{width:auto}
+.cg-person{margin:0 0 18px}
+.cg-person h2{font-size:16px;margin:0 0 8px}
+.cg-person.mine h2{color:var(--muted)}
+.cg-card{text-decoration:none}
+.cg-card .pfoot{display:flex;flex-direction:column;align-items:flex-start;gap:2px}
+.cg-done{font-size:12px;color:var(--ok);font-weight:700}
+.cg-slips{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px}
+.cg-modal{max-height:65vh;overflow:auto;min-width:min(900px,80vw)}
+.cg-slip{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px 14px}
+.cg-slip header{display:flex;gap:8px;align-items:baseline;margin-bottom:6px}
+.cg-slip header small{color:var(--muted)}
+.cg-slip.partial{border-style:dashed}
+.cg-partial{font-size:12px;color:#8a5a00;margin-bottom:4px}
+.cg-checks{display:flex;flex-wrap:wrap;gap:4px;margin:4px 0}
+.cg-yes,.cg-no{font-size:12px;border-radius:999px;padding:2px 8px}
+.cg-yes{background:#e3f6e8;color:#14532d}
+.cg-no{background:#fdecec;color:#8a1f1f}
+.cg-row{display:flex;flex-wrap:wrap;gap:12px;font-size:13px;margin:6px 0}
+.cg-text{margin:6px 0 0;font-size:14px}
+
+.fb-panel{position:fixed;top:0;right:0;bottom:0;width:min(400px,100vw);background:var(--panel);border-left:1px solid var(--line);
+  box-shadow:-6px 0 20px rgba(0,0,0,.12);z-index:60;display:flex;flex-direction:column}
+.fb-panel header{display:flex;align-items:center;gap:8px;padding:10px 12px;border-bottom:1px solid var(--line);background:var(--panel2)}
+.fb-status{font-size:12px;color:var(--muted)}
+.fb-body{overflow:auto;padding:10px 14px 24px}
+.fb-who{margin:2px 0}
+.fb-body h3{font-size:14px;margin:16px 0 6px;color:var(--brand-d)}
+.fb-check{display:flex;align-items:center;gap:8px;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--panel2)}
+.fb-q{display:flex;gap:8px;align-items:flex-start;font-size:14px;line-height:1.25}
+.fb-q small{display:block;color:var(--muted);font-size:12px}
+.fb-ico{font-size:18px;width:22px;flex:none;text-align:center}
+.fb-yn{display:flex;gap:4px;flex:none}
+.fb-choice{border:1px solid var(--line);background:#fff;border-radius:8px;padding:6px 10px;font-size:13px;cursor:pointer}
+.fb-choice.yes.on{background:var(--ok);border-color:var(--ok);color:#fff}
+.fb-choice.no.on{background:var(--bad);border-color:var(--bad);color:#fff}
+.fb-stars{display:flex;flex:none}
+.fb-star{border:0;background:none;font-size:24px;line-height:1;color:#d4d7e3;cursor:pointer;padding:0 2px}
+.fb-star.on{color:#f5a524}
+.fb-levels{display:grid;grid-template-columns:repeat(5,1fr);gap:4px}
+.fb-level{border:1px solid var(--line);background:#fff;border-radius:8px;padding:6px 2px;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:2px}
+.fb-level b{font-size:18px}
+.fb-level small{font-size:10px;color:var(--muted);text-align:center;line-height:1.1}
+.fb-level.hint{border-color:var(--brand);border-style:dashed}
+.fb-level.on{background:var(--brand);border-color:var(--brand);color:#fff}
+.fb-level.on small{color:#fff}
+.fb-text{display:block;margin:8px 0}
+.fb-text>span{display:block;font-size:14px;margin-bottom:3px}
+.fb-text small{color:var(--muted)}
+.fb-ta{width:100%;resize:vertical;font-family:inherit}
+.fb-done{margin-top:14px;padding:8px 10px;border-radius:8px;background:#fff8e1;font-size:13px}
+.fb-done:empty{display:none}
+.fb-done.ok{background:#e3f6e8;color:#14532d;font-weight:700}
+body.fb-open .editor .body{margin-right:min(400px,100vw)}
+@media (max-width:900px){ body.fb-open .editor .body{margin-right:0} }
+body.fb-open .hlaunch{display:none}

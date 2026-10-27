@@ -33,6 +33,7 @@ const auth = require('./auth');
 const { open, projectStats } = require('./store');
 const names = require('./names');
 const ai = require('./ai');
+const FEEDBACK = require('../public/js/feedback-def.js');
 
 const PORT = Number(process.env.PORT) || 8790;
 const PUBLIC = path.join(__dirname, '..', 'public');
@@ -45,6 +46,22 @@ const ASSET_TYPES = /^(image\/(png|jpeg|gif|webp|svg\+xml|bmp|avif)|audio\/[\w.+
 const store = open();
 
 /* ------------------------------------------------------------- helpers */
+/* two students in the same period (a teacher is in every class) */
+async function sameClass(user, username){
+  if(user.role === 'teacher') return true;
+  const o = await store.getUser(username);
+  return !!o && o.role === 'student' && !o.disabled && !!user.period && o.period === user.period;
+}
+/* feedback slips with the names of who wrote them, who made the game, and the game */
+async function withNames(list){
+  const users = Object.fromEntries((await store.listUsers()).map(u => [u.username, u]));
+  const names = {};
+  for(const f of list) if(!(f.project in names)){ const pr = await store.getProject(f.project); names[f.project] = pr ? pr.name : ''; }
+  return list.map(f => ({ project:f.project, game:names[f.project], owner:f.owner, ownerName:(users[f.owner] || {}).name || f.owner,
+    reviewer:f.reviewer, reviewerName:(users[f.reviewer] || {}).name || f.reviewer, period:(users[f.owner] || {}).period || '',
+    data:f.data, updated:f.updated, complete:FEEDBACK.complete(f.data) }));
+}
+
 function send(res, code, body, headers={}){
   const json = typeof body !== 'string' && !Buffer.isBuffer(body);
   res.writeHead(code, { 'Content-Type': json ? 'application/json' : 'text/plain', 'Cache-Control':'no-store', ...headers });
@@ -208,7 +225,10 @@ async function api(req, res, url){
     }
     if(p[1] === 'trash' && m === 'GET') return send(res, 200, await store.listDeleted(user.username));
     const pr = await store.getProject(p[1]);
-    if(!pr || (pr.owner !== user.username && !teacher)) return send(res, 404, { error:'none' });
+    // a classmate (same period) may open a game to play it and give feedback — look only, never change
+    const classmate = !!pr && !teacher && pr.owner !== user.username && !p[2] && m === 'GET' && !pr.deleted &&
+      await sameClass(user, pr.owner);
+    if(!pr || (pr.owner !== user.username && !teacher && !classmate)) return send(res, 404, { error:'none' });
     const mine = pr.owner === user.username;
     const canEdit = mine || teacher;
 
@@ -258,6 +278,35 @@ async function api(req, res, url){
     }
   }
 
+  /* Class Games: everyone's games in my period, and feedback slips */
+  if(p[0] === 'class' && p[1] === 'games' && !p[2] && m === 'GET'){
+    const period = teacher ? String(url.searchParams.get('period') || '') : user.period;
+    const people = await store.classGames(period);
+    const mineDone = new Set((await store.listFeedback({ reviewer:user.username })).map(f => f.project));
+    const counts = {};
+    for(const f of await store.listFeedback()) counts[f.project] = (counts[f.project] || 0) + 1;
+    return send(res, 200, { period, me:user.username, people:people.map(u => ({ ...u,
+      projects:u.projects.filter(pr => (pr.stats && pr.stats.blocks) > 0 || u.username === user.username)
+        .map(pr => ({ id:pr.id, name:pr.name, thumb:pr.thumb, updated:pr.updated, blocks:(pr.stats && pr.stats.blocks) || 0,
+          reviewed:mineDone.has(pr.id), slips:counts[pr.id] || 0 })) })) });
+  }
+  if(p[0] === 'feedback' && p[1] === 'received' && !p[2] && m === 'GET'){
+    const list = await store.listFeedback({ owner:user.username });
+    return send(res, 200, await withNames(list));
+  }
+  if(p[0] === 'feedback' && p[1] && p[1] !== 'received' && !p[2]){
+    const pr = await store.getProject(p[1]);
+    if(!pr || pr.deleted) return send(res, 404, { error:'none' });
+    if(m === 'GET'){ const f = await store.getFeedback(pr.id, user.username); return send(res, 200, { data:f ? f.data : null, updated:f ? f.updated : null }); }
+    if(m === 'PUT'){
+      if(pr.owner === user.username) return send(res, 400, { error:'yours' });
+      if(!teacher && !(await sameClass(user, pr.owner))) return send(res, 403, { error:'class' });
+      const b = await readJSON(req, 20000);
+      const f = await store.saveFeedback(pr.id, user.username, pr.owner, FEEDBACK.clean(b.data));
+      return send(res, 200, { updated:f.updated });
+    }
+  }
+
   if(p[0] === 'learn' && !p[1]){
     if(m === 'GET'){ const d = await store.getLearn(user.username); return send(res, 200, { data:d ? d.data : null }); }
     if(m === 'PUT'){
@@ -286,6 +335,12 @@ async function api(req, res, url){
 
   if(p[0] === 'admin'){
     if(!teacher) return send(res, 403, { error:'teacher' });
+    if(p[1] === 'feedback' && !p[2] && m === 'GET'){
+      const period = String(url.searchParams.get('period') || '');
+      const owners = period ? new Set((await store.listUsers()).filter(u => u.period === period).map(u => u.username)) : null;
+      const list = (await store.listFeedback()).filter(f => !owners || owners.has(f.owner));
+      return send(res, 200, await withNames(list));
+    }
     if(p[1] === 'learn' && !p[2] && m === 'GET'){
       const users = (await store.listUsers()).filter(u => u.role === 'student');
       const ls = Object.fromEntries((await store.listLearn()).map(d => [d.owner, d]));
