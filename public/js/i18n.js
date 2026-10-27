@@ -27,7 +27,7 @@ window.I18N = (function(){
     'Rename':'Renombrar', 'Duplicate':'Duplicar', 'Class Games':'Juegos de la clase', 'Give feedback':'Dar comentarios', 'Menu':'Menú', 'File':'Archivo', 'Feedback':'Comentarios', 'Copy':'Copiar', 'Paste':'Pegar', 'Could not copy.':'No se pudo copiar.', 'Copied! Right-click the scripts area and choose Paste, or press Ctrl+V.':'¡Copiado! Haz clic derecho en el área de programas y elige Pegar, o presiona Ctrl+V.', 'Delete':'Borrar', 'Restore':'Restaurar',
     'Untitled':'Sin título', 'Saved':'Guardado', 'Saving…':'Guardando…', 'Not saved yet':'Aún no guardado',
     'Offline — kept on this computer':'Sin conexión — guardado en esta computadora',
-    'Read only':'Solo lectura', 'History':'Historial', 'Save now':'Guardar ahora',
+    'Read only':'Solo lectura', 'Your teacher has locked editing. You can still open and play your game.':'Tu maestro bloqueó la edición. Todavía puedes abrir y jugar tu juego.', 'History':'Historial', 'Save now':'Guardar ahora',
     'Go back to this version':'Volver a esta versión', 'Versions are saved as you work.':'Las versiones se guardan mientras trabajas.',
     'Restore this version? Your current work is kept in the history too.':'¿Volver a esta versión? Tu trabajo actual también queda en el historial.',
     'just now':'ahora', '{n} min ago':'hace {n} min', '{n} h ago':'hace {n} h', 'yesterday':'ayer',

@@ -26,6 +26,23 @@ window.CLASSGAMES = (function(){
     const pick = isTeacher ? h('select', { class:'inp cg-period', 'aria-label':L('Period', 'Período') },
       ...['2', '3', '4', '5', '6'].map(p => h('option', { value:p }, L('Period ', 'Período ') + p))) : null;
     if(pick){ pick.value = sessionStorageGet('cg-period') || '2'; pick.onchange = () => { sessionStorageSet('cg-period', pick.value); load(); }; }
+    // lock a whole period: its students can play their games but not change them
+    const lockBtn = isTeacher ? h('button', { class:'btn', type:'button' }) : null;
+    async function drawLock(){
+      if(!lockBtn) return;
+      let on = false;
+      try { on = (await api('/admin/lock')).includes(pick.value); } catch(e){}
+      lockBtn.textContent = on ? L('Unlock editing', 'Desbloquear edición') : L('Lock editing', 'Bloquear edición');
+      lockBtn.classList.toggle('danger', !on);
+      lockBtn.onclick = async () => {
+        const msg = on ? L('Let period ', 'Permitir que el período ') + pick.value + L(' change their games again?', ' cambie sus juegos otra vez?')
+          : L('Lock period ', '¿Bloquear el período ') + pick.value + L('? Students can still open and play their games, but cannot change them or make new ones.', '? Pueden abrir y jugar sus juegos, pero no cambiarlos ni hacer nuevos.');
+        if(!(await UI.confirm(msg, on ? L('Unlock', 'Desbloquear') : L('Lock', 'Bloquear')))) return;
+        await api('/admin/lock', { method:'POST', body:JSON.stringify({ period:pick.value, locked:!on }) });
+        drawLock();
+      };
+    }
+    if(pick){ const was = pick.onchange; pick.onchange = () => { was(); drawLock(); }; drawLock(); }
     app.replaceChildren(
       top(L('Class Games', 'Juegos de la clase')),
       h('main', { class:'pmain cg-main' },
@@ -35,6 +52,7 @@ window.CLASSGAMES = (function(){
           h('span', { class:'grow' }), pick,
           isTeacher ? h('a', { class:'btn', href:'/feedback-form.html', target:'_blank' }, L('Paper slips', 'Tarjetas de papel')) : null,
           !isTeacher ? h('a', { class:'btn primary', href:'#/class/mine' }, L('Feedback on my games', 'Comentarios sobre mis juegos')) : null,
+          isTeacher ? lockBtn : null,
           isTeacher ? h('button', { class:'btn primary', type:'button', onclick:() => teacherSlips(pick.value) }, L('All slips', 'Todas las tarjetas')) : null),
         list));
     async function load(){

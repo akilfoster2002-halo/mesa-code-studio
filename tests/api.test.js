@@ -376,3 +376,19 @@ test('Class Games: a classmate can play your game read-only and leave one feedba
   assert.strictEqual((await (await call(t.cookie, '/admin/feedback?period=2')).json()).length, 1);
   assert.strictEqual((await call(b.cookie, '/admin/feedback')).status, 403);
 });
+
+test('a locked period can open and play its games but not change them', async () => {
+  const s = await login('cara', 'fox77'), t = await login('teach', 'apple-pear');
+  const p = await (await call(s.cookie, '/projects', { method:'POST', body:JSON.stringify({ name:'Locked Game', data:{ targets:[{ isStage:true, scripts:[] }] } }) })).json();
+  assert.strictEqual((await call(s.cookie, '/admin/lock', { method:'POST', body:'{"period":"3","locked":true}' })).status, 403, 'students cannot lock');
+  assert.strictEqual((await call(t.cookie, '/admin/lock', { method:'POST', body:'{"period":"3","locked":true}' })).status, 200);
+  assert.deepStrictEqual(await (await call(t.cookie, '/admin/lock')).json(), ['3']);
+  const seen = await (await call(s.cookie, '/projects/' + p.id)).json();
+  assert.strictEqual(seen.readOnly, true); assert.strictEqual(seen.locked, true);
+  assert.strictEqual((await call(s.cookie, '/projects/' + p.id, { method:'PUT', body:'{"data":{}}' })).status, 403);
+  assert.strictEqual((await call(s.cookie, '/projects/' + p.id, { method:'DELETE' })).status, 403);
+  assert.strictEqual((await call(s.cookie, '/projects', { method:'POST', body:'{"name":"x"}' })).status, 403);
+  assert.strictEqual((await call(t.cookie, '/projects/' + p.id, { method:'PUT', body:JSON.stringify({ name:'Teacher can' }) })).status, 200, 'the teacher still can');
+  await call(t.cookie, '/admin/lock', { method:'POST', body:'{"period":"3","locked":false}' });
+  assert.strictEqual((await call(s.cookie, '/projects/' + p.id, { method:'PUT', body:JSON.stringify({ name:'Mine again' }) })).status, 200);
+});

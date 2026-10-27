@@ -59,6 +59,7 @@ class FileStore {
   async setTutorial(username, v){ const u = this.db.users[username]; if(u){ u.tutorial = v; this._save(); } }
   async setTip(username, v){ const u = this.db.users[username]; if(u){ u.helper_tip = v || null; this._save(); } }
   async setDisabled(username, v){ const u = this.db.users[username]; if(u){ u.disabled = !!v; this._save(); } }
+  async setLocked(period, v){ for(const u of Object.values(this.db.users)) if(u.role === 'student' && u.period === period) u.locked = !!v; this._save(); }
   async lastVersionLabel(id){ const vs = this.db.versions[id] || []; return vs.length ? vs[vs.length-1].label : null; }
   /* one row per account: how far each student has got */
   async overview(){
@@ -280,7 +281,8 @@ class PgStore {
       ALTER TABLE cs_users ADD COLUMN IF NOT EXISTS last_login TIMESTAMPTZ;
       ALTER TABLE cs_users ADD COLUMN IF NOT EXISTS disabled BOOLEAN NOT NULL DEFAULT false;
       ALTER TABLE cs_users ADD COLUMN IF NOT EXISTS tutorial TEXT;
-      ALTER TABLE cs_users ADD COLUMN IF NOT EXISTS helper_tip TEXT;   -- a teacher's note, first in the student's Block Helper
+      ALTER TABLE cs_users ADD COLUMN IF NOT EXISTS helper_tip TEXT;
+      ALTER TABLE cs_users ADD COLUMN IF NOT EXISTS locked BOOLEAN NOT NULL DEFAULT false;   -- the teacher stopped edits (a period at a time)   -- a teacher's note, first in the student's Block Helper
       ALTER TABLE cs_projects ADD COLUMN IF NOT EXISTS stats JSONB;
       ALTER TABLE cs_projects ADD COLUMN IF NOT EXISTS edited_by TEXT;
       CREATE TABLE IF NOT EXISTS cs_learn (
@@ -320,6 +322,7 @@ class PgStore {
   async setTutorial(username, v){ await this.q('UPDATE cs_users SET tutorial=$2 WHERE username=$1', [username, v]); }
   async setTip(username, v){ await this.q('UPDATE cs_users SET helper_tip=$2 WHERE username=$1', [username, v || null]); }
   async setDisabled(username, v){ await this.q('UPDATE cs_users SET disabled=$2 WHERE username=$1', [username, !!v]); }
+  async setLocked(period, v){ await this.q(`UPDATE cs_users SET locked=$2 WHERE role='student' AND period=$1`, [period, !!v]); }
   async lastVersionLabel(id){
     const r = await this.q('SELECT label FROM cs_versions WHERE project=$1 ORDER BY created DESC LIMIT 1', [id]);
     return r.rows[0] ? r.rows[0].label : null;

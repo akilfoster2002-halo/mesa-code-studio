@@ -176,6 +176,8 @@ async function api(req, res, url){
   const user = await store.getUser(me.u);
   if(!user || user.disabled) return send(res, 401, { error:'login' });
   const teacher = user.role === 'teacher';
+  // the teacher can lock a period: its students can open and play their games, not change them
+  const locked = !teacher && !!user.locked;
 
   if(p[0] === 'me' && p[1] === 'tutorial' && m === 'POST'){
     const b = await readJSON(req, 2000);
@@ -184,7 +186,7 @@ async function api(req, res, url){
     await store.setTutorial(user.username, v);
     return send(res, 200, { ok:true });
   }
-  if(p[0] === 'me') return send(res, 200, { username:user.username, name:user.name, role:user.role, period:user.period, tutorial:user.tutorial || null, tip:user.helper_tip || null });
+  if(p[0] === 'me') return send(res, 200, { username:user.username, name:user.name, role:user.role, period:user.period, tutorial:user.tutorial || null, tip:user.helper_tip || null, locked });
 
   /* the Block Helper: the browser sends the question with the project as
      it is on screen (names and scripts only) and the chat so far */
@@ -218,6 +220,7 @@ async function api(req, res, url){
     if(!p[1]){
       if(m === 'GET') return send(res, 200, await store.listProjects(user.username));
       if(m === 'POST'){
+        if(locked) return send(res, 403, { error:'locked' });
         const b = await readJSON(req);
         const pr = await store.createProject(user.username, cleanName(b.name) || 'Untitled', b.data || {}, b.thumb);
         return send(res, 200, { id:pr.id, name:pr.name, updated:pr.updated });
@@ -230,14 +233,14 @@ async function api(req, res, url){
       await sameClass(user, pr.owner);
     if(!pr || (pr.owner !== user.username && !teacher && !classmate)) return send(res, 404, { error:'none' });
     const mine = pr.owner === user.username;
-    const canEdit = mine || teacher;
+    const canEdit = (mine && !locked) || teacher;
 
     if(!p[2]){
       if(m === 'GET'){
         const owner = mine ? user : await store.getUser(pr.owner);
-        return send(res, 200, { ...pr, readOnly: !mine, canEdit, ownerName: owner ? owner.name : pr.owner });
+        return send(res, 200, { ...pr, readOnly: !mine || locked, canEdit, locked: mine && locked, ownerName: owner ? owner.name : pr.owner });
       }
-      if(!canEdit || (m === 'DELETE' && !mine)) return send(res, 403, { error:'not yours' });
+      if(!canEdit || (m === 'DELETE' && !mine)) return send(res, 403, { error: locked ? 'locked' : 'not yours' });
       if(m === 'PUT'){
         const b = await readJSON(req);
         const fields = {};
@@ -263,7 +266,7 @@ async function api(req, res, url){
       }
       if(m === 'DELETE'){ await store.deleteProject(pr.id); return send(res, 200, { ok:true }); }
     }
-    if(p[2] === 'undelete' && m === 'POST' && mine){ await store.restoreDeleted(pr.id); return send(res, 200, { ok:true }); }
+    if(p[2] === 'undelete' && m === 'POST' && mine && !locked){ await store.restoreDeleted(pr.id); return send(res, 200, { ok:true }); }
     if(p[2] === 'versions'){
       if(!p[3]) return send(res, 200, await store.listVersions(pr.id));
       const v = await store.getVersion(pr.id, p[3]);
@@ -404,6 +407,15 @@ async function api(req, res, url){
       const b = await readJSON(req, 8000);
       await store.setTip(u.username, String(b.tip || '').replace(/\r/g, '').trim().slice(0, 2000));
       return send(res, 200, { ok:true });
+    }
+    if(p[1] === 'lock'){
+      if(m === 'GET'){ const us = await store.listUsers(); return send(res, 200, [...new Set(us.filter(u => u.role === 'student' && u.locked).map(u => u.period))]); }
+      if(m === 'POST'){
+        const b = await readJSON(req, 2000), period = String(b.period || '');
+        if(!period) return send(res, 400, { error:'period' });
+        await store.setLocked(period, !!b.locked);
+        return send(res, 200, { ok:true });
+      }
     }
     if(p[1] === 'students' && p[3] === 'disable' && m === 'POST'){
       const u = await store.getUser(p[2]);

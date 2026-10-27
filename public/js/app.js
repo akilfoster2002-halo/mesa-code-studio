@@ -331,9 +331,10 @@
     P = PROJECT.repair(JSON.parse(JSON.stringify(data)));
     await MEDIA.loadAll(PROJECT.assets(P));
     E.title.value = pr.name; E.title.disabled = readOnly;
-    E.banner.classList.toggle('hidden', !someoneElse);
+    E.banner.classList.toggle('hidden', !someoneElse && !pr.locked);
     E.banner.classList.toggle('editing', someoneElse && !readOnly);
     E.banner.replaceChildren();
+    if(pr.locked) E.banner.append(h('span', {}, t('Your teacher has locked editing. You can still open and play your game.')));
     if(someoneElse){
       const back = me.role === 'teacher' ? h('a', { class:'btn small', href:'#/teacher' }, '← ' + t('Dashboard'))
         : h('a', { class:'btn small', href:'#/class' }, '← ' + t('Class Games'));
