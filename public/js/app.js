@@ -245,6 +245,7 @@
       h('header', { class:'top' }, logo(),
         h('button', { class:'btn ghost proj-btn', type:'button', onclick:projectSwitcher, title:t('My Projects') }, t('My Projects') + ' ▾'),
         E.title, E.status, h('span', { class:'grow' }),
+        E.fbGive = h('button', { class:'btn primary fb-top hidden', type:'button' }, t('Give feedback')),
         E.fbBtn = h('button', { class:'btn primary fb-top hidden', type:'button' }),
         h('button', { class:'btn ghost hist-btn', type:'button', onclick:historyPanel, title:t('History') }, t('History')),
         h('button', { class:'btn ghost file-btn', type:'button', onclick:fileMenu }, t('File') + ' ▾'),
@@ -359,7 +360,9 @@
     VM.rt.dirty = true;
     // Feedback, in the top bar: a classmate fills in a slip; the owner reads the slips
     const who = pr.ownerName || pr.owner;
-    E.fbBtn.classList.add('hidden');
+    E.fbBtn.classList.add('hidden'); E.fbGive.classList.add('hidden');
+    // a teacher can leave a slip on any student's game too
+    if(me.role === 'teacher' && someoneElse){ E.fbGive.onclick = () => CLASSGAMES.openPanel(id, pr.name, who, true); E.fbGive.classList.remove('hidden'); }
     if(me.role === 'student' && readOnly && someoneElse){
       E.fbBtn.textContent = t('Give feedback'); E.fbBtn.onclick = () => CLASSGAMES.openPanel(id, pr.name, who);
       E.fbBtn.classList.remove('hidden');

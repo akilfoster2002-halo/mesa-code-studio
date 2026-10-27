@@ -115,7 +115,7 @@ window.CLASSGAMES = (function(){
     if(panel){ panel.remove(); panel = null; document.body.classList.remove('fb-open'); }
     if(reopen && keepButton !== true){ reopen.remove(); reopen = null; }
   }
-  async function openPanel(projectId, gameName, ownerName){
+  async function openPanel(projectId, gameName, ownerName, teacher){
     if(panel){ closePanel(true); return; }
     if(reopen){ reopen.remove(); reopen = null; }
     let data = { checks:{}, ratings:{}, texts:{} };
@@ -185,7 +185,7 @@ window.CLASSGAMES = (function(){
       showDone();
       if(missingList().length){ doneBox.scrollIntoView({ behavior:'smooth', block:'center' }); return UI.toast(doneBox.textContent, 'bad'); }
       UI.toast(L('Feedback sent to ', 'Comentarios enviados a ') + ownerName + '!');
-      location.hash = '#/class';
+      if(teacher) closePanel(); else location.hash = '#/class';
     }
     document.body.append(panel);
     document.body.classList.add('fb-open');
