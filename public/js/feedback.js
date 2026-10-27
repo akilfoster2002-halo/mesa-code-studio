@@ -99,10 +99,14 @@ window.CLASSGAMES = (function(){
   }
 
   /* ----------------------------------- the slip, beside the game */
-  let panel = null;
-  function closePanel(){ if(panel){ panel.remove(); panel = null; document.body.classList.remove('fb-open'); } }
+  let panel = null, reopen = null;
+  function closePanel(keepButton){
+    if(panel){ panel.remove(); panel = null; document.body.classList.remove('fb-open'); }
+    if(reopen && keepButton !== true){ reopen.remove(); reopen = null; }
+  }
   async function openPanel(projectId, gameName, ownerName){
-    if(panel){ closePanel(); return; }
+    if(panel){ closePanel(true); return; }
+    if(reopen){ reopen.remove(); reopen = null; }
     let data = { checks:{}, ratings:{}, texts:{} };
     try { const got = await api('/feedback/' + projectId); if(got.data) data = { checks:{}, ratings:{}, texts:{}, ...got.data }; } catch(e){}
     const status = h('span', { class:'fb-status' });
@@ -116,12 +120,16 @@ window.CLASSGAMES = (function(){
       }, 500);
     };
     const doneBox = h('div', { class:'fb-done' });
-    function showDone(){
+    function missingList(){
       const missing = [];
       F.checks.forEach(c => { if(!data.checks[c.id]) missing.push(c.icon); });
       F.ratings.forEach(r => { if(!data.ratings[r.id]) missing.push(r.icon); });
       if(data.level === undefined) missing.push('📊');
       F.texts.filter(x => x.required).forEach(x => { if(!data.texts[x.id]) missing.push(x.icon); });
+      return missing;
+    }
+    function showDone(){
+      const missing = missingList();
       status.textContent = '✓ ' + L('Saved', 'Guardado');
       doneBox.className = 'fb-done' + (missing.length ? '' : ' ok');
       doneBox.textContent = missing.length ? L('Still to fill: ', 'Falta llenar: ') + missing.join(' ') : '🎉 ' + L('Slip finished! Thank you.', '¡Tarjeta terminada! Gracias.');
@@ -165,7 +173,7 @@ window.CLASSGAMES = (function(){
     });
     panel = h('aside', { class:'fb-panel', 'aria-label':L('Feedback slip', 'Tarjeta de comentarios') },
       h('header', {}, h('b', {}, '💬 ' + L('Feedback slip', 'Tarjeta de comentarios')), h('span', { class:'grow' }), status,
-        h('button', { class:'btn small ghost', type:'button', title:L('Close', 'Cerrar'), onclick:closePanel }, '✕')),
+        h('button', { class:'btn small ghost', type:'button', title:L('Close', 'Cerrar'), onclick:hide }, '✕')),
       h('div', { class:'fb-body' },
         h('p', { class:'fb-who' }, '🎮 ', h('b', {}, gameName), ' — ' + L('by ', 'de ') + ownerName),
         h('p', { class:'muted' }, L('Copy your paper slip. Play the game to check each one.', 'Copia tu tarjeta de papel. Juega para revisar cada una.')),
@@ -173,7 +181,23 @@ window.CLASSGAMES = (function(){
         h('h3', {}, '2 · ' + L('Stars', 'Estrellas')), ...ratingRows,
         h('h3', {}, '3 · ' + L('I think this game is at level…', 'Creo que este juego está en el nivel…')), levelRow,
         h('h3', {}, '4 · ' + L('Comments', 'Comentarios')), ...textRows,
-        doneBox));
+        doneBox,
+        h('button', { class:'btn primary fb-submit', type:'button', onclick:submit }, '📨 ' + L('Submit feedback', 'Enviar comentarios'))));
+    // closing the slip leaves a big button to bring it back
+    function hide(){
+      closePanel(true);
+      reopen = h('button', { class:'btn primary fb-reopen', type:'button', onclick:() => openPanel(projectId, gameName, ownerName) }, '💬 ' + L('Give feedback', 'Dar comentarios'));
+      document.body.append(reopen);
+    }
+    async function submit(){
+      clearTimeout(timer);
+      try { await api('/feedback/' + projectId, { method:'PUT', body:JSON.stringify({ data }) }); }
+      catch(e){ status.textContent = '⚠️ ' + L('Not saved — try again', 'No se guardó — intenta otra vez'); return; }
+      showDone();
+      if(missingList().length){ doneBox.scrollIntoView({ behavior:'smooth', block:'center' }); return UI.toast('✋ ' + doneBox.textContent, 'bad'); }
+      UI.toast('🎉 ' + L('Feedback sent to ', 'Comentarios enviados a ') + ownerName + '!');
+      location.hash = '#/class';
+    }
     document.body.append(panel);
     document.body.classList.add('fb-open');
     markLevel();

@@ -327,13 +327,15 @@
       const back = me.role === 'teacher' ? h('a', { class:'btn small', href:'#/teacher' }, '← ' + t('Dashboard'))
         : h('a', { class:'btn small', href:'#/class' }, '← ' + t('Class Games'));
       const give = me.role === 'student' && readOnly
-        ? h('button', { class:'btn small primary fb-give', type:'button', onclick:() => CLASSGAMES.openPanel(id, pr.name, pr.ownerName || pr.owner) }, '💬 ' + t('Give feedback')) : null;
-      if(readOnly) E.banner.append(h('span', {}, '👁 ' + t('Viewing {n}\'s project', { n:pr.ownerName || pr.owner }) + ' — ' + t('Read only')),
-        h('span', { class:'grow' }), give, pr.canEdit ? h('a', { class:'btn small primary', href:'#/p/' + id + '/edit' }, '✏️ ' + t('Edit this project')) : null, back);
+        ? h('button', { class:'btn primary fb-give', type:'button', onclick:() => CLASSGAMES.openPanel(id, pr.name, pr.ownerName || pr.owner) }, '💬 ' + t('Give feedback')) : null;
+      if(readOnly) E.banner.append(...[h('span', {}, '🔒 ' + t('Viewing {n}\'s project', { n:pr.ownerName || pr.owner }) + ' — ' + (I18N.lang === 'es' ? 'Solo para jugar, no puedes cambiarlo' : 'Play only, you can\'t change it')),
+        h('span', { class:'grow' }), give, pr.canEdit ? h('a', { class:'btn small primary', href:'#/p/' + id + '/edit' }, '✏️ ' + t('Edit this project')) : null, back].filter(Boolean));
       else E.banner.append(h('span', {}, '✏️ ' + t('Editing {n}\'s project — changes save to their account. Their work from before is kept in History.', { n:pr.ownerName || pr.owner })),
         h('span', { class:'grow' }), h('a', { class:'btn small', href:'#/p/' + id }, '✓ ' + t('Done')), back);
     }
     document.body.classList.toggle('readonly', readOnly);
+    // a student in a classmate's game: play only, nothing of it to take away
+    document.body.classList.toggle('peer', readOnly && someoneElse && me.role === 'student');
     STAGE.clearMonitors();
     VM.load(P, { username: me.username });
     STAGE.setReadOnly(readOnly);
@@ -347,6 +349,8 @@
     SAVE.open(id, readOnly);
     HELPER.load(P, { id, readOnly });
     VM.rt.dirty = true;
+    // a classmate's game opens with the feedback slip already beside it
+    if(me.role === 'student' && readOnly && someoneElse) CLASSGAMES.openPanel(id, pr.name, pr.ownerName || pr.owner);
   }
 
   function changed(kind){
@@ -450,7 +454,8 @@
     const r = e.currentTarget.getBoundingClientRect();
     UI.menu(r.left, r.bottom + 4, [
       { label:'＋ ' + t('New project'), value:'new' },
-      { label:'⤓ ' + t('Download to your computer'), value:'down' },
+      // a classmate's game is play-only: no copy of it to take home
+      ...(readOnly && me.role === 'student' && projectMeta.owner !== me.username ? [] : [{ label:'⤓ ' + t('Download to your computer'), value:'down' }]),
       ...(readOnly ? [] : [{ label:'⤒ ' + t('Load from your computer'), value:'up' }])], async v => {
       if(v === 'new') newProject();
       if(v === 'down') exportProject();

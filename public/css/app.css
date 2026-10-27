@@ -630,3 +630,10 @@ body.full-stage .hlaunch,body.full-stage .helper{display:none}
 body.fb-open .editor .body{margin-right:min(400px,100vw)}
 @media (max-width:900px){ body.fb-open .editor .body{margin-right:0} }
 body.fb-open .hlaunch{display:none}
+
+.fb-submit{display:block;width:100%;margin-top:14px;padding:14px;font-size:18px;font-weight:800;background:var(--ok);border-color:var(--ok)}
+.fb-reopen{position:fixed;right:20px;bottom:20px;z-index:60;padding:16px 22px;font-size:20px;font-weight:800;border-radius:999px;box-shadow:0 6px 18px rgba(0,0,0,.25);animation:fbpulse 1.6s ease-in-out infinite}
+@keyframes fbpulse{50%{transform:scale(1.06)}}
+.banner .fb-give{font-size:16px;font-weight:800;padding:8px 16px}
+body.readonly .banner:not(.editing){background:#ffe4e4;color:#7a1f1f;font-weight:600}
+body.peer .dl{display:none}
