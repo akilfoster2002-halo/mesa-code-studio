@@ -15,15 +15,10 @@
       { id:'lose',    icon:'💀', level:3, en:'How do you lose? What happens then?',                    es:'¿Cómo pierdes? ¿Qué pasa entonces?' },
       { id:'win',     icon:'🏆', level:3, en:'How do you win?',                                        es:'¿Cómo ganas?' },
       { id:'score',   icon:'🔢', level:4, en:'What does the score, lives or timer count?',             es:'¿Qué cuentan los puntos, vidas o tiempo?' },
-      { id:'restart', icon:'🚩', level:4, en:'What happens when you press the green flag again?',      es:'¿Qué pasa al presionar la bandera verde otra vez?' },
       { id:'more',    icon:'📈', level:4, en:'What makes it harder, or what start screen or next level does it have?', es:'¿Qué lo hace más difícil, o qué pantalla de inicio u otro nivel tiene?' }
     ],
     CHECK_TEXT: 160,
-    // 1–4 stars
-    ratings: [
-      { id:'fun',  icon:'🎉', en:'Fun to play',   es:'Divertido de jugar' },
-      { id:'look', icon:'🎨', en:'Looks great',   es:'Se ve muy bien' }
-    ],
+    ratings: [],   // no stars on the slip
     // the rubric level the reviewer thinks the game is at
     levels: [
       { n:0, en:'Not yet',          es:'Todavía no' },
@@ -46,7 +41,7 @@
       if(!ok('moves')) return 0;
       if(!ok('enemy')) return 1;
       if(!(ok('lose') && ok('win'))) return 2;
-      if(!(ok('score') && ok('restart') && ok('more'))) return 3;
+      if(!(ok('score') && ok('more'))) return 3;
       return 4;
     },
 

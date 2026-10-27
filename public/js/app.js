@@ -37,17 +37,28 @@
       I18N.lang === 'es' ? 'EN' : 'ES');
   }
   function logo(){ return h('a', { class:'logo', href:'#/' }, h('span', { class:'logo-mark' }, '◆'), h('span', {}, 'Code Studio')); }
-  function userBits(){
+  function userBits(compact){
     if(!me) return [];
+    const go = [
+      me.role === 'teacher' ? { label:t('Dashboard'), value:'#/teacher' } : null,
+      { label:t('Class Games'), value:'#/class' },
+      { label:t('Game design'), value:'/design' },
+      { label:t('Learn'), value:'/learn' }].filter(Boolean);
+    // in the editor the pages go in one menu, so the bar stays short
+    if(compact) return [
+      h('button', { class:'btn ghost menu-btn', type:'button', onclick:e => {
+        const r = e.currentTarget.getBoundingClientRect();
+        UI.menu(r.left, r.bottom + 4, [...go, { sep:true }, { label:t('Tour'), value:'tour' }, { label:t('Log out'), value:'out' }], v => {
+          if(v === 'tour') TOUR.start(); else if(v === 'out') logout(); else if(v.startsWith('#')) location.hash = v; else location.href = v;
+        });
+      } }, t('Menu') + ' ▾'),
+      h('span', { class:'who', title:me.username }, me.name)];
     return [
-      me.role === 'teacher' ? h('a', { class:'btn ghost', href:'#/teacher' }, '🍎 ' + t('Dashboard')) : null,
-      h('a', { class:'btn ghost', href:'#/class', title:t('Class Games') }, '🏅 ', h('span', { class:'lbl' }, t('Class Games'))),
-      h('a', { class:'btn ghost', href:'/design', title:t('Game design') }, '🎨 ', h('span', { class:'lbl' }, t('Game design'))),
-      h('a', { class:'btn ghost', href:'/learn', title:t('Learn') }, '🎮 ', h('span', { class:'lbl' }, t('Learn'))),
-      h('button', { class:'btn tour-btn', type:'button', title:t('Tour'), onclick:() => TOUR.start() }, '❓ ' + t('Tour')),
-      h('span', { class:'who', title:me.username }, '👤 ' + me.name),
+      ...go.map(g => h('a', { class:'btn ghost', href:g.value }, g.label)),
+      h('button', { class:'btn tour-btn', type:'button', title:t('Tour'), onclick:() => TOUR.start() }, t('Tour')),
+      h('span', { class:'who', title:me.username }, me.name),
       h('button', { class:'btn ghost', type:'button', onclick:logout }, t('Log out'))
-    ].filter(Boolean);
+    ];
   }
   async function logout(){
     if(SAVE.dirty) await SAVE.flush();
@@ -232,12 +243,11 @@
     E.full = h('button', { class:'btn ghost icon', type:'button', title:t('Full screen'), onclick:() => { document.body.classList.toggle('full-stage'); VM.rt.dirty = true; setTimeout(() => STAGE.renderMonitors(), 50); } }, '⛶');
     E.root = h('div', { class:'editor' },
       h('header', { class:'top' }, logo(),
-        h('button', { class:'btn ghost proj-btn', type:'button', onclick:projectSwitcher, title:t('My Projects') }, '🗂 ', h('span', { class:'lbl' }, t('My Projects')), ' ▾'),
-        h('button', { class:'btn ghost', type:'button', title:t('New project'), onclick:newProject }, '＋ ', h('span', { class:'lbl' }, t('New'))),
+        h('button', { class:'btn ghost proj-btn', type:'button', onclick:projectSwitcher, title:t('My Projects') }, t('My Projects') + ' ▾'),
         E.title, E.status, h('span', { class:'grow' }),
-        h('button', { class:'btn ghost dl', type:'button', title:t('Save the code of every sprite as one PDF, to hand in'), onclick:downloadScript }, '⤓ ', h('span', { class:'lbl' }, t('Download script'))),
-        h('button', { class:'btn ghost hist-btn', type:'button', onclick:historyPanel, title:t('History') }, '🕘 ', h('span', { class:'lbl' }, t('History'))),
-        h('button', { class:'btn ghost', type:'button', onclick:fileMenu }, '📁 ▾'),
+        E.fbBtn = h('button', { class:'btn primary fb-top hidden', type:'button' }),
+        h('button', { class:'btn ghost hist-btn', type:'button', onclick:historyPanel, title:t('History') }, t('History')),
+        h('button', { class:'btn ghost file-btn', type:'button', onclick:fileMenu }, t('File') + ' ▾'),
         E.userBox = h('span', { class:'userbox' })),
       E.banner,
       h('div', { class:'body' },
@@ -304,7 +314,7 @@
   async function editorView(id, edit){
     document.body.className = 'v-editor';
     const E = editorShell();
-    E.userBox.replaceChildren(langBtn(), ...userBits());
+    E.userBox.replaceChildren(langBtn(), ...userBits(true));
     app.replaceChildren(E.root);
     E.status.textContent = t('Loading…');
     let pr;
@@ -326,10 +336,8 @@
     if(someoneElse){
       const back = me.role === 'teacher' ? h('a', { class:'btn small', href:'#/teacher' }, '← ' + t('Dashboard'))
         : h('a', { class:'btn small', href:'#/class' }, '← ' + t('Class Games'));
-      const give = me.role === 'student' && readOnly
-        ? h('button', { class:'btn primary fb-give', type:'button', onclick:() => CLASSGAMES.openPanel(id, pr.name, pr.ownerName || pr.owner) }, '📝 ' + t('Give feedback')) : null;
-      if(readOnly) E.banner.append(...[h('span', {}, '🔒 ' + t('Viewing {n}\'s project', { n:pr.ownerName || pr.owner }) + ' — ' + (I18N.lang === 'es' ? 'Solo para jugar, no puedes cambiarlo' : 'Play only, you can\'t change it')),
-        h('span', { class:'grow' }), give, pr.canEdit ? h('a', { class:'btn small primary', href:'#/p/' + id + '/edit' }, '✏️ ' + t('Edit this project')) : null, back].filter(Boolean));
+      if(readOnly) E.banner.append(...[h('span', {}, t('Viewing {n}\'s project', { n:pr.ownerName || pr.owner }) + ' — ' + (I18N.lang === 'es' ? 'Solo para jugar, no puedes cambiarlo' : 'Play only, you can\'t change it')),
+        h('span', { class:'grow' }), pr.canEdit ? h('a', { class:'btn small primary', href:'#/p/' + id + '/edit' }, '✏️ ' + t('Edit this project')) : null, back].filter(Boolean));
       else E.banner.append(h('span', {}, '✏️ ' + t('Editing {n}\'s project — changes save to their account. Their work from before is kept in History.', { n:pr.ownerName || pr.owner })),
         h('span', { class:'grow' }), h('a', { class:'btn small', href:'#/p/' + id }, '✓ ' + t('Done')), back);
     }
@@ -349,8 +357,20 @@
     SAVE.open(id, readOnly);
     HELPER.load(P, { id, readOnly });
     VM.rt.dirty = true;
-    // a classmate's game opens with the feedback slip already beside it
-    if(me.role === 'student' && readOnly && someoneElse) CLASSGAMES.openPanel(id, pr.name, pr.ownerName || pr.owner);
+    // Feedback, in the top bar: a classmate fills in a slip; the owner reads the slips
+    const who = pr.ownerName || pr.owner;
+    E.fbBtn.classList.add('hidden');
+    if(me.role === 'student' && readOnly && someoneElse){
+      E.fbBtn.textContent = t('Give feedback'); E.fbBtn.onclick = () => CLASSGAMES.openPanel(id, pr.name, who);
+      E.fbBtn.classList.remove('hidden');
+      CLASSGAMES.openPanel(id, pr.name, who);   // and it opens beside the game right away
+    } else if(!someoneElse){
+      CLASSGAMES.receivedCount(id).then(n => {
+        if(!n || current !== '#/p/' + id && current !== '#/p/' + id + '/edit') return;
+        E.fbBtn.textContent = t('Feedback') + ' (' + n + ')'; E.fbBtn.onclick = () => CLASSGAMES.projectSlips(id, pr.name);
+        E.fbBtn.classList.remove('hidden');
+      });
+    }
   }
 
   function changed(kind){
@@ -368,7 +388,7 @@
     function status(text, cls){ if(mounted){ mounted.status.textContent = text; mounted.status.className = 'status ' + (cls || ''); } }
     function open(i, readOnly){
       id = i; ro = readOnly; dirty = false; nameDirty = null; clearTimeout(timer); clearTimeout(retry);
-      status(ro ? '👁 ' + t('Read only') : '✓ ' + t('Saved'), 'ok');
+      status(ro ? t('Read only') : '✓ ' + t('Saved'), 'ok');
     }
     function backup(i){ try { return JSON.parse(localStorage.getItem(KEY(i)) || 'null'); } catch(e){ return null; } }
     function snapshot(){ VM.syncLayers(); return PROJECT.serialize(P); }
@@ -450,14 +470,17 @@
   }
 
   /* -------------------------------------------------- file: download/load */
+  const peer = () => readOnly && me.role === 'student' && projectMeta.owner !== me.username;
   function fileMenu(e){
     const r = e.currentTarget.getBoundingClientRect();
     UI.menu(r.left, r.bottom + 4, [
-      { label:'＋ ' + t('New project'), value:'new' },
+      { label:t('New project'), value:'new' },
+      ...(peer() ? [] : [{ label:t('Download script') + ' (PDF)', value:'pdf' }]),
       // a classmate's game is play-only: no copy of it to take home
-      ...(readOnly && me.role === 'student' && projectMeta.owner !== me.username ? [] : [{ label:'⤓ ' + t('Download to your computer'), value:'down' }]),
-      ...(readOnly ? [] : [{ label:'⤒ ' + t('Load from your computer'), value:'up' }])], async v => {
+      ...(peer() ? [] : [{ label:t('Download to your computer'), value:'down' }]),
+      ...(readOnly ? [] : [{ label:t('Load from your computer'), value:'up' }])], async v => {
       if(v === 'new') newProject();
+      if(v === 'pdf') downloadScript();
       if(v === 'down') exportProject();
       if(v === 'up') importProject();
     });

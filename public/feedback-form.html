@@ -13,7 +13,7 @@
   .bar{display:flex;gap:10px;align-items:center;justify-content:center;padding:12px 16px;flex-wrap:wrap}
   .bar button{font:inherit;font-weight:700;border:0;border-radius:10px;background:var(--brand);color:#fff;padding:10px 16px;cursor:pointer}
   .bar p{margin:0;color:var(--muted)}
-  .page{width:8.5in;height:10.95in;margin:0 auto 16px;background:#fff;padding:.3in .3in;display:flex;flex-direction:row;gap:.4in;overflow:hidden;box-shadow:0 2px 10px rgba(0,0,0,.08)}
+  .page{width:11in;height:8.45in;margin:0 auto 16px;background:#fff;padding:.3in .3in;display:flex;flex-direction:row;gap:.4in;overflow:hidden;box-shadow:0 2px 10px rgba(0,0,0,.08)}
   .slip{flex:1;border:2px solid var(--ink);border-radius:14px;padding:10px 14px;display:flex;flex-direction:column;gap:4px;min-width:0;position:relative}
   .slip + .slip::before{content:"✂";position:absolute;left:-.29in;top:-2px;color:#999;font-size:13px}
   .slip + .slip::after{content:"";position:absolute;left:-.21in;top:18px;bottom:0;border-left:1.5px dashed #bbb}
@@ -40,9 +40,9 @@
   .tip{font-size:10.5px;color:var(--muted);margin:0}
   .line{font-size:12px;margin-top:2px}
   .line small{color:var(--muted)}
-  .write{border-bottom:1.5px solid var(--ink);height:34px}
+  .write{border-bottom:1.5px solid var(--ink);height:26px}
   @media print{
-    @page{size:letter portrait;margin:0}
+    @page{size:letter landscape;margin:0}
     body{background:#fff}
     .bar{display:none}
     .page{margin:0;box-shadow:none;page-break-after:always}
@@ -52,9 +52,9 @@
 </head>
 <body>
 <div class="bar">
-  <p>One slip per page. Students copy their slip into Code Studio → 🏅 Class Games → a game → 💬 Give feedback.</p>
+  <p>Two slips per page (landscape). Students copy their slip into Code Studio → Class Games → a game → Give feedback.</p>
   <label>Pages <input id="pages" type="number" min="1" max="40" value="1" style="width:56px"></label>
-  <button type="button" onclick="window.print()">🖨 Print</button>
+  <button type="button" onclick="window.print()">Print</button>
 </div>
 <div id="out"></div>
 <script src="js/feedback-def.js"></script>
@@ -64,24 +64,21 @@
   const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;' }[c]));
   function slip(){
     return `<section class="slip">
-      <div class="top"><h1>💬 Game Feedback Slip</h1><small>Tarjeta de comentarios del juego</small></div>
+      <div class="top"><h1>Game Feedback Slip</h1><small>Tarjeta de comentarios del juego</small></div>
       <div class="who"><div>Me · Yo:</div><div>Game · Juego:</div><div>Made by · Hecho por:</div></div>
       <h2>1 · Play it and write what you saw · Juega y escribe lo que viste</h2>
-      ${F.checks.map(c => `<div class="line">${c.icon} <b>${esc(c.en)}</b> <small>· ${esc(c.es)}</small></div><div class="write"></div>`).join('')}
-      <h2>2 · Stars — color in 1 to 4 · Estrellas — colorea de 1 a 4</h2>
-      <table>${F.ratings.map(r => `<tr><td class="ico">${r.icon}</td><td class="q">${esc(r.en)}<small>${esc(r.es)}</small></td>
-        <td class="stars">☆☆☆☆</td></tr>`).join('')}</table>
-      <h2>3 · I think this game is at level… (circle one) · Creo que está en el nivel… (encierra uno)</h2>
+      ${F.checks.map((c, i) => `<div class="line"><b>${i + 1}. ${esc(c.en)}</b> <small>· ${esc(c.es)}</small></div><div class="write"></div>`).join('')}
+      <h2>2 · I think this game is at level… (circle one) · Creo que está en el nivel… (encierra uno)</h2>
       <div class="levels">${F.levels.map(l => `<span><b>${l.n}</b>${esc(l.en)}<br>${esc(l.es)}</span>`).join('')}</div>
-      <p class="tip">Each level needs everything before it: 1 = 🕹 · 2 = 🕹👾 · 3 = 🕹👾💀🏆 · 4 = all 7 · Cada nivel necesita todo lo de antes.</p>
-      <h2>4 · Comments · Comentarios</h2>
-      ${F.texts.map(x => `<div class="line">${x.icon} <b>${esc(x.en)}</b> <small>· ${esc(x.es)}</small></div><div class="write"></div>`).join('')}
+      <p class="tip">Each level needs everything before it: 1 = the player moves · 2 = + an enemy · 3 = + win and lose · 4 = + score, and harder or a start screen. · Cada nivel necesita todo lo de antes.</p>
+      <h2>3 · Comments · Comentarios</h2>
+      ${F.texts.map(x => `<div class="line"><b>${esc(x.en)}</b> <small>· ${esc(x.es)}</small></div><div class="write"></div>`).join('')}
     </section>`;
   }
   const out = document.getElementById('out'), pages = document.getElementById('pages');
   function draw(){
     const n = Math.max(1, Math.min(40, Number(pages.value) || 1));
-    out.innerHTML = Array.from({ length:n }, () => `<div class="page">${slip()}</div>`).join('');
+    out.innerHTML = Array.from({ length:n }, () => `<div class="page">${slip()}${slip()}</div>`).join('');
   }
   pages.oninput = draw;
   draw();

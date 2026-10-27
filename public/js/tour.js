@@ -99,9 +99,9 @@ window.TOUR = (function(){
       done:() => { const v = ($('.title-in') || {}).value; return v && v !== base.name && document.activeElement !== $('.title-in'); } },
     { page:'editor', icon:'💾', at:'.status', text:['Your work saves by itself. Look for “✓ Saved”.', 'Tu trabajo se guarda solo. Busca “✓ Guardado”.'] },
     { page:'editor', icon:'🕘', at:'.hist-btn', text:['Made a mistake? History takes you back to an earlier version.', '¿Te equivocaste? El Historial te lleva a una versión anterior.'] },
-    { page:'editor', icon:'⤓', at:'.dl', text:['Download script makes a PDF of your code to hand in.', 'Descargar código hace un PDF de tu código para entregar.'] },
-    { page:'editor', icon:'🗂', at:'.proj-btn', text:['My Projects ▾ switches between your projects. ＋ New starts another.', 'Mis proyectos ▾ cambia entre tus proyectos. ＋ Nuevo empieza otro.'] },
-    { page:'editor', icon:'🚪', at:'.userbox', text:['When class ends: Log out!', 'Al terminar la clase: ¡Salir!'] },
+    { page:'editor', icon:'⤓', at:'.file-btn', text:['File ▾ has Download script: a PDF of your code to hand in.', 'Archivo ▾ tiene Descargar código: un PDF de tu código para entregar.'] },
+    { page:'editor', icon:'🗂', at:'.proj-btn', text:['My Projects ▾ switches between your projects. File ▾ → New project starts another.', 'Mis proyectos ▾ cambia entre tus proyectos. Archivo ▾ → Proyecto nuevo empieza otro.'] },
+    { page:'editor', icon:'🚪', at:'.userbox', text:['When class ends: Menu ▾ → Log out!', 'Al terminar la clase: Menú ▾ → ¡Salir!'] },
     { page:'any', icon:'🎉', text:['You did it! Now build something amazing.', '¡Lo lograste! Ahora crea algo increíble.'], last:true }
   ];
 
