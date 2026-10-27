@@ -637,3 +637,6 @@ body.fb-open .hlaunch{display:none}
 .banner .fb-give{font-size:16px;font-weight:800;padding:8px 16px}
 body.readonly .banner:not(.editing){background:#ffe4e4;color:#7a1f1f;font-weight:600}
 body.peer .dl{display:none}
+.fb-levels .fb-level{grid-column:auto;width:auto;margin:0;padding:6px 2px;text-align:center}
+.btn.primary.fb-submit{background:var(--ok);border-color:var(--ok);color:#fff}
+body.peer .hlaunch{display:none}

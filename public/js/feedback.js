@@ -172,7 +172,7 @@ window.CLASSGAMES = (function(){
       return h('label', { class:'fb-text' }, h('span', {}, x.icon + ' ' + L(x.en, x.es), h('small', {}, ' · ' + L(x.es, x.en))), ta);
     });
     panel = h('aside', { class:'fb-panel', 'aria-label':L('Feedback slip', 'Tarjeta de comentarios') },
-      h('header', {}, h('b', {}, '💬 ' + L('Feedback slip', 'Tarjeta de comentarios')), h('span', { class:'grow' }), status,
+      h('header', {}, h('b', {}, '📝 ' + L('Feedback slip', 'Tarjeta de comentarios')), h('span', { class:'grow' }), status,
         h('button', { class:'btn small ghost', type:'button', title:L('Close', 'Cerrar'), onclick:hide }, '✕')),
       h('div', { class:'fb-body' },
         h('p', { class:'fb-who' }, '🎮 ', h('b', {}, gameName), ' — ' + L('by ', 'de ') + ownerName),
@@ -186,7 +186,7 @@ window.CLASSGAMES = (function(){
     // closing the slip leaves a big button to bring it back
     function hide(){
       closePanel(true);
-      reopen = h('button', { class:'btn primary fb-reopen', type:'button', onclick:() => openPanel(projectId, gameName, ownerName) }, '💬 ' + L('Give feedback', 'Dar comentarios'));
+      reopen = h('button', { class:'btn primary fb-reopen', type:'button', onclick:() => openPanel(projectId, gameName, ownerName) }, '📝 ' + L('Give feedback', 'Dar comentarios'));
       document.body.append(reopen);
     }
     async function submit(){
