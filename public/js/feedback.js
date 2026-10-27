@@ -81,14 +81,18 @@ window.CLASSGAMES = (function(){
   }
 
   /* the slips classmates left on one of my games (the owner, from the editor) */
-  async function projectSlips(projectId, gameName){
+  // a teacher reads the slips on any game; the owner reads the ones on their own
+  const slipsFor = async (projectId, teacher) => teacher
+    ? api('/admin/feedback?project=' + encodeURIComponent(projectId))
+    : (await api('/feedback/received')).filter(f => f.project === projectId);
+  async function projectSlips(projectId, gameName, teacher){
     let list;
-    try { list = (await api('/feedback/received')).filter(f => f.project === projectId); } catch(e){ UI.toast(e.message, 'bad'); return; }
+    try { list = await slipsFor(projectId, teacher); } catch(e){ UI.toast(e.message, 'bad'); return; }
     const body = h('div', { class:'cg-slips cg-modal' }, list.length ? list.map(f => slipCard(f, false)) : h('p', {}, L('No feedback on this game yet.', 'Aún no hay comentarios en este juego.')));
     UI.dialog({ title:L('Feedback on ', 'Comentarios sobre ') + gameName + ' (' + list.length + ')', body, wide:true, ok:L('Close', 'Cerrar'), cancel:null });
   }
-  async function receivedCount(projectId){
-    try { return (await api('/feedback/received')).filter(f => f.project === projectId).length; } catch(e){ return 0; }
+  async function receivedCount(projectId, teacher){
+    try { return (await slipsFor(projectId, teacher)).length; } catch(e){ return 0; }
   }
 
   /* one slip, read only */

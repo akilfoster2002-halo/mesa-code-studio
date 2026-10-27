@@ -336,7 +336,8 @@ async function api(req, res, url){
   if(p[0] === 'admin'){
     if(!teacher) return send(res, 403, { error:'teacher' });
     if(p[1] === 'feedback' && !p[2] && m === 'GET'){
-      const period = String(url.searchParams.get('period') || '');
+      const period = String(url.searchParams.get('period') || ''), project = String(url.searchParams.get('project') || '');
+      if(project) return send(res, 200, await withNames(await store.listFeedback({ project })));
       const owners = period ? new Set((await store.listUsers()).filter(u => u.period === period).map(u => u.username)) : null;
       const list = (await store.listFeedback()).filter(f => !owners || owners.has(f.owner));
       return send(res, 200, await withNames(list));

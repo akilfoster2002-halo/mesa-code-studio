@@ -364,10 +364,11 @@
       E.fbBtn.textContent = t('Give feedback'); E.fbBtn.onclick = () => CLASSGAMES.openPanel(id, pr.name, who);
       E.fbBtn.classList.remove('hidden');
       CLASSGAMES.openPanel(id, pr.name, who);   // and it opens beside the game right away
-    } else if(!someoneElse){
-      CLASSGAMES.receivedCount(id).then(n => {
-        if(!n || current !== '#/p/' + id && current !== '#/p/' + id + '/edit') return;
-        E.fbBtn.textContent = t('Feedback') + ' (' + n + ')'; E.fbBtn.onclick = () => CLASSGAMES.projectSlips(id, pr.name);
+    } else if(!someoneElse || me.role === 'teacher'){
+      const teacher = me.role === 'teacher';
+      CLASSGAMES.receivedCount(id, teacher).then(n => {
+        if((!n && !teacher) || current !== '#/p/' + id && current !== '#/p/' + id + '/edit') return;
+        E.fbBtn.textContent = t('Feedback') + ' (' + n + ')'; E.fbBtn.onclick = () => CLASSGAMES.projectSlips(id, pr.name, teacher);
         E.fbBtn.classList.remove('hidden');
       });
     }
