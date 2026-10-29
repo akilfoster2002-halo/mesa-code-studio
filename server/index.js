@@ -135,6 +135,7 @@ function serveStatic(req, res, pathname){
   if(pathname === '/design' || pathname === '/design/') pathname = '/design.html';
   if(pathname === '/learn' || pathname === '/learn/') pathname = '/learn.html';
   if(pathname === '/html' || pathname === '/html/') pathname = '/html.html';
+  if(pathname === '/resume' || pathname === '/resume/') pathname = '/resume.html';
   const file = path.normalize(path.join(PUBLIC, decodeURIComponent(pathname)));
   if(!file.startsWith(PUBLIC)) return send(res, 403, 'forbidden');
   fs.stat(file, (err, st) => {
@@ -450,7 +451,7 @@ async function api(req, res, url){
           grade:x.data.grade == null ? null : x.data.grade };
       return send(res, 200, kids.sort((a, b) => a.name.localeCompare(b.name)).map(u => ({ username:u.username, name:u.name,
         learn:{ levels:(learn[u.username] || {}).levels || {}, words:(learn[u.username] || {}).words || null, html:((learn[u.username] || {}).html || {}).acts || {},
-          site:HTMLLESSONS.siteInfo(((learn[u.username] || {}).html || {}).site) },
+          site:{ ...HTMLLESSONS.siteInfo(((learn[u.username] || {}).html || {}).site), in:((learn[u.username] || {}).html || {}).siteIn || null } },
         design:designs[u.username] || null, projects:(over[u.username] || {}).projects || 0, blocks:(over[u.username] || {}).blocks || 0,
         last_login:(over[u.username] || {}).last_login || null, subs:subs[u.username] || {},
         locked:!!u.locked, games:games[u.username] || [], slips:slips[u.username] || [] })));
@@ -669,8 +670,10 @@ function mergeLearn(old, add){
     out.html.acts = { ...(out.html.acts || {}), [id]:{ best, n:was.n + 1 } };
   }
   if(add.html && typeof add.html.page === 'string') out.html.page = add.html.page.slice(0, 20000);
-  // My Resume: the page the student types in the Classroom (it replaces the old copy)
-  if(add.html && typeof add.html.site === 'string') out.html.site = add.html.site.slice(0, HTMLLESSONS.SITE_MAX);
+  // My Resume: the page the student types (it replaces the old copy), and when it was
+  // turned in. Turned in, it cannot change until it is unsubmitted (as in Google Classroom).
+  if(add.html && typeof add.html.siteIn === 'boolean') out.html.siteIn = add.html.siteIn ? new Date().toISOString() : null;
+  if(add.html && typeof add.html.site === 'string' && !out.html.siteIn) out.html.site = add.html.site.slice(0, HTMLLESSONS.SITE_MAX);
   return out;
 }
 

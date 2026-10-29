@@ -25,9 +25,12 @@ student goes straight to their own class. Each class has:
   clicks a student's slip to read it, with the game beside it.
 - **HTML assignments** (no HTML tab: each runs on its own assignment page):
   - **HTML Practice** — the 7 practice activities (`/html?embed#/`).
-  - **My Resume** — a plain editor (line numbers, Tab indents, **Save & refresh** or Ctrl+S,
-    and it saves by itself) with the page beside it. Saved as `learn.html.site`; done once it has
-    the skeleton (DOCTYPE, html, head, title, style, body, h1). The teacher presses 👁 to see it.
+  - **My Resume** — set out like a Google Classroom assignment: the instructions, and a **Your
+    work** card with the student's `resume.html` (a picture of the page). The file opens the editor
+    at **/resume** in a new tab: coloured code with line numbers, the page in a browser beside it,
+    **Save & refresh** (Ctrl/⌘ S; it also saves by itself), and the 7 skeleton parts it has.
+    **Turn in** / **Unsubmit** as in Classroom (turned in, it is read only). Due Wednesday, Nov 11.
+    Saved as `learn.html.site` (+ `siteIn`). The teacher's 👁 opens `/resume?u=<username>`, read only.
 - The top bar's tabs are Classroom and Blocks.
 - **＋ Create assignment** (teacher, on Classwork) — title, instructions, topic, due date, for one
   class or all of them. Students open it, **＋ Add HTML file** (up to 5 `.html` files, 400 KB each)

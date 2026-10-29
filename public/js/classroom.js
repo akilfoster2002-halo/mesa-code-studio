@@ -48,8 +48,9 @@
     sureGame:{ en:'Turn in your game? You can still play it, but not change it.', es:'¿Entregar tu juego? Todavía puedes jugarlo, pero no cambiarlo.' },
     gameLocked:{ en:'Locked. You can still play it. To change it, ask your teacher to give it back.', es:'Bloqueado. Todavía puedes jugarlo. Para cambiarlo, pide a tu maestro que te lo devuelva.' },
     noGame:{ en:'No game yet', es:'Aún no hay juego' },
-    saved:{ en:'Saved', es:'Guardado' }, notSaved:{ en:'Not saved yet', es:'Aún no guardado' },
-    saveRefresh:{ en:'Save & refresh', es:'Guardar y actualizar' }, seeSite:{ en:'See it', es:'Verlo' },
+    seeSite:{ en:'See it', es:'Verlo' }, openEditor:{ en:'Open in the editor', es:'Abrir en el editor' },
+    needs:{ en:'Your page needs:', es:'Tu página necesita:' }, notStarted:{ en:'not started', es:'sin empezar' },
+    editorHint:{ en:'Click resume.html to open the editor.', es:'Haz clic en resume.html para abrir el editor.' },
     addGame:{ en:'Add a game', es:'Añadir un juego' }, addFirst:{ en:'Add a classmate’s game to give feedback on.', es:'Añade el juego de un compañero para comentarlo.' },
     removeGame:{ en:'Remove', es:'Quitar' }, noGames:{ en:'No more classmates’ games.', es:'No hay más juegos de compañeros.' },
     playHint:{ en:'Press the flag to play.', es:'Presiona la bandera para jugar.' },
@@ -124,7 +125,7 @@
     const due = setting(it).due;
     if(!st) return null;
     if(st.graded) return h('span', { class:'cr-chip graded' }, st.points ? st.grade + ' / ' + st.points : '✓ ' + w('graded'));
-    if(st.state === 'done') return h('span', { class:'cr-chip done' }, '✓ ' + (it.custom || it.turnin ? w('turnedIn') : w('done')) + (st.late ? ' · ' + w('late') : ''));
+    if(st.state === 'done') return h('span', { class:'cr-chip done' }, '✓ ' + (it.custom || it.turnin || it.site ? w('turnedIn') : w('done')) + (st.late ? ' · ' + w('late') : ''));
     if(due && due < today()) return h('span', { class:'cr-chip late' }, w('missing'));
     return h('span', { class:'cr-chip' + (st.state === 'started' ? ' started' : '') }, st.state === 'started' ? w('started') + ' · ' + st.text : w('none'));
   }
@@ -269,7 +270,7 @@
         return;
       }
       const n = rows.filter(r => r.st.state === 'done').length;
-      box.replaceChildren(h('small', { class:'cr-n' }, n + ' / ' + rows.length + ' ' + (it.custom || it.turnin ? w('turnedIn') : w('done')).toLowerCase()),
+      box.replaceChildren(h('small', { class:'cr-n' }, n + ' / ' + rows.length + ' ' + (it.custom || it.turnin || it.site ? w('turnedIn') : w('done')).toLowerCase()),
         h('div', { class:'cr-kids' }, ...rows.map(r => h('a', { class:'cr-kid ' + r.st.state, href:'#/c/' + period + '/a/' + it.id, title:r.st.text },
           avatar(r.name, color(period)), h('span', {}, r.name), r.st.state === 'done' ? h('b', {}, it.turnin ? '🔒' : '✓') : null))));
     } catch(e){ box.replaceChildren(); }
@@ -368,10 +369,11 @@
     // HTML: the lesson runs right here, in a frame (there is no HTML tab), or the student's own website editor
     if(!teacher && (it.frame || it.site)){
       const st = status(it, mine);
-      side.append(h('div', { class:'cr-card cr-yours' }, h('div', { class:'cr-yours-h' }, h('b', {}, w('yourWork')), stateChip(st, it)),
+      if(!it.site) side.append(h('div', { class:'cr-card cr-yours' }, h('div', { class:'cr-yours-h' }, h('b', {}, w('yourWork')), stateChip(st, it)),
         h('div', { class:'cr-st' }, bar(st.pct), h('small', {}, st.text))));
-      body.parentNode.after(it.site ? siteEditor(period, it) : h('iframe', { class:'cr-lesson', src:it.frame, title:L(it.title),
-        onload:e => { try { const d = e.target.contentDocument; new ResizeObserver(() => { e.target.style.height = Math.max(560, d.body.scrollHeight + 30) + 'px'; }).observe(d.body); } catch(x){} } }));
+      if(it.site) return resumeWork(period, it, body, side);
+      body.parentNode.after(h('iframe', { class:'cr-lesson', src:it.frame, title:L(it.title),
+        onload:e => { const fr = e.target; try { const d = fr.contentDocument; new ResizeObserver(() => { fr.style.height = Math.max(560, d.body.scrollHeight + 30) + "px"; }).observe(d.body); } catch(x){} } }));
       return;
     }
     if(!teacher){
@@ -391,59 +393,42 @@
     studentWork(period, it, $('.cr-sw'));
   }
 
-  /* My Resume: a plain editor. Type, then Save (or Ctrl+S) and the
-     page beside it refreshes, as in class: Edit → Save → Refresh. It also
-     saves by itself a few seconds after typing stops. */
-  function siteEditor(period, it){
+  /* My Resume, set out like a Google Classroom assignment: the instructions,
+     and a Your work card with the student's resume.html. The file opens the
+     editor (/resume) in its own tab; coming back here shows the newest page.
+     Turn in / Unsubmit as in Classroom (turned in, it cannot change). */
+  function resumeWork(period, it, body, side){
     const HL = window.HTMLLESSONS;
-    const ed = h('textarea', { class:'cr-code', spellcheck:'false', autocapitalize:'none', autocomplete:'off', 'aria-label':L(it.title), maxlength:HL.SITE_MAX });
-    const nums = h('div', { class:'cr-nums' });
-    const view = h('iframe', { class:'cr-site-frame', sandbox:'', title:'resume.html' });
-    const tab = h('span', { class:'cr-site-tab' }, '…');
-    const msg = h('small', { class:'cr-site-msg muted' });
-    const parts = h('div', { class:'cr-site-parts' });
-    let saved = '', timer = null;
-    const lines = () => { nums.textContent = Array.from({ length:ed.value.split('\n').length }, (x, i) => i + 1).join('\n'); };
-    const refresh = () => { view.srcdoc = ed.value; tab.textContent = (ed.value.match(/<title>([^<]*)<\/title>/i) || [])[1] || 'resume.html';
-      const has = HL.siteInfo(ed.value).has;
-      parts.replaceChildren(...HL.SITE_PARTS.map(p => h('span', { class:'cr-chip' + (has.includes(p.id) ? ' done' : '') }, (has.includes(p.id) ? '✓ ' : '') + p.en))); };
-    const save = async () => {
-      clearTimeout(timer);
-      if(ed.value === saved){ refresh(); msg.textContent = '✓ ' + w('saved'); return; }
-      const text = ed.value;
-      try { await put('/learn', { data:{ html:{ site:text } } }); saved = text; msg.textContent = '✓ ' + w('saved'); refresh(); }
-      catch(e){ msg.textContent = '⚠ ' + t('Could not reach the server.'); }
+    body.append(h('div', { class:'cr-resume-needs' }, h('b', {}, '✅ ' + w('needs')),
+      h('div', { class:'cr-site-parts' }, ...HL.SITE_PARTS.map(p => h('span', { class:'cr-chip' + (((mine.learn.site || {}).has || []).includes(p.id) ? ' done' : '') }, p.en)))));
+    const draw = (text, inAt) => {
+      const st = status(it, mine);
+      const thumb = h('iframe', { class:'cr-thumb-frame', sandbox:'', tabindex:'-1', 'aria-hidden':'true', title:'resume.html' });
+      thumb.srcdoc = text || '';
+      side.replaceChildren(h('div', { class:'cr-card cr-yours cr-gc' },
+        h('div', { class:'cr-yours-h' }, h('b', {}, w('yourWork')), stateChip(st, it)),
+        h('a', { class:'cr-attach', href:'/resume', target:'_blank', rel:'noopener', title:w('openEditor') },
+          h('span', { class:'cr-thumb' }, text ? thumb : h('span', { class:'cr-thumb-blank' }, '</>')),
+          h('span', { class:'cr-attach-t' }, h('b', {}, 'resume.html'), h('small', {}, 'HTML · ' + (text ? (((mine.learn.site || {}).has || []).length + ' / ' + HL.SITE_PARTS.length + ' 🏷') : w('notStarted')))),
+          h('span', { class:'cr-attach-go' }, '↗')),
+        inAt ? h('small', { class:'muted' }, '🔒 ' + w('turnedIn') + ' ' + fmtWhen(inAt)) : h('small', { class:'muted' }, w('editorHint')),
+        h('button', { class:'btn ' + (inAt ? '' : 'primary') + ' cr-gc-btn', type:'button', disabled:!inAt && !text, onclick:async e => {
+          e.target.disabled = true;
+          try { await put('/learn', { data:{ html:{ siteIn:!inAt } } }); refreshResume(); } catch(x){ e.target.disabled = false; }
+        } }, inAt ? w('unsubmit') : w('turnIn'))));
     };
-    ed.oninput = () => { lines(); msg.textContent = w('notSaved'); clearTimeout(timer); timer = setTimeout(save, 4000); };
-    ed.onkeydown = e => {
-      if((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's'){ e.preventDefault(); save(); }
-      if(e.key === 'Tab'){ e.preventDefault(); ed.setRangeText('  ', ed.selectionStart, ed.selectionEnd, 'end'); ed.oninput(); }
+    const refreshResume = async () => {
+      const r = await api('/learn').catch(() => null), x = ((r && r.data) || {}).html || {};
+      mine.learn.site = { ...HL.siteInfo(x.site), in:x.siteIn || null };
+      draw(x.site || '', x.siteIn || null);
+      body.querySelectorAll('.cr-resume-needs .cr-chip').forEach((c, i) => c.classList.toggle('done', mine.learn.site.has.includes(HL.SITE_PARTS[i].id)));
     };
-    ed.onscroll = () => { nums.scrollTop = ed.scrollTop; };
-    api('/learn').then(r => { ed.value = saved = (((r && r.data) || {}).html || {}).site || ''; lines(); refresh(); msg.textContent = ''; });
-    lines();
-    return h('div', { class:'cr-site' },
-      h('div', { class:'cr-site-bar' }, h('b', {}, '📄 resume.html'), h('span', { class:'grow' }), msg,
-        h('button', { class:'btn primary', type:'button', onclick:save, title:'Ctrl+S' }, '💾 ' + w('saveRefresh'))),
-      h('div', { class:'cr-site-cols' },
-        h('div', { class:'cr-editor' }, nums, ed),
-        h('div', { class:'cr-site-view' }, h('div', { class:'cr-site-top' }, h('i'), h('i'), h('i'), tab), view)),
-      parts);
+    draw('', null); refreshResume();
+    // back from the editor tab: show the newest page
+    onVisible = () => { if(location.hash === '#/c/' + period + '/a/' + it.id) refreshResume(); };
   }
-  // the teacher sees one student's website: the page, or its code
-  async function showSite(r){
-    const f = await api('/admin/site/' + encodeURIComponent(r.username));
-    const frame = h('iframe', { class:'cr-view-frame', sandbox:'', title:f.name });
-    frame.srcdoc = f.html;
-    const code = h('pre', { class:'cr-view-code', hidden:true }, f.html || '—');
-    const tabs = [w('page'), w('code')].map((label, i) => h('button', { class:'cr-tab' + (i ? '' : ' on'), type:'button', onclick:() => {
-      tabs.forEach((b, k) => b.classList.toggle('on', k === i)); frame.hidden = !!i; code.hidden = !i; } }, label));
-    const back = h('div', { class:'cr-view', onclick:e => { if(e.target === back) back.remove(); } },
-      h('div', { class:'cr-view-card' },
-        h('div', { class:'cr-view-top' }, h('b', {}, '💻 ' + f.name + ' · resume.html'), h('nav', { class:'cr-tabs' }, ...tabs), h('span', { class:'grow' }),
-          h('button', { class:'btn', type:'button', onclick:() => back.remove() }, '✕ ' + w('close'))), frame, code));
-    document.body.append(back);
-  }
+  let onVisible = null;
+  document.addEventListener('visibilitychange', () => { if(document.visibilityState === 'visible' && onVisible) onVisible(); });
 
   /* Game Feedback, all on the assignment page: the student adds classmates'
      games to it, plays each one here and fills out its slip beside it */
@@ -637,7 +622,7 @@
         return h('div', { class:'cr-person cr-swrow' }, avatar(r.name, color(period)), h('div', { class:'cr-sw-name' }, h('b', {}, r.name), h('div', { class:'muted' }, r.username)),
           it.slips ? h('div', { class:'cr-slips' }, ...(r.slips.length ? r.slips.map(x => h('button', { class:'cr-chip', type:'button', title:w('seeSlip'), onclick:() => showSlip(x.project, r.username) }, '💬 ' + x.game + ' · ' + x.owner))
             : [h('small', { class:'muted' }, w('noSlips'))])) :
-          it.site ? h('div', { class:'cr-st' }, bar(st.pct), h('small', {}, st.text), r.learn.site.len ? h('button', { class:'btn small', type:'button', onclick:() => showSite(r) }, '👁 ' + w('seeSite')) : null) :
+          it.site ? h('div', { class:'cr-st' }, bar(st.pct), h('small', {}, st.text), r.learn.site.len ? h('a', { class:'btn small', href:'/resume?u=' + encodeURIComponent(r.username), target:'_blank', rel:'noopener' }, '👁 ' + w('seeSite') + ' ↗') : null) :
           it.games ? h('div', { class:'cr-games row' }, ...(r.games.length ? r.games.map(g => gameTile(g, h('small', { class:'muted' }, g.blocks + ' 🧩'))) : [h('small', { class:'muted' }, w('noGame'))]))
             : h('div', { class:'cr-st' }, bar(st.pct), h('small', {}, st.text)), h('span', { class:'grow' }),
           stateChip(st, it),

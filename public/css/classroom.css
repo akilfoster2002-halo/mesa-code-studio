@@ -228,19 +228,20 @@ button.cr-game{cursor:pointer;font:inherit;text-align:left;width:100%;grid-templ
 .cr-view-card>.cr-fbcols{padding:12px;overflow:auto}
 /* HTML lessons in a frame on the assignment page */
 .cr-lesson{width:100%;min-height:560px;border:1px solid #dadce0;border-radius:10px;margin-top:16px;background:#fff6f1;display:block}
-/* My Resume: a plain editor and the page it makes */
-.cr-site{display:grid;gap:8px;margin-top:16px}
-.cr-site-bar{display:flex;align-items:center;gap:10px}
-.cr-site-cols{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:12px}
-.cr-editor{display:grid;grid-template-columns:auto 1fr;background:#1e1e2e;border-radius:10px;overflow:hidden;height:520px}
-.cr-nums{padding:12px 8px 12px 12px;color:#6c7086;text-align:right;font:15px/1.5 "Ubuntu Mono",Menlo,monospace;white-space:pre;overflow:hidden;user-select:none}
-.cr-code{border:0;outline:0;resize:none;background:transparent;color:#f5f5f5;padding:12px;font:15px/1.5 "Ubuntu Mono",Menlo,monospace;tab-size:2;white-space:pre;overflow:auto;caret-color:#fff}
-.cr-site-view{border:1px solid #dadce0;border-radius:10px;overflow:hidden;display:grid;grid-template-rows:auto 1fr;height:520px;background:#fff}
-.cr-site-top{display:flex;align-items:center;gap:5px;background:#eef0f3;padding:6px 10px}
-.cr-site-top i{width:10px;height:10px;border-radius:50%;background:#d3d7dd}
-.cr-site-tab{margin-left:8px;background:#fff;border-radius:8px 8px 0 0;padding:2px 12px;font-size:13px;color:#555}
-.cr-site-frame{width:100%;height:100%;border:0}
+/* My Resume, like a Google Classroom assignment: the file in Your work opens the editor */
 .cr-site-parts{display:flex;flex-wrap:wrap;gap:6px}
 .cr-site-parts .cr-chip{background:#f1f3f4;color:#5f6368;font-family:"Ubuntu Mono",Menlo,monospace}
 .cr-site-parts .cr-chip.done{background:#e6f4ea;color:#137333}
-@media (max-width:900px){ .cr-site-cols{grid-template-columns:1fr} }
+.cr-resume-needs{display:grid;gap:8px;border-top:1px solid #e0e0e0;padding-top:12px}
+.cr-resume-needs b{font-weight:600;font-size:14px;color:#3c4043}
+.cr-gc{display:grid;gap:12px;padding:18px}
+.cr-attach{display:grid;grid-template-columns:88px 1fr auto;align-items:stretch;border:1px solid #dadce0;border-radius:10px;overflow:hidden;text-decoration:none;color:#202124;transition:box-shadow .15s,border-color .15s}
+.cr-attach:hover{border-color:#1967d2;box-shadow:0 1px 3px rgba(60,64,67,.3),0 4px 8px rgba(60,64,67,.15)}
+.cr-thumb{position:relative;overflow:hidden;background:#fff;border-right:1px solid #dadce0;height:66px}
+.cr-thumb-frame{position:absolute;top:0;left:0;width:352px;height:264px;border:0;transform:scale(.25);transform-origin:0 0;pointer-events:none;background:#fff}
+.cr-thumb-blank{display:grid;place-items:center;height:100%;background:#1e1f29;color:#ff7a93;font:700 18px "Ubuntu Mono",Menlo,monospace}
+.cr-attach-t{display:grid;align-content:center;padding:0 12px;min-width:0}
+.cr-attach-t b{font-weight:600;font-size:14px;font-family:"Ubuntu Mono",Menlo,monospace}
+.cr-attach-t small{color:#5f6368;font-size:12px}
+.cr-attach-go{display:grid;place-items:center;padding:0 12px;color:#1967d2;font-size:16px}
+.cr-gc-btn{width:100%;justify-content:center}

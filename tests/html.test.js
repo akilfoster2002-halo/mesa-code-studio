@@ -82,12 +82,14 @@ test('HTML Class 1: 15 minutes in 8 rounds, from the slides; ids the server keep
   for(const no of ['<h1></h1>', '<h1>Pizza<h1>', 'Pizza', '<h2>Pizza</h2>', '<h1>Pizza</h1><p>x</p>']) assert.ok(!H.C1_H1(no), no);
 });
 
-test('My Resume: the skeleton parts it has, and done once it has them all', () => {
+test('My Resume: the skeleton parts it has; done once it is turned in', () => {
   const C = require('../public/js/classwork.js');
   const page = '<!DOCTYPE html>\n<html>\n<head>\n<title>Me - Resume</title>\n<style>\n</style>\n</head>\n<body>\n<h1>Me</h1>\n</body>\n</html>';
   assert.deepStrictEqual(H.siteInfo(page), { len:page.length, has:H.SITE_PARTS.map(p => p.id), ok:true });
   assert.deepStrictEqual(H.siteInfo('<h1>Me</h1>').has, []);                        // an h1 has to be in the body
   assert.strictEqual(H.siteInfo(page.replace('</h1>', '')).ok, false);              // the #1 bug: a missing closing tag
-  const st = text => C.status(C.ITEMS.find(i => i.id === 'site'), C.studentData({ html:{ site:text } }, null, []));
-  assert.deepStrictEqual([st('').state, st('<html><body></body></html>').state, st(page).state], ['none', 'started', 'done']);
+  const st = (text, siteIn) => C.status(C.ITEMS.find(i => i.id === 'site'), C.studentData({ html:{ site:text, siteIn } }, null, []));
+  assert.deepStrictEqual([st('').state, st('<html><body></body></html>').state, st(page).state], ['none', 'started', 'started']);
+  assert.deepStrictEqual([st(page, '2026-11-10T15:00:00Z').state, st(page, '2026-11-10T15:00:00Z').late], ['done', false]);   // done = turned in
+  assert.strictEqual(st(page, '2026-11-12T15:00:00Z').late, true);                  // after Wednesday, November 11
 });

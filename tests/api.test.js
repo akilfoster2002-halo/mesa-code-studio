@@ -549,4 +549,15 @@ test('My Resume: saved with Learn; the teacher reads it; grades say how far it i
   const row = (await (await call(t.cookie, '/room/' + me.period + '/grades')).json()).find(r => r.username === 'ana');
   assert.strictEqual(row.learn.site.ok, true);
   assert.strictEqual(row.learn.html.cwords.best, 90);
+  // turned in: it cannot change until it is unsubmitted
+  await call(cookie, '/learn', { method:'PUT', body:JSON.stringify({ data:{ html:{ siteIn:true } } }) });
+  await call(cookie, '/learn', { method:'PUT', body:JSON.stringify({ data:{ html:{ site:'changed' } } }) });
+  let got = (await (await call(cookie, '/learn')).json()).data.html;
+  assert.deepStrictEqual([got.site, typeof got.siteIn], [page, 'string']);
+  assert.ok((await (await call(t.cookie, '/room/' + me.period + '/grades')).json()).find(r => r.username === 'ana').learn.site.in);
+  await call(cookie, '/learn', { method:'PUT', body:JSON.stringify({ data:{ html:{ siteIn:false } } }) });
+  await call(cookie, '/learn', { method:'PUT', body:JSON.stringify({ data:{ html:{ site:'changed' } } }) });
+  got = (await (await call(cookie, '/learn')).json()).data.html;
+  assert.deepStrictEqual([got.site, got.siteIn], ['changed', null]);
+  assert.strictEqual((await fetch(base + '/resume')).status, 200);                  // the editor tab
 });
