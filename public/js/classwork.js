@@ -43,7 +43,7 @@
       { id:'html', kind:'assignment', at:'2026-10-29T14:05:00Z', icon:'🌐', title:{ en:'HTML Practice', es:'Práctica de HTML' }, href:'/html#/', frame:'/html?embed#/',
         line:{ en:'7 activities to practice the tags: flash cards, typing, closing tags, fix the bug…', es:'7 actividades para practicar las etiquetas: tarjetas, escribir, cerrar etiquetas, arreglar errores…' },
         status:d => { const acts = (d.learn && d.learn.html) || {}, n = HL.ACTS.filter(a => acts[a.id]).length; return prog(n, HL.ACTS.length, n + ' / ' + HL.ACTS.length); } },
-      { id:'site', kind:'assignment', at:'2026-10-29T14:10:00Z', site:true, icon:'💻', title:{ en:'My HTML Website', es:'Mi sitio web HTML' },
+      { id:'site', kind:'assignment', at:'2026-10-29T14:10:00Z', site:true, icon:'📄', title:{ en:'My Resume', es:'Mi currículum' },
         line:{ en:'Type your resume.html in the editor. Every class you add to it.', es:'Escribe tu resume.html en el editor. Cada clase le añades algo.' },
         status:d => { const x = (d.learn && d.learn.site) || { len:0, has:[], ok:false }, of = HL.SITE_PARTS.length;
           return { state:x.ok ? 'done' : x.len ? 'started' : 'none', pct:Math.round(100 * x.has.length / of), text:x.has.length + ' / ' + of + ' 🏷' }; } }

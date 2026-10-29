@@ -86,7 +86,7 @@ test('HTML Class 1: 15 minutes in 8 rounds, from the slides; ids the server keep
   for(const no of ['<h1></h1>', '<h1>Pizza<h1>', 'Pizza', '<h2>Pizza</h2>', '<h1>Pizza</h1><p>x</p>']) assert.ok(!H.C1_H1(no), no);
 });
 
-test('My HTML Website: the skeleton parts it has, and done once it has them all', () => {
+test('My Resume: the skeleton parts it has, and done once it has them all', () => {
   const C = require('../public/js/classwork.js');
   const page = '<!DOCTYPE html>\n<html>\n<head>\n<title>Me - Resume</title>\n<style>\n</style>\n</head>\n<body>\n<h1>Me</h1>\n</body>\n</html>';
   assert.deepStrictEqual(H.siteInfo(page), { len:page.length, has:H.SITE_PARTS.map(p => p.id), ok:true });

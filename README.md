@@ -29,7 +29,7 @@ student goes straight to their own class. Each class has:
     Byte page in order, type it line by line, exit ticket). A missed question goes to the back of
     the round and comes back. It is `/html?embed#/c1` in a frame.
   - **HTML Practice** — the 7 practice activities (`/html?embed#/`).
-  - **My HTML Website** — a plain editor (line numbers, Tab indents, **Save & refresh** or Ctrl+S,
+  - **My Resume** — a plain editor (line numbers, Tab indents, **Save & refresh** or Ctrl+S,
     and it saves by itself) with the page beside it. Saved as `learn.html.site`; done once it has
     the skeleton (DOCTYPE, html, head, title, style, body, h1). The teacher presses 👁 to see it.
 - The top bar's tabs are Classroom and Blocks.

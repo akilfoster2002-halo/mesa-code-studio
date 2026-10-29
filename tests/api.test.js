@@ -537,7 +537,7 @@ test('Game Design: the student turns in their game (the editor lock); the teache
   assert.strictEqual((await (await call(cookie, '/me')).json()).locked, false);
 });
 
-test('My HTML Website: saved with Learn; the teacher reads it; grades say how far it is', async () => {
+test('My Resume: saved with Learn; the teacher reads it; grades say how far it is', async () => {
   const { cookie } = await login('ana', 'tiger42'), t = await login('teach', 'apple-pear');
   const page = '<!DOCTYPE html><html><head><title>Ana</title><style></style></head><body><h1>Ana</h1></body></html>';
   assert.strictEqual((await call(cookie, '/learn', { method:'PUT', body:JSON.stringify({ data:{ html:{ site:page } } }) })).status, 200);
