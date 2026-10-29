@@ -185,6 +185,7 @@
   /* ------------------------------------------------------------- stream */
   function streamView(period){
     const teacher = me.role === 'teacher';
+    gradeRows = null;
     const dueSoon = allItems().filter(it => visible(it) && setting(it).due && setting(it).due >= today())
       .filter(it => teacher || !mine || (status(it, mine) || {}).state !== 'done')
       .sort((a, b) => setting(a).due.localeCompare(setting(b).due)).slice(0, 4);
@@ -209,6 +210,18 @@
           room = await put('/room/' + period + '/posts/' + x.id, {}, 'DELETE'); streamView(period);
         } }, '🗑') : null),
       richText(x.text));
+    // assignments are in the stream too, as in Google Classroom: the built-in ones first, then by date with the posts
+    // the teacher's card lists every student in the class by name, with where their work is
+    const work = it => { const st = !teacher && mine ? status(it, mine) : null, due = setting(it).due;
+      const kids = teacher ? h('div', { class:'cr-work-kids' }, h('small', { class:'muted' }, t('Loading…'))) : null;
+      if(kids) studentChips(period, it, kids);
+      return h('div', { class:'cr-card cr-work' }, h('a', { class:'cr-work-head', href:'#/c/' + period + '/a/' + it.id },
+        h('span', { class:'cr-item-ico' + (it.custom ? ' own' : '') }, it.icon),
+        h('div', { class:'cr-work-t' }, h('b', {}, L(it.title)),
+          h('small', {}, (it.custom ? it.custom.by + ' · ' + fmtDate(it.custom.at.slice(0, 10)) : w('assignment')) + (due ? ' · ' + w('due') + ' ' + fmtDate(due) : ''))),
+        h('span', { class:'grow' }), st ? stateChip(st, it) : null), kids); };
+    const feed = [...allItems().filter(it => it.kind === 'assignment' && visible(it)).map(it => ({ it, at:it.custom ? it.custom.at : '' })), ...room.posts]
+      .sort((a, b) => !a.at ? -1 : !b.at ? 1 : b.at.localeCompare(a.at));
     app.replaceChildren(topbar(period, ''), h('main', { class:'cr-main' },
       h('div', { class:'cr-banner', style:{ background:color(period) } }, h('b', {}, w('cls')), h('span', {}, w('period') + ' ' + period)),
       h('div', { class:'cr-stream' },
@@ -217,7 +230,22 @@
                          : h('small', { class:'muted' }, w('noDue')),
           h('a', { class:'cr-link', href:'#/c/' + period + '/work' }, w('viewAll'))),
         h('div', { class:'cr-feed' }, composer,
-          ...(room.posts.length ? room.posts.map(post) : [h('div', { class:'cr-card cr-empty' }, '💬 ', w('noPosts'))])))));
+          ...feed.length ? feed.map(x => x.it ? work(x.it) : post(x)) : [h('div', { class:'cr-card cr-empty' }, '💬 ', w('noPosts'))]))));
+  }
+
+  // every student's name on an assignment card in the stream, with their state; a name opens the assignment
+  let gradeRows = null;
+  async function studentChips(period, it, box){
+    try {
+      let rows;
+      if(it.custom) rows = (await api('/room/' + period + '/assignments/' + it.id + '/work')).map(r => ({ name:r.name, st:status(it, { subs:{ [it.id]:subOf(r) } }) }));
+      else { gradeRows = gradeRows && gradeRows.period === period ? gradeRows : { period, rows:api('/room/' + period + '/grades') };
+        rows = (await gradeRows.rows).map(r => ({ name:r.name, st:status(it, r) })); }
+      const n = rows.filter(r => r.st.state === 'done').length;
+      box.replaceChildren(h('small', { class:'cr-n' }, n + ' / ' + rows.length + ' ' + (it.custom || it.turnin ? w('turnedIn') : w('done')).toLowerCase()),
+        h('div', { class:'cr-kids' }, ...rows.map(r => h('a', { class:'cr-kid ' + r.st.state, href:'#/c/' + period + '/a/' + it.id, title:r.st.text },
+          avatar(r.name, color(period)), h('span', {}, r.name), r.st.state === 'done' ? h('b', {}, it.turnin ? '🔒' : '✓') : null))));
+    } catch(e){ box.replaceChildren(); }
   }
 
   /* ---------------------------------------------------------- classwork */
