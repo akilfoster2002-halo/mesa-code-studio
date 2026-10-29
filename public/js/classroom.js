@@ -43,6 +43,10 @@
     cancel:{ en:'Cancel', es:'Cancelar' }, toAll:{ en:'Assign to all my classes', es:'Asignar a todas mis clases' },
     viewA:{ en:'View assignment', es:'Ver tarea' }, yourWork:{ en:'Your work', es:'Tu trabajo' }, addFile:{ en:'Add HTML file', es:'Añadir archivo HTML' },
     turnIn:{ en:'Turn in', es:'Entregar' }, unsubmit:{ en:'Unsubmit', es:'Anular entrega' }, turnedIn:{ en:'Turned in', es:'Entregado' },
+    giveBack:{ en:'Give back', es:'Devolver' }, giveBackT:{ en:'Unlock it so the student can change it', es:'Desbloquéalo para que el estudiante lo cambie' },
+    allIn:{ en:'Turn in all', es:'Entregar todos' }, sureAllIn:{ en:'Turn in and lock every student’s packet in this class?', es:'¿Entregar y bloquear el paquete de cada estudiante de esta clase?' },
+    sureTurnIn:{ en:'Turn in your plan? You cannot change it after.', es:'¿Entregar tu plan? Después no lo puedes cambiar.' },
+    lockedM:{ en:'Locked. To change it, ask your teacher to give it back.', es:'Bloqueado. Para cambiarlo, pide a tu maestro que te lo devuelva.' },
     late:{ en:'late', es:'tarde' }, needFile:{ en:'Add your .html file, then turn it in.', es:'Añade tu archivo .html y luego entrégalo.' },
     tooBig:{ en:'That file is too big (400 KB at most).', es:'Ese archivo es muy grande (máximo 400 KB).' },
     notHtml:{ en:'Pick an .html file.', es:'Elige un archivo .html.' }, studentWork:{ en:'Student work', es:'Trabajo de los estudiantes' },
@@ -100,7 +104,7 @@
     const due = setting(it).due;
     if(!st) return null;
     if(st.graded) return h('span', { class:'cr-chip graded' }, st.points ? st.grade + ' / ' + st.points : '✓ ' + w('graded'));
-    if(st.state === 'done') return h('span', { class:'cr-chip done' }, '✓ ' + (it.custom ? w('turnedIn') : w('done')) + (st.late ? ' · ' + w('late') : ''));
+    if(st.state === 'done') return h('span', { class:'cr-chip done' }, '✓ ' + (it.custom || it.turnin ? w('turnedIn') : w('done')) + (st.late ? ' · ' + w('late') : ''));
     if(due && due < today()) return h('span', { class:'cr-chip late' }, w('missing'));
     return h('span', { class:'cr-chip' + (st.state === 'started' ? ' started' : '') }, st.state === 'started' ? w('started') + ' · ' + st.text : w('none'));
   }
@@ -305,9 +309,19 @@
     app.replaceChildren(topbar(period, 'work'), h('main', { class:'cr-main' },
       h('a', { class:'cr-back', href:'#/c/' + period + '/work' }, '◀ ' + w('back')),
       h('div', { class:'cr-a' + (teacher ? ' teacher' : '') }, body, teacher ? null : side), teacher ? h('div', { class:'cr-sw' }) : null));
-    if(!teacher) return a ? yourWork(period, a, side) : side.append(h('div', { class:'cr-card cr-yours' }, h('b', {}, w('yourWork')),
-      (() => { const st = status(it, mine); return [stateChip(st, it), h('div', { class:'cr-st' }, bar(st.pct), h('small', {}, st.text))]; })(),
-      h('a', { class:'btn primary', href:it.href }, it.icon + ' ' + w('open'))));
+    if(!teacher){
+      if(a) return yourWork(period, a, side);
+      const st = status(it, mine), turned = it.turnin && st.state === 'done';
+      return side.append(h('div', { class:'cr-card cr-yours' }, h('div', { class:'cr-yours-h' }, h('b', {}, w('yourWork')), stateChip(st, it)),
+        h('div', { class:'cr-st' }, bar(st.pct), h('small', {}, st.text)),
+        turned ? h('small', { class:'muted' }, '🔒 ' + w('lockedM')) : null,
+        h('a', { class:'btn' + (turned ? '' : ' primary'), href:it.href }, it.icon + ' ' + w('open')),
+        it.turnin && !turned ? h('button', { class:'btn', type:'button', onclick:async e => {
+          if(!confirm(w('sureTurnIn'))) return;
+          e.target.disabled = true;
+          try { await put('/design/turnin', {}, 'POST'); route(true); } catch(x){ e.target.disabled = false; }
+        } }, '📤 ' + w('turnIn')) : null));
+    }
     studentWork(period, it, $('.cr-sw'));
   }
 
@@ -405,13 +419,24 @@
     }
     const rows = await api('/room/' + period + '/grades');
     const n = rows.filter(r => status(it, r).state === 'done').length;
+    // the Game Design Packet: turned in = locked; the teacher gives one back, or turns in the whole class
+    const turn = (path, body, ask) => async e => {
+      if(ask && !confirm(ask)) return;
+      e.target.disabled = true;
+      try { await put('/admin/designs/' + path, body, 'POST'); } catch(x){}
+      studentWork(period, it, box);
+    };
     box.replaceChildren(h('section', { class:'cr-topic' }, h('h2', { class:'cr-topic-h' }, w('studentWork'),
-        h('small', { class:'cr-n' }, n + ' ' + w('done').toLowerCase() + ' · ' + rows.length + ' ' + w('students').toLowerCase())),
+        h('small', { class:'cr-n' }, n + ' ' + (it.turnin ? w('turnedIn') : w('done')).toLowerCase() + ' · ' + rows.length + ' ' + w('students').toLowerCase()),
+        it.turnin && n < rows.length ? h('button', { class:'btn small cr-allin', type:'button', onclick:turn('turnin', { on:true, period }, w('sureAllIn')) }, '🔒 ' + w('allIn')) : null),
       ...rows.map(r => { const st = status(it, r);
         return h('div', { class:'cr-person cr-swrow' }, avatar(r.name, color(period)), h('div', { class:'cr-sw-name' }, h('b', {}, r.name), h('div', { class:'muted' }, r.username)),
           h('div', { class:'cr-st' }, bar(st.pct), h('small', {}, st.text)), h('span', { class:'grow' }),
           it.student && st.state !== 'none' ? h('a', { class:'btn small', href:it.student(r.username) }, '📄 ' + w('openWork')) : null,
-          stateChip(st, it)); })));
+          stateChip(st, it),
+          it.turnin ? (st.state === 'done'
+            ? h('button', { class:'btn small', type:'button', title:w('giveBackT'), onclick:turn(r.username + '/turnin', { on:false }) }, '↩ ' + w('giveBack'))
+            : h('button', { class:'btn small', type:'button', onclick:turn(r.username + '/turnin', { on:true }) }, '🔒 ' + w('turnIn'))) : null); })));
   }
 
   /* -------------------------------------------------------------- people */

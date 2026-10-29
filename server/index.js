@@ -19,6 +19,9 @@
      Game Design Studio (/design): GET/PUT /api/design (the student's own packet);
        teacher: GET /api/admin/designs, GET /api/admin/designs/:u,
                 POST /api/admin/designs/:u/approve (the "my idea is small enough" check)
+       Turning the packet in locks it: POST /api/design/turnin (the student; only
+       a teacher can give it back), teacher: POST /api/admin/designs/:u/turnin { on },
+       POST /api/admin/designs/turnin { on, period } (every student in a period)
 
    Accounts live in the database. The class list (private/roster.json, made
    by tools/make-logins.js) is never in the repo: `npm run seed` adds any new
@@ -41,6 +44,8 @@ const PUBLIC = path.join(__dirname, '..', 'public');
 const MAX_PROJECT = 3 * 1024 * 1024;        // project JSON (assets live elsewhere)
 const MAX_ASSET = 12 * 1024 * 1024;         // one picture or sound
 const MAX_DESIGN = 2 * 1024 * 1024;         // a design packet, sketches included
+// a packet turned in (locked: the student cannot change it) or given back
+const turnIn = (data, on) => ({ ...(data || {}), turnedIn:on, turnedInAt:on ? new Date().toISOString() : null });
 const MAX_FILE = 400 * 1024;                 // one HTML file a student attaches to an assignment
 
 const ASSET_TYPES = /^(image\/(png|jpeg|gif|webp|svg\+xml|bmp|avif)|audio\/[\w.+-]+|video\/(mp4|webm|ogg))$/;
@@ -477,6 +482,11 @@ async function api(req, res, url){
     }
   }
 
+  if(p[0] === 'design' && p[1] === 'turnin' && !p[2] && m === 'POST'){
+    const d = await store.getDesign(user.username);
+    await store.saveDesign(user.username, turnIn(d && d.data, true));
+    return send(res, 200, { ok:true });
+  }
   if(p[0] === 'design' && !p[1]){
     if(m === 'GET'){ const d = await store.getDesign(user.username); return send(res, 200, d ? { data:d.data, updated:d.updated } : { data:null }); }
     if(m === 'PUT'){
@@ -484,9 +494,10 @@ async function api(req, res, url){
       if(!b.data || typeof b.data !== 'object' || Array.isArray(b.data)) return send(res, 400, { error:'data' });
       const old = await store.getDesign(user.username);
       const was = (old && old.data) || {};
+      if(was.turnedIn) return send(res, 423, { error:'turnedIn', data:was, updated:old.updated });      // turned in: locked
       // written from a copy that is out of date (the plan is open on another computer): send back the newer one
       if(b.base !== undefined && old && (was.savedAt || 0) !== (b.base || 0)) return send(res, 409, { error:'newer', data:was, updated:old.updated });
-      const data = { ...b.data, approved: !!was.approved, approvedBy: was.approvedBy || null };    // only a teacher sets these
+      const data = { ...b.data, approved: !!was.approved, approvedBy: was.approvedBy || null, turnedIn:false, turnedInAt:null };    // only a teacher sets these
       const d = await store.saveDesign(user.username, data);
       return send(res, 200, { updated:d.updated });
     }
@@ -525,6 +536,21 @@ async function api(req, res, url){
       if(!u) return send(res, 404, { error:'none' });
       const d = await store.getDesign(u.username);
       return send(res, 200, { username:u.username, name:u.name, period:u.period, data:d ? d.data : null, updated:d ? d.updated : null });
+    }
+    if(p[1] === 'designs' && p[2] === 'turnin' && !p[3] && m === 'POST'){
+      const b = await readJSON(req, 2000);
+      const period = String(b.period || '');
+      const kids = (await store.listUsers()).filter(u => u.role === 'student' && !u.disabled && (!period || String(u.period) === period));
+      for(const u of kids){ const d = await store.getDesign(u.username); if(!!(d && d.data && d.data.turnedIn) !== !!b.on) await store.saveDesign(u.username, turnIn(d && d.data, !!b.on)); }
+      return send(res, 200, { ok:true, n:kids.length });
+    }
+    if(p[1] === 'designs' && p[2] && p[3] === 'turnin' && m === 'POST'){
+      const u = await store.getUser(p[2]);
+      if(!u) return send(res, 404, { error:'none' });
+      const b = await readJSON(req, 2000);
+      const d = await store.getDesign(u.username);
+      await store.saveDesign(u.username, turnIn(d && d.data, !!b.on));
+      return send(res, 200, { ok:true });
     }
     if(p[1] === 'designs' && p[3] === 'approve' && m === 'POST'){
       const u = await store.getUser(p[2]);

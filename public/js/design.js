@@ -59,7 +59,12 @@
     notStarted:{ en:'not started', es:'sin empezar' }, approveT:{ en:'Tap when the idea is small enough', es:'Toca cuando la idea sea lo bastante pequeña' },
     sketchHere:{ en:'(no drawing)', es:'(sin dibujo)' }, empty:{ en:'—', es:'—' }, listen:{ en:'Listen', es:'Escuchar' },
     newer:{ en:'Your plan was changed on another computer. This is the newest one.', es:'Tu plan cambió en otra computadora. Este es el más nuevo.' },
-    yourTitle:{ en:'My game', es:'Mi juego' }, nothing:{ en:'Nothing yet.', es:'Aún nada.' }
+    yourTitle:{ en:'My game', es:'Mi juego' }, nothing:{ en:'Nothing yet.', es:'Aún nada.' },
+    turnIn:{ en:'Turn in', es:'Entregar' }, turnedIn:{ en:'Turned in', es:'Entregado' },
+    sureTurnIn:{ en:'Turn in your plan? You cannot change it after.', es:'¿Entregar tu plan? Después no lo puedes cambiar.' },
+    locked:{ en:'Turned in. Your plan is locked.', es:'Entregado. Tu plan está bloqueado.' },
+    lockedM:{ en:'To change it, ask your teacher to give it back.', es:'Para cambiarlo, pide a tu maestro que te lo devuelva.' },
+    giveBack:{ en:'Give back', es:'Devolver' }, allIn:{ en:'Turn in all', es:'Entregar todos' }
   };
   const w = (k, vars) => { let s = L(W[k]); if(vars) s = s.replace(/\{(\w+)\}/g, (m, x) => vars[x]); return s; };
 
@@ -80,6 +85,7 @@
   const SAVE = { timer:null, dirty:false, state:'saved' };
   const localKey = () => 'gd-' + (me && me.username);
   function mark(){
+    if(data.turnedIn) return;                     // turned in: locked
     data.savedAt = Date.now();
     data.done = STEPS.filter(complete).map(s => s.id);
     try { localStorage.setItem(localKey(), JSON.stringify(data)); } catch(e){}
@@ -94,7 +100,10 @@
     const sent = data.savedAt;
     try { await api('/design', { method:'PUT', body:JSON.stringify({ data, base:SAVE.base }) }); SAVE.base = sent; setStatus('saved'); }
     catch(e){
-      if(e.status === 409){                       // changed on another computer since this one loaded it: take that copy
+      if(e.status === 423){                       // turned in (here or by the teacher): show it locked
+        try { localStorage.removeItem(localKey()); } catch(x){}
+        data = null; await loadMine(); current = ''; route(true); UI.toast(w('locked'));
+      } else if(e.status === 409){                       // changed on another computer since this one loaded it: take that copy
         try { localStorage.removeItem(localKey()); } catch(x){}
         data = null; await loadMine(); current = ''; route(true); UI.toast(w('newer'));
       } else if(e.status !== 401){ SAVE.dirty = true; setStatus('offline'); SAVE.timer = setTimeout(flush, 5000); }
@@ -114,7 +123,7 @@
     SAVE.base = d.savedAt || 0;
     try {
       const local = JSON.parse(localStorage.getItem(localKey()) || 'null');
-      if(local && (local.savedAt || 0) > (d.savedAt || 0)){ d = { ...local, approved:d.approved, approvedBy:d.approvedBy }; SAVE.dirty = true; }
+      if(!d.turnedIn && local && (local.savedAt || 0) > (d.savedAt || 0)){ d = { ...local, approved:d.approved, approvedBy:d.approvedBy }; SAVE.dirty = true; }
     } catch(e){}
     data = Object.assign({ step:0, answers:{}, research:{}, done:[] }, d);
     data.answers = data.answers || {}; data.research = data.research || {};
@@ -268,7 +277,8 @@
       const ex = h('div', { class:'gd-ex-text hidden' }, L(s.example), ear(L(s.example)));
       parts.push(h('div', { class:'gd-ex' }, h('button', { class:'btn gd-ex-btn', type:'button', onclick:() => ex.classList.toggle('hidden') }, '🟡 ' + w('example')), ex));
     }
-    for(const q of s.qs) parts.push(questionCard(q));
+    if(data.turnedIn) parts.unshift(lockBanner());
+    parts.push(h('fieldset', { class:'gd-fs', disabled:!!data.turnedIn }, ...s.qs.map(questionCard)));
     const nav = h('div', { class:'gd-nav' },
       i > 0 ? h('a', { class:'btn big', href:'#/s/' + STEPS[i - 1].id }, '◀ ' + w('back')) : h('span'),
       h('span', { class:'grow' }),
@@ -276,11 +286,22 @@
                            : h('a', { class:'btn primary big', href:'#/packet' }, '📄 ' + w('packet')));
     app.replaceChildren(
       topbar([h('span', { class:'gd-left' }), h('span', { class:'gd-status status' }),
-        h('a', { class:'btn ghost', href:'#/packet', title:w('packet') }, '📄 ', h('span', { class:'lbl' }, w('packet')))]),
+        h('a', { class:'btn ghost', href:'#/packet', title:w('packet') }, '📄 ', h('span', { class:'lbl' }, w('packet'))), turnInBtn()]),
       h('div', { class:'gd-body' }, h('nav', { class:'gd-map' }), h('main', { class:'gd-main' }, h('div', { class:'gd-card' }, ...parts, nav))));
     setStatus(SAVE.state); drawMap();
     $('.gd-main').scrollTop = 0; scrollTo(0, 0);
   }
+
+  // turned in: the plan is locked until the teacher gives it back
+  const lockBanner = () => h('div', { class:'gd-lock' }, h('span', { class:'gd-lock-ico' }, '🔒'),
+    h('div', {}, h('b', {}, w('locked')), h('small', {}, w('lockedM'))));
+  const turnInBtn = () => data.turnedIn ? h('span', { class:'gd-in-chip' }, '🔒 ' + w('turnedIn'))
+    : h('button', { class:'btn primary', type:'button', onclick:async () => {
+        if(!confirm(w('sureTurnIn'))) return;
+        await flush();
+        try { await api('/design/turnin', { method:'POST', body:'{}' }); data.turnedIn = true; current = ''; route(true); }
+        catch(e){ UI.toast(t('Could not reach the server.')); }
+      } }, '📤 ' + w('turnIn'));
 
   /* ---------------------------------------------------------- questions */
   function questionCard(q){
@@ -576,8 +597,9 @@
       sec('sketch', h('div', { class:'pk-screen' }, pic('sk_screen'))));
     const back = username ? '#/teacher' : '#/s/' + STEPS[data ? data.step || 0 : 0].id;
     app.replaceChildren(topbar([h('a', { class:'btn ghost', href:back }, '◀ ' + w('back')),
-      h('button', { class:'btn ghost', type:'button', onclick:() => print() }, '🖨 ', h('span', { class:'lbl' }, w('print')))]),
-      h('main', { class:'pk-wrap' }, page));
+      h('button', { class:'btn ghost', type:'button', onclick:() => print() }, '🖨 ', h('span', { class:'lbl' }, w('print'))),
+      username ? null : turnInBtn()]),
+      h('main', { class:'pk-wrap' }, username || !data.turnedIn ? null : lockBanner(), page));
   }
 
   /* ------------------------------------------------------ teacher list */
@@ -600,13 +622,13 @@
       const stat = (icon, n, label) => h('div', { class:'stat' }, h('span', { class:'stat-ico' }, icon), h('b', {}, String(n)), h('small', {}, label));
       main.replaceChildren(
         h('div', { class:'stats' }, stat('👥', list.length, t('Students')), stat('✏️', started, I18N.lang === 'es' ? 'Empezaron' : 'Started'),
-          stat('✅', ok, w('ideaOk')), stat('📶', avg + ' / ' + STEPS.length, w('steps'))),
+          stat('✅', ok, w('ideaOk')), stat('🔒', list.filter(r => r.turnedIn).length, w('turnedIn')), stat('📶', avg + ' / ' + STEPS.length, w('steps'))),
         h('div', { class:'ptabs' },
           h('button', { class:'tab' + (tab === 'all' ? ' on' : ''), type:'button', onclick:() => { tab = 'all'; draw(); } }, w('all')),
           ...periods.map(p => h('button', { class:'tab' + (p === tab ? ' on' : ''), type:'button', onclick:() => { tab = p; draw(); } }, w('period') + ' ' + p))),
         h('div', { class:'twrap' }, h('table', { class:'ttable' },
           h('thead', {}, h('tr', {}, h('th', {}, w('name')), tab === 'all' ? h('th', {}, w('period')) : null, h('th', {}, w('game')), h('th', {}, w('steps')),
-            h('th', { title:w('approveT') }, w('ideaOk')), h('th', {}, w('lastSaved')), h('th', {}))),
+            h('th', { title:w('approveT') }, w('ideaOk')), h('th', {}, w('turnedIn')), h('th', {}, w('lastSaved')), h('th', {}))),
           h('tbody', {}, ...list.map(r => h('tr', {},
             h('td', {}, h('b', {}, r.name), h('div', { class:'muted' }, r.username)),
             tab === 'all' ? h('td', {}, r.period) : null,
@@ -616,6 +638,11 @@
               await api('/admin/designs/' + r.username + '/approve', { method:'POST', body:JSON.stringify({ approved:!r.approved }) });
               r.approved = !r.approved; draw();
             } }, r.approved ? '✅' : '⬜')),
+            h('td', {}, r.turnedIn ? h('button', { class:'btn small gd-okbtn', type:'button', title:w('giveBack'), onclick:async () => {
+                if(!confirm(w('giveBack') + ': ' + r.name + '?')) return;
+                await api('/admin/designs/' + r.username + '/turnin', { method:'POST', body:JSON.stringify({ on:false }) });
+                r.turnedIn = false; draw();
+              } }, '🔒 ' + w('giveBack')) : h('span', { class:'muted' }, '—')),
             h('td', {}, r.updated ? UI.ago(r.updated) : '—'),
             h('td', {}, r.updated ? h('a', { class:'btn small', href:'#/teacher/' + r.username, title:w('open') }, '📄 ' + w('open')) : null)))))));
     };

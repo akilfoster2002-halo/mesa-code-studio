@@ -13,10 +13,11 @@ student goes straight to their own class. Each class has:
 
 - **Stream** — the teacher's posts (one class or "Post to all my classes"; links are clickable)
   and an **Upcoming** box of work due soon.
-- **Classwork** — topics (Start here · Learn to code · Block coding · Game design · Web pages: HTML ·
-  More practice), each with **assignments** (they have progress) and **materials** (places to go).
-  Tap an item to open it. Teachers can hide an item from a class, give it a due date, and jump to
-  that tool's progress page. Students see Assigned / Started / Done / Missing.
+- **Classwork** — the **Game Design Packet** (the one built-in assignment) and the teacher's own
+  assignments. The tools (Blocks, Learn, HTML) stay in the top bar. Teachers can hide an item or give
+  it a due date. A student's packet is done when it is **turned in**, which **locks** it: the
+  student cannot change it until the teacher presses **Give back** (on the assignment page or the
+  Design teacher list). **🔒 Turn in all** turns in and locks every packet in a class.
 - **＋ Create assignment** (teacher, on Classwork) — title, instructions, topic, due date, for one
   class or all of them. Students open it, **＋ Add HTML file** (up to 5 `.html` files, 400 KB each)
   and **Turn in** (Unsubmit to change it). The assignment page lists **every student by name** with

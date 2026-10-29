@@ -164,3 +164,14 @@ textarea.gd-in{resize:vertical;line-height:1.35}
   .gd-top{gap:2px;padding:0 6px} .gd-top .btn{padding:7px 8px}
   .gd-top .logo span:last-child{font-size:14px}
 }
+
+/* turned in: locked until the teacher gives it back */
+.gd-fs{border:0;margin:0;padding:0;min-width:0;display:grid;gap:14px}
+.gd-fs[disabled] .gd-q{opacity:.75}
+.gd-fs[disabled] canvas{pointer-events:none}
+.gd-lock{display:flex;align-items:center;gap:12px;background:#eef6ff;border:2px solid #9cc3f5;border-radius:14px;padding:10px 14px}
+.gd-lock-ico{font-size:30px}
+.gd-lock b{display:block;font-size:18px} .gd-lock small{color:var(--muted);font-size:14px}
+.pk-wrap>.gd-lock{max-width:860px;margin:0 auto 12px}
+.gd-in-chip{background:#e3f6ec;color:#1f7a50;border-radius:999px;padding:5px 12px;font-weight:700;white-space:nowrap}
+@media print{ .gd-lock{display:none} }

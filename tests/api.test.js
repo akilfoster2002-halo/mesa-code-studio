@@ -487,3 +487,28 @@ test('Grading: points on the assignment, the teacher grades and comments, the st
   assert.strictEqual(grades.find(r => r.username === 'ana').subs[a.id].grade, 17.5);
   assert.strictEqual((await (await tc(w + 'ana/grade', { grade:null }, 'PUT')).json()).grade, null);
 });
+
+test('game design packet: turning it in locks it; only a teacher gives it back', async () => {
+  const { cookie } = await login('ana', 'tiger42');
+  const save = title => call(cookie, '/design', { method:'PUT', body:JSON.stringify({ data:{ answers:{ title } } }) });
+  assert.strictEqual((await save('Locked Cats')).status, 200);
+  assert.strictEqual((await call(cookie, '/design/turnin', { method:'POST', body:'{}' })).status, 200);
+  assert.strictEqual((await save('Changed')).status, 423);                    // locked
+  let got = await (await call(cookie, '/design')).json();
+  assert.deepStrictEqual([got.data.turnedIn, got.data.answers.title], [true, 'Locked Cats']);
+  assert.strictEqual((await call(cookie, '/admin/designs/ana/turnin', { method:'POST', body:'{"on":false}' })).status, 403);
+
+  const t = await login('teach', 'apple-pear');
+  const row = (await (await call(t.cookie, '/admin/designs')).json()).find(r => r.username === 'ana');
+  assert.strictEqual(row.turnedIn, true);
+  await call(t.cookie, '/admin/designs/ana/turnin', { method:'POST', body:'{"on":false}' });     // given back
+  assert.strictEqual((await save('Changed')).status, 200);
+
+  // the teacher turns in every student's packet at once (one period, or all)
+  const all = await (await call(t.cookie, '/admin/designs/turnin', { method:'POST', body:'{"on":true}' })).json();
+  assert.ok(all.n >= 1);
+  assert.strictEqual((await save('Again')).status, 423);
+  const grades = await (await call(t.cookie, '/room/' + row.period + '/grades')).json();
+  assert.strictEqual(grades.find(r => r.username === 'ana').design.turnedIn, true);
+  await call(t.cookie, '/admin/designs/turnin', { method:'POST', body:'{"on":false}' });
+});

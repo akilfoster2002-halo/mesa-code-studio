@@ -223,7 +223,7 @@ function projectStats(data){
 function designSummary(d){
   d = d || {};
   return { done: Array.isArray(d.done) ? d.done.length : 0, step: d.step || 0, title: String(d.answers && d.answers.title || '').slice(0, 60),
-    approved: !!d.approved };
+    approved: !!d.approved, turnedIn: !!d.turnedIn, turnedInAt: d.turnedInAt || null };
 }
 function row(u, ps, recent){
   const best = ps.reduce((a, p) => Math.max(a, (p.stats && p.stats.blocks) || 0), 0);
