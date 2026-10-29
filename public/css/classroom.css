@@ -245,3 +245,4 @@ button.cr-game{cursor:pointer;font:inherit;text-align:left;width:100%;grid-templ
 .cr-attach-t small{color:#5f6368;font-size:12px}
 .cr-attach-go{display:grid;place-items:center;padding:0 12px;color:#1967d2;font-size:16px}
 .cr-gc-btn{width:100%;justify-content:center}
+.cr-for{color:#1967d2;font-weight:500}

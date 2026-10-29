@@ -64,6 +64,7 @@
     edit:{ en:'Edit', es:'Editar' }, sureDelA:{ en:'Delete this assignment and the work turned in for it?', es:'¿Eliminar esta tarea y el trabajo entregado?' },
     page:{ en:'Page', es:'Página' }, code:{ en:'Code', es:'Código' }, close:{ en:'Close', es:'Cerrar' }, back:{ en:'Classwork', es:'Trabajo de clase' },
     noWork:{ en:'Nothing attached yet', es:'Nada adjunto todavía' }, openWork:{ en:'Open their work', es:'Abrir su trabajo' },
+    forL:{ en:'For', es:'Para' }, everyone:{ en:'All students', es:'Todos los estudiantes' },
     points:{ en:'points', es:'puntos' }, pointsL:{ en:'Points', es:'Puntos' }, ungraded:{ en:'Ungraded', es:'Sin calificar' },
     grade:{ en:'Grade', es:'Calificación' }, graded:{ en:'Graded', es:'Calificado' },
     comments:{ en:'Private comments', es:'Comentarios privados' }, addComment:{ en:'Add a private comment…', es:'Añade un comentario privado…' },
@@ -113,6 +114,9 @@
   // a teacher's own assignment carries its due date; a built-in one has the class's setting, or its own default (`due` in classwork.js)
   const setting = it => it.custom ? { due:it.custom.due } : (room && room.work[it.id]) || (it.due ? { due:it.due } : {});
   const visible = it => me.role === 'teacher' || !setting(it).hidden;
+  // a teacher's assignment given to some students only: their names (none = the whole class)
+  const forNames = a => a && Array.isArray(a.to) && a.to.length ? a.to.map(u => ((room.students || []).find(k => k.username === u) || { name:u }).name) : null;
+  const isFor = (a, username) => !a || !Array.isArray(a.to) || !a.to.length || a.to.includes(username);
   const avatar = (name, c) => h('span', { class:'cr-av', style:{ background:c || '#5f6368' } }, (name || '?').trim()[0].toUpperCase());
   // post text: line breaks kept, links clickable, nothing else is HTML
   function richText(s){
@@ -284,7 +288,8 @@
       const set = setting(it), st = !teacher && mine ? status(it, mine) : null, isOpen = openItem === it.id;
       const head = h('button', { class:'cr-item-head', type:'button', 'aria-expanded':String(isOpen), onclick:() => { openItem = isOpen ? null : it.id; workView(period); } },
         h('span', { class:'cr-item-ico' + (it.kind === 'material' ? ' mat' : '') + (it.custom ? ' own' : '') + (set.hidden ? ' off' : '') }, it.icon),
-        h('span', { class:'cr-item-t' }, L(it.title), set.hidden ? h('span', { class:'cr-chip off' }, '🙈 ' + w('hidden')) : null),
+        h('span', { class:'cr-item-t' }, L(it.title), set.hidden ? h('span', { class:'cr-chip off' }, '🙈 ' + w('hidden')) : null,
+          teacher && forNames(it.custom) ? h('span', { class:'cr-chip' }, '👤 ' + forNames(it.custom).join(', ')) : null),
         h('span', { class:'grow' }),
         set.due ? h('small', { class:'cr-due' + (set.due < today() && (!st || st.state !== 'done') ? ' late' : '') }, w('due') + ' ' + fmtDate(set.due)) : null,
         st ? stateChip(st, it) : null);
@@ -323,9 +328,11 @@
     const due = h('input', { type:'date', class:'inp', value:a && a.due || '' });
     const pts = h('input', { type:'number', class:'inp cr-pts', min:0, max:1000, value:a ? pointsOf(a) : 100, title:'0 = ' + w('ungraded') });
     const all = h('input', { type:'checkbox' });
+    const forWho = h('select', { class:'inp', onchange:() => { all.checked = false; all.disabled = !!forWho.value; } }, h('option', { value:'' }, '👥 ' + w('everyone')),
+      ...(room.students || []).map(k => h('option', { value:k.username, selected:a && Array.isArray(a.to) && a.to.length === 1 && a.to[0] === k.username ? true : null }, '👤 ' + k.name)));
     const msg = h('span', { class:'cr-err' });
     const save = h('button', { class:'btn primary', type:'button', onclick:async () => {
-      const body = { title:title.value.trim(), text:text.value, topic:topic.value, due:due.value || null, points:pts.value === '' ? 0 : Number(pts.value) };
+      const body = { title:title.value.trim(), text:text.value, topic:topic.value, due:due.value || null, points:pts.value === '' ? 0 : Number(pts.value), to:forWho.value ? [forWho.value] : [] };
       if(!body.title){ title.focus(); return; }
       save.disabled = true;
       try {
@@ -337,6 +344,7 @@
     setTimeout(() => title.focus(), 0);
     return h('div', { class:'cr-card cr-form' }, h('b', { class:'cr-form-h' }, '📄 ' + (a ? w('edit') : w('create'))), title, text,
       h('div', { class:'cr-form-row' }, h('label', {}, w('topic') + ' ', topic), h('label', {}, '📅 ' + w('setDue') + ' ', due), h('label', {}, '💯 ' + w('pointsL') + ' ', pts),
+        h('label', {}, w('forL') + ' ', forWho),
         a ? null : h('label', { class:'cr-check' }, all, ' ' + w('toAll'))),
       h('div', { class:'cr-form-row' }, msg, h('span', { class:'grow' }), h('button', { class:'btn', type:'button', onclick:done }, w('cancel')), save));
   }
@@ -352,6 +360,7 @@
       h('div', { class:'cr-a-t' }, h('h1', {}, L(it.title)),
         h('small', { class:'muted' }, a ? a.by + ' · ' + fmtDate(a.at.slice(0, 10)) : w('assignment')),
         a ? h('small', { class:'cr-pts-l' }, pointsOf(a) ? pointsOf(a) + ' ' + w('points') : w('ungraded')) : null,
+        teacher && forNames(a) ? h('small', { class:'cr-for' }, '👤 ' + w('forL') + ': ' + forNames(a).join(', ')) : null,
         set.due ? h('small', { class:'cr-due' + (set.due < today() ? ' late' : '') }, w('due') + ' ' + fmtDate(set.due)) : null),
       teacher && a ? h('div', { class:'cr-a-tools' },
         h('button', { class:'btn', type:'button', onclick:() => below.replaceChildren(assignmentForm(period, a, () => below.replaceChildren())) }, '✏️ ' + w('edit')),
@@ -652,6 +661,7 @@
     const rows = await api('/room/' + period + '/grades');
     const cols = allAssignments().filter(visible);
     const cell = (it, r) => {
+      if(!isFor(it.custom, r.username)) return h('td', { class:'cr-g' }, '');
       const st = status(it, r), due = setting(it).due;
       const late = st.state !== 'done' && due && due < today();
       return h('td', { class:'cr-g ' + st.state + (late || st.late ? ' late' : ''), title:st.text },
@@ -661,7 +671,7 @@
     };
     // built-in work: average progress; a teacher's assignment: average of the grades given so far
     const avg = it => {
-      if(it.custom){ const gs = rows.map(r => status(it, r)).filter(s => s.graded && s.points);
+      if(it.custom){ const gs = rows.filter(r => isFor(it.custom, r.username)).map(r => status(it, r)).filter(s => s.graded && s.points);
         return gs.length ? Math.round(gs.reduce((n, s) => n + s.pct, 0) / gs.length) + '%' : '—'; }
       return (rows.length ? Math.round(rows.reduce((n, r) => n + status(it, r).pct, 0) / rows.length) : 0) + '%';
     };

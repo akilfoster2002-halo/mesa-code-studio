@@ -302,7 +302,7 @@ async function api(req, res, url){
      POST /api/room/:p/posts   teacher: { text } a new post; DELETE /api/room/:p/posts/:id
      PUT  /api/room/:p/work/:item  teacher: { hidden, due }
      GET  /api/room/:p/grades  teacher: every student's work in that period
-     POST /api/room/:p/assignments  teacher: { title, text, topic, due } a new assignment (PUT/DELETE …/:a)
+     POST /api/room/:p/assignments  teacher: { title, text, topic, due, to } a new assignment (PUT/DELETE …/:a); to = usernames, [] = everyone
      GET  /api/room/:p/assignments/:a/work   student: their files and turned-in state; teacher: every student's
      GET  …/work/:student/files/:f   one attached file, as { name, html } (shown in a sandboxed frame)
      POST …/files { name, html } · DELETE …/files/:f · POST …/turnin { on }   (the student)
@@ -318,12 +318,17 @@ async function api(req, res, url){
     const cls = (await store.getClass(period) || {}).data || {};
     const room = { posts:Array.isArray(cls.posts) ? cls.posts : [], work:cls.work && typeof cls.work === 'object' ? cls.work : {},
       assignments:Array.isArray(cls.assignments) ? cls.assignments : [] };
-    if(!p[2] && m === 'GET') return send(res, 200, room);
+    // an assignment with `to` (usernames) is only for those students; without it, the whole class
+    const isFor = (a, username) => !Array.isArray(a.to) || !a.to.length || a.to.includes(username);
+    const kidsOf = () => users.filter(u => u.role === 'student' && !u.disabled && String(u.period) === period);
+    if(!p[2] && m === 'GET') return send(res, 200, teacher
+      ? { ...room, students:kidsOf().map(u => ({ username:u.username, name:u.name })).sort((x, y) => x.name.localeCompare(y.name)) }
+      : { ...room, assignments:room.assignments.filter(a => isFor(a, user.username)) });
 
     /* a teacher's assignment: students attach HTML files and turn them in */
     if(p[2] === 'assignments' && p[3] && p[4]){
       const a = room.assignments.find(x => x.id === p[3]);
-      if(!a) return send(res, 404, { error:'none' });
+      if(!a || (!teacher && !isFor(a, user.username))) return send(res, 404, { error:'none' });
       const summary = sub => { const d = (sub && sub.data) || {};
         return { turnedIn:!!d.turnedIn, at:d.at || null, files:(d.files || []).map(f => ({ id:f.id, name:f.name, size:f.html.length })),
           grade:d.grade == null ? null : d.grade, gradedAt:d.gradedAt || null, comments:d.comments || [] }; };
@@ -331,7 +336,7 @@ async function api(req, res, url){
       if(p[4] === 'work' && !p[5] && m === 'GET'){
         if(!teacher) return send(res, 200, summary(await store.getSubmission(a.id, user.username)));
         const subs = Object.fromEntries((await store.listSubmissions([a.id])).map(x => [x.owner, x]));
-        const kids = users.filter(u => u.role === 'student' && !u.disabled && String(u.period) === period).sort((x, y) => x.name.localeCompare(y.name));
+        const kids = kidsOf().filter(u => isFor(a, u.username)).sort((x, y) => x.name.localeCompare(y.name));
         return send(res, 200, kids.map(u => ({ username:u.username, name:u.name, ...summary(subs[u.username]) })));
       }
       if(p[4] === 'work' && p[5] && p[6] === 'files' && p[7] && !p[8] && m === 'GET'){
@@ -398,11 +403,12 @@ async function api(req, res, url){
       if(!title) return send(res, 400, { error:'title' });
       const fields = { title, text:String(b.text || '').trim().slice(0, 4000), topic:/^[a-z0-9-]{1,30}$/.test(b.topic || '') ? b.topic : 'assignments',
         due:/^\d{4}-\d{2}-\d{2}$/.test(b.due || '') ? b.due : null, files:b.files !== false,
+        to:Array.isArray(b.to) ? b.to.filter(u => kidsOf().some(k => k.username === u)).slice(0, 200) : [],
         points:Number.isFinite(Number(b.points)) && b.points !== '' && b.points != null ? Math.max(0, Math.min(1000, Math.round(Number(b.points)))) : 100 };
       if(!p[3]) room.assignments.push({ id:'a-' + crypto.randomBytes(6).toString('base64url').toLowerCase().replace(/[^a-z0-9]/g, 'x'), ...fields, by:user.name, at:new Date().toISOString() });
       else { const a = room.assignments.find(x => x.id === p[3]); if(!a) return send(res, 404, { error:'none' }); Object.assign(a, fields); }
       await store.saveClass(period, room);
-      return send(res, 200, room);
+      return send(res, 200, { ...room, students:kidsOf().map(u => ({ username:u.username, name:u.name })).sort((x, y) => x.name.localeCompare(y.name)) });
     }
     if(p[2] === 'assignments' && p[3] && !p[4] && m === 'DELETE'){
       room.assignments = room.assignments.filter(x => x.id !== p[3]);

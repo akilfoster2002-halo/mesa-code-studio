@@ -470,6 +470,25 @@ test('Assignments: a teacher makes one, a student attaches an HTML file and turn
   assert.ok(!gone.assignments.some(x => x.id === a.id));
 });
 
+test('Assignments for one student: only that student sees it, and only they are on the teacher\'s list', async () => {
+  const t = await login('teach', 'apple-pear');
+  const tc = (path, body, method='POST') => call(t.cookie, path, { method, body:JSON.stringify(body) });
+  const room = await (await tc('/room/2/assignments', { title:'Catch-up', text:'Just you', to:['ana', 'cara', 'nobody'] })).json();
+  const a = room.assignments.find(x => x.title === 'Catch-up');
+  assert.deepStrictEqual(a.to, ['ana']);                                   // cara is in period 3; nobody does not exist
+  assert.ok(room.students.some(k => k.username === 'dev'));
+  const ana = await login('ana', 'tiger42'), dev = await login('dev', 'bear55');
+  assert.ok((await (await call(ana.cookie, '/room/2')).json()).assignments.some(x => x.id === a.id));
+  const devRoom = await (await call(dev.cookie, '/room/2')).json();
+  assert.ok(!devRoom.assignments.some(x => x.id === a.id) && !devRoom.students);
+  assert.strictEqual((await call(dev.cookie, '/room/2/assignments/' + a.id + '/work')).status, 404);
+  const list = await (await call(t.cookie, '/room/2/assignments/' + a.id + '/work')).json();
+  assert.deepStrictEqual(list.map(r => r.username), ['ana']);
+  const all = await (await tc('/room/2/assignments/' + a.id, { title:'Catch-up', to:[] }, 'PUT')).json();
+  assert.deepStrictEqual(all.assignments.find(x => x.id === a.id).to, []);
+  await tc('/room/2/assignments/' + a.id, {}, 'DELETE');
+});
+
 test('Grading: points on the assignment, the teacher grades and comments, the student sees both and can reply', async () => {
   const t = await login('teach', 'apple-pear');
   const tc = (path, body, method='POST') => call(t.cookie, path, { method, body:JSON.stringify(body) });
