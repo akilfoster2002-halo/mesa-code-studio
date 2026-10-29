@@ -202,8 +202,6 @@
     app.replaceChildren(topbar(), h('main', { class:'hx-main' },
       h('div', { class:'hx-hero' }, h('span', { class:'hx-hero-tag' }, '</>'),
         h('div', {}, h('b', {}, w('what')), h('small', {}, '⏱ ' + total + ' ' + w('min') + ' · ' + doneN + ' / ' + ACTS.length + ' ✓')), ear(w('what'))),
-      h('a', { class:'hx-step hx-c1link', href:'#/c1' }, h('span', { class:'hx-step-ico' }, '1️⃣'),
-        h('div', { class:'hx-step-txt' }, h('b', {}, w('c1')), h('small', {}, '⏱ 15 ' + w('min'))), h('span', { class:'ln-card-go' }, '▶')),
       h('div', { class:'hx-path' }, ...ACTS.map((a, i) => {
         const b = bestOf(a.id), played = playedOf(a.id);
         return h('a', { class:'hx-step' + (played ? ' done' : '') + (a === next ? ' next' : ''), href:'#/a/' + a.id },

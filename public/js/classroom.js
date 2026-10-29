@@ -390,7 +390,7 @@
     studentWork(period, it, $('.cr-sw'));
   }
 
-  /* My HTML Website: a plain editor. Type, then Save (or Ctrl+S) and the
+  /* My Resume: a plain editor. Type, then Save (or Ctrl+S) and the
      page beside it refreshes, as in class: Edit → Save → Refresh. It also
      saves by itself a few seconds after typing stops. */
   function siteEditor(period, it){

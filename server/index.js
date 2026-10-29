@@ -534,7 +534,7 @@ async function api(req, res, url){
       const list = (await store.listFeedback()).filter(f => !owners || owners.has(f.owner));
       return send(res, 200, await withNames(list));
     }
-    // one student's My HTML Website, to read and see
+    // one student's My Resume, to read and see
     if(p[1] === 'site' && p[2] && !p[3] && m === 'GET'){
       const u = await store.getUser(p[2]);
       if(!u) return send(res, 404, { error:'none' });
@@ -669,7 +669,7 @@ function mergeLearn(old, add){
     out.html.acts = { ...(out.html.acts || {}), [id]:{ best, n:was.n + 1 } };
   }
   if(add.html && typeof add.html.page === 'string') out.html.page = add.html.page.slice(0, 20000);
-  // My HTML Website: the page the student types in the Classroom (it replaces the old copy)
+  // My Resume: the page the student types in the Classroom (it replaces the old copy)
   if(add.html && typeof add.html.site === 'string') out.html.site = add.html.site.slice(0, HTMLLESSONS.SITE_MAX);
   return out;
 }

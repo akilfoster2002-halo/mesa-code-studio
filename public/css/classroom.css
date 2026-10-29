@@ -228,7 +228,7 @@ button.cr-game{cursor:pointer;font:inherit;text-align:left;width:100%;grid-templ
 .cr-view-card>.cr-fbcols{padding:12px;overflow:auto}
 /* HTML lessons in a frame on the assignment page */
 .cr-lesson{width:100%;min-height:560px;border:1px solid #dadce0;border-radius:10px;margin-top:16px;background:#fff6f1;display:block}
-/* My HTML Website: a plain editor and the page it makes */
+/* My Resume: a plain editor and the page it makes */
 .cr-site{display:grid;gap:8px;margin-top:16px}
 .cr-site-bar{display:flex;align-items:center;gap:10px}
 .cr-site-cols{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:12px}
