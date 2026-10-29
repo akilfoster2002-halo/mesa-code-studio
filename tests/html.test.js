@@ -39,3 +39,17 @@ test('the first page starts with goals left to do, and a full page meets them al
   const full = '<h1>Me</h1><p>Hi</p><p>I am <b>Ana</b></p><ul><li>a</li><li>b</li><li>c</li></ul><img src="star.png">';
   for(const g of H.GOALS) assert.ok(g.test(full), g.id);
 });
+
+test('Classwork: every item has a link and both languages, and progress works out from saved work', () => {
+  const C = require('../public/js/classwork.js');
+  assert.strictEqual(new Set(C.ITEMS.map(i => i.id)).size, C.ITEMS.length);
+  for(const it of C.ITEMS){ assert.ok(it.href && it.title.en && it.title.es && it.line.en && it.line.es, it.id); assert.match(it.id, /^[a-z0-9-]{1,30}$/); }
+  const empty = C.studentData(null, null, []);
+  for(const a of C.ASSIGNMENTS) assert.strictEqual(C.status(a, empty).state, 'none', a.id);
+  const d = C.studentData({ html:{ acts:{ cards:{ best:80 }, page:{ best:100 } } } }, { done:[1, 2, 3] }, [{ stats:{ blocks:40 } }]);
+  const by = id => C.status(C.ITEMS.find(i => i.id === id), d);
+  assert.strictEqual(by('game').state, 'done');
+  assert.strictEqual(by('packet').text, '3 / 15');
+  assert.strictEqual(by('html').text, '2 / 7');
+  assert.strictEqual(by('html-page').state, 'done');
+});

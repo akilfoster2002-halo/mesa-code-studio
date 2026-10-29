@@ -165,6 +165,13 @@ class FileStore {
   }
   async listLearn(){ return Object.values(this.db.learn || {}); }
 
+  /* a class (one per period): the teacher's posts on the Stream and the Classwork settings */
+  async getClass(period){ return (this.db.classes || {})[period] || null; }
+  async saveClass(period, data){
+    const cs = this.db.classes || (this.db.classes = {});
+    cs[period] = { period, data, updated:now() }; this._save(); return cs[period];
+  }
+
   /* Class Games feedback: one slip per reviewer per game */
   async getFeedback(project, reviewer){ return (this.db.feedback || {})[project + '|' + reviewer] || null; }
   async saveFeedback(project, reviewer, owner, data){
@@ -303,7 +310,12 @@ class PgStore {
         updated  TIMESTAMPTZ DEFAULT now(),
         PRIMARY KEY (project, reviewer)
       );
-      CREATE INDEX IF NOT EXISTS cs_feedback_owner ON cs_feedback(owner);`);
+      CREATE INDEX IF NOT EXISTS cs_feedback_owner ON cs_feedback(owner);
+      CREATE TABLE IF NOT EXISTS cs_classes (
+        period  TEXT PRIMARY KEY,
+        data    JSONB NOT NULL,
+        updated TIMESTAMPTZ DEFAULT now()
+      );`);
     // projects saved before the dashboard counted blocks
     for(const r of (await this.q('SELECT id, data FROM cs_projects WHERE stats IS NULL')).rows)
       await this.q('UPDATE cs_projects SET stats=$2 WHERE id=$1', [r.id, projectStats(r.data)]);
@@ -436,6 +448,15 @@ class PgStore {
   async listLearn(){
     const r = await this.q('SELECT owner,data,updated FROM cs_learn');
     return r.rows.map(d => ({ ...d, updated:iso(d.updated) }));
+  }
+  async getClass(period){
+    const r = await this.q('SELECT period,data,updated FROM cs_classes WHERE period=$1', [period]);
+    const d = r.rows[0]; return d ? { ...d, updated:iso(d.updated) } : null;
+  }
+  async saveClass(period, data){
+    const r = await this.q(`INSERT INTO cs_classes (period,data,updated) VALUES ($1,$2,now())
+      ON CONFLICT (period) DO UPDATE SET data=$2, updated=now() RETURNING period,data,updated`, [period, data]);
+    const d = r.rows[0]; return { ...d, updated:iso(d.updated) };
   }
   async getFeedback(project, reviewer){
     const r = await this.q('SELECT * FROM cs_feedback WHERE project=$1 AND reviewer=$2', [project, reviewer]);

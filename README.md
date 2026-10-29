@@ -6,7 +6,26 @@ redeploys on every push to main of this repo; database: Supabase project `code-s
 The MESA CS block editor: a Scratch-style editor on its own website, with a login for every
 student, auto-save, and history. This is the standard editor going forward.
 
-## What students get
+## Classroom (/)
+
+The front page is set out like Google Classroom. A teacher sees a card per class (period); a
+student goes straight to their own class. Each class has:
+
+- **Stream** — the teacher's posts (one class or "Post to all my classes"; links are clickable)
+  and an **Upcoming** box of work due soon.
+- **Classwork** — topics (Start here · Learn to code · Block coding · Game design · Web pages: HTML ·
+  More practice), each with **assignments** (they have progress) and **materials** (places to go).
+  Tap an item to open it. Teachers can hide an item from a class, give it a due date, and jump to
+  that tool's progress page. Students see Assigned / Started / Done / Missing.
+- **People** (teacher) — the class list with last login, and the teacher dashboard.
+- **Grades** (teacher: every student × every assignment, with the class average) /
+  **My work** (student).
+
+Progress is worked out from what the tools already save; the list itself is
+`public/js/classwork.js`. Posts and the hide/due settings are in `cs_classes` (one row per period),
+API `/api/room`. The block editor moved to **/studio** (old `/#/p/<id>` links are sent there).
+
+## What students get (the block editor, /studio)
 
 - **Every Scratch block**: Motion, Looks, Sound, Events, Control, Sensing, Operators, Variables,
   Lists and My Blocks (138 blocks), plus the **Pen**, **Music** and **Text to Speech** extensions
@@ -75,8 +94,8 @@ Each ends with a score out of 100; the best is kept (inside `cs_learn`, key `htm
 plays it once more. Content is in `public/js/html-lessons.js` (`tests/html.test.js` checks it).
 Teachers: 🍎 **HTML progress** shows the best score per activity, by period.
 
-The four parts of the site — ◆ Blocks, 🎮 Learn, 🎨 Design, `</>` HTML — are tabs in every top bar
-(`public/js/sitenav.js`); in the editor they are in the Menu.
+Every tool's top bar has tabs back to 🏫 Classroom and across to ◆ Blocks, 🎮 Learn, 🎨 Design and
+`</>` HTML (`public/js/sitenav.js`); in the editor they are in the Menu.
 
 ## Game Design Studio (/design)
 

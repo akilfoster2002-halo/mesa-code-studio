@@ -406,3 +406,27 @@ test('a locked period can open and play its games but not change them', async ()
   await call(t.cookie, '/admin/lock', { method:'POST', body:'{"period":"3","locked":false}' });
   assert.strictEqual((await call(s.cookie, '/projects/' + p.id, { method:'PUT', body:JSON.stringify({ name:'Mine again' }) })).status, 200);
 });
+
+test('Classroom: teacher posts and sets due dates, a student sees only their own class', async () => {
+  const t = await login('teach', 'apple-pear');
+  const tc = (path, body, method='POST') => call(t.cookie, path, { method, body:JSON.stringify(body) });
+  const rooms = await (await call(t.cookie, '/room')).json();
+  assert.ok(rooms.includes('2') && rooms.includes('3'));
+  const posted = await (await tc('/room/2/posts', { text:'  Hello class  ' })).json();
+  assert.strictEqual(posted.posts[0].text, 'Hello class');
+  await tc('/room/2/work/html', { due:'2026-11-03', hidden:false }, 'PUT');
+  await tc('/room/2/work/scratch', { hidden:true, due:'not a date' }, 'PUT');
+  const ana = await login('ana', 'tiger42');
+  assert.deepStrictEqual(await (await call(ana.cookie, '/room')).json(), ['2']);
+  const room = await (await call(ana.cookie, '/room/2')).json();
+  assert.strictEqual(room.posts.length, 1);
+  assert.deepStrictEqual(room.work, { html:{ hidden:false, due:'2026-11-03' }, scratch:{ hidden:true, due:null } });
+  assert.strictEqual((await call(ana.cookie, '/room/3')).status, 403);
+  assert.strictEqual((await call(ana.cookie, '/room/2/posts', { method:'POST', body:JSON.stringify({ text:'hi' }) })).status, 403);
+  assert.strictEqual((await call(ana.cookie, '/room/2/grades')).status, 403);
+  const grades = await (await call(t.cookie, '/room/2/grades')).json();
+  assert.ok(!grades.some(g => g.username === 'cara'));
+  assert.strictEqual(grades.find(g => g.username === 'ana').learn.html.cards.best, 80);
+  const gone = await (await tc('/room/2/posts/' + posted.posts[0].id, {}, 'DELETE')).json();
+  assert.strictEqual(gone.posts.length, 0);
+});

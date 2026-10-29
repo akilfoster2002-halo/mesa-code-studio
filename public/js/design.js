@@ -456,7 +456,7 @@
           c.ok ? null : h('a', { class:'btn small', href:'#/s/' + c.step }, w('fix'))))),
         h('div', { class:'gd-final' },
           h('a', { class:'btn big', href:'#/packet' }, '📄 ' + w('packet')),
-          h('a', { class:'btn primary big', href:'/#/' }, '◆ ' + w('build'))));
+          h('a', { class:'btn primary big', href:'/studio#/' }, '◆ ' + w('build'))));
     }
   };
 

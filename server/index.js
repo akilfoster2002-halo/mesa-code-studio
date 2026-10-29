@@ -119,7 +119,9 @@ const MIME = { '.html':'text/html; charset=utf-8', '.js':'text/javascript; chars
   '.svg':'image/svg+xml', '.png':'image/png', '.jpg':'image/jpeg', '.woff2':'font/woff2', '.json':'application/json',
   '.ico':'image/x-icon', '.webmanifest':'application/manifest+json' };
 function serveStatic(req, res, pathname){
-  if(pathname === '/') pathname = '/index.html';
+  // the Classroom is the front page; the block editor (and its #/p/<id> links) is /studio
+  if(pathname === '/' || pathname === '/classroom') pathname = '/classroom.html';
+  if(pathname === '/studio' || pathname === '/studio/') pathname = '/index.html';
   if(pathname === '/design' || pathname === '/design/') pathname = '/design.html';
   if(pathname === '/learn' || pathname === '/learn/') pathname = '/learn.html';
   if(pathname === '/html' || pathname === '/html/') pathname = '/html.html';
@@ -280,6 +282,57 @@ async function api(req, res, url){
       await store.addVersion(pr.id, 'before restore');          // the work being replaced is kept too
       await store.saveProject(pr.id, { data:v.data }, { force:true, label:'restored' });
       return send(res, 200, { ok:true });
+    }
+  }
+
+  /* the Classroom (/): one class per period, like Google Classroom.
+     GET  /api/room            the periods (teacher: every period; student: theirs)
+     GET  /api/room/:p         posts on the Stream + Classwork settings (hidden, due)
+     POST /api/room/:p/posts   teacher: { text } a new post; DELETE /api/room/:p/posts/:id
+     PUT  /api/room/:p/work/:item  teacher: { hidden, due }
+     GET  /api/room/:p/grades  teacher: every student's work in that period */
+  if(p[0] === 'room'){
+    const users = await store.listUsers();
+    const periods = [...new Set(users.filter(u => u.role === 'student' && !u.disabled && u.period).map(u => String(u.period)))].sort();
+    if(!p[1] && m === 'GET') return send(res, 200, teacher ? periods : [String(user.period || '')]);
+    const period = String(p[1] || '');
+    if(!teacher && period !== String(user.period)) return send(res, 403, { error:'class' });
+    if(!/^[\w-]{1,20}$/.test(period)) return send(res, 400, { error:'period' });
+    const cls = (await store.getClass(period) || {}).data || {};
+    const room = { posts:Array.isArray(cls.posts) ? cls.posts : [], work:cls.work && typeof cls.work === 'object' ? cls.work : {} };
+    if(!p[2] && m === 'GET') return send(res, 200, room);
+    if(!teacher) return send(res, 403, { error:'teacher' });
+    if(p[2] === 'posts' && !p[3] && m === 'POST'){
+      const b = await readJSON(req, 20000);
+      const text = String(b.text || '').trim().slice(0, 4000);
+      if(!text) return send(res, 400, { error:'text' });
+      room.posts.unshift({ id:crypto.randomBytes(6).toString('base64url'), text, by:user.name, at:new Date().toISOString() });
+      room.posts = room.posts.slice(0, 200);
+      await store.saveClass(period, room);
+      return send(res, 200, room);
+    }
+    if(p[2] === 'posts' && p[3] && m === 'DELETE'){
+      room.posts = room.posts.filter(x => x.id !== p[3]);
+      await store.saveClass(period, room);
+      return send(res, 200, room);
+    }
+    if(p[2] === 'work' && /^[a-z0-9-]{1,30}$/.test(p[3] || '') && !p[4] && m === 'PUT'){
+      const b = await readJSON(req, 2000);
+      const due = /^\d{4}-\d{2}-\d{2}$/.test(b.due || '') ? b.due : null;
+      const w = { hidden:!!b.hidden, due };
+      if(!w.hidden && !w.due) delete room.work[p[3]]; else room.work[p[3]] = w;
+      await store.saveClass(period, room);
+      return send(res, 200, room);
+    }
+    if(p[2] === 'grades' && !p[3] && m === 'GET'){
+      const kids = users.filter(u => u.role === 'student' && !u.disabled && String(u.period) === period);
+      const learn = Object.fromEntries((await store.listLearn()).map(d => [d.owner, d.data || {}]));
+      const designs = Object.fromEntries((await store.listDesigns()).map(d => [d.owner, d.summary]));
+      const over = Object.fromEntries((await store.overview()).map(r => [r.username, r]));
+      return send(res, 200, kids.sort((a, b) => a.name.localeCompare(b.name)).map(u => ({ username:u.username, name:u.name,
+        learn:{ levels:(learn[u.username] || {}).levels || {}, words:(learn[u.username] || {}).words || null, html:((learn[u.username] || {}).html || {}).acts || {} },
+        design:designs[u.username] || null, projects:(over[u.username] || {}).projects || 0, blocks:(over[u.username] || {}).blocks || 0,
+        last_login:(over[u.username] || {}).last_login || null })));
     }
   }
 
