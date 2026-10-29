@@ -1,11 +1,10 @@
 /* SITENAV — the way back to the Classroom (/) and the four tools, as tabs
-   in every tool's top bar: Blocks (the editor) and HTML.
+   in every tool's top bar: Blocks (the editor). HTML lives in Classroom assignments.
    `on` is the part shown. */
 window.SITENAV = (function(){
   const PARTS = [
     { id:'classroom', icon:'🏫', href:'/', en:'Classroom', es:'Clase' },
-    { id:'blocks', icon:'◆', href:'/studio#/', en:'Blocks', es:'Bloques' },
-    { id:'html', icon:'</>', href:'/html', en:'HTML', es:'HTML' }
+    { id:'blocks', icon:'◆', href:'/studio#/', en:'Blocks', es:'Bloques' }
   ];
   function bar(on){
     const { h } = UI;

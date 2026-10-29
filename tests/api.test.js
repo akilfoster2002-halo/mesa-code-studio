@@ -536,3 +536,17 @@ test('Game Design: the student turns in their game (the editor lock); the teache
   await call(t.cookie, '/admin/students/ana/lock', { method:'POST', body:'{"locked":false}' });
   assert.strictEqual((await (await call(cookie, '/me')).json()).locked, false);
 });
+
+test('My HTML Website: saved with Learn; the teacher reads it; grades say how far it is', async () => {
+  const { cookie } = await login('ana', 'tiger42'), t = await login('teach', 'apple-pear');
+  const page = '<!DOCTYPE html><html><head><title>Ana</title><style></style></head><body><h1>Ana</h1></body></html>';
+  assert.strictEqual((await call(cookie, '/learn', { method:'PUT', body:JSON.stringify({ data:{ html:{ site:page } } }) })).status, 200);
+  await call(cookie, '/learn', { method:'PUT', body:JSON.stringify({ data:{ html:{ acts:{ cwords:{ best:90 } } } } }) });   // other saves keep it
+  assert.strictEqual((await (await call(cookie, '/learn')).json()).data.html.site, page);
+  assert.strictEqual((await call(cookie, '/admin/site/ana')).status, 403);
+  assert.deepStrictEqual(await (await call(t.cookie, '/admin/site/ana')).json(), { name:'Ana', html:page });
+  const me = await (await call(cookie, '/me')).json();
+  const row = (await (await call(t.cookie, '/room/' + me.period + '/grades')).json()).find(r => r.username === 'ana');
+  assert.strictEqual(row.learn.site.ok, true);
+  assert.strictEqual(row.learn.html.cwords.best, 90);
+});

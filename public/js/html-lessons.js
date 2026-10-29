@@ -93,9 +93,111 @@
     { id:'img', en:'A picture <img>', es:'Una imagen <img>', test:s => /<img\s[^>]*src=/i.test(s) }
   ];
 
+  /* =================================================================
+     HTML CLASS 1 — the lesson in the slides (Intro to HTML & CSS, class 1),
+     as one 15-minute assignment. Every question that is missed comes
+     back at the end of its round, so each idea is answered right at least
+     once. Ids are letters only (the server keeps scores by id).
+     ================================================================= */
+  const C1_ACTS = [
+    { id:'cwords', icon:'📖', min:2, title:{ en:'Words for Today', es:'Palabras de hoy' }, line:{ en:'website, browser, HTML, CSS, tag, element…', es:'sitio web, navegador, HTML, CSS, etiqueta, elemento…' } },
+    { id:'csort',  icon:'🎨', min:1, title:{ en:'HTML or CSS?', es:'¿HTML o CSS?' }, line:{ en:'HTML builds the page. CSS styles it.', es:'HTML construye la página. CSS le da estilo.' } },
+    { id:'cparts', icon:'🔍', min:2, title:{ en:'Anatomy of a Tag', es:'Partes de una etiqueta' }, line:{ en:'Opening tag + content + closing tag = element', es:'Etiqueta de apertura + contenido + etiqueta de cierre = elemento' } },
+    { id:'cjobs',  icon:'🏷', min:2, title:{ en:'Every Tag Has a Job', es:'Cada etiqueta tiene un trabajo' }, line:{ en:'DOCTYPE, html, head, title, style, body, h1, p', es:'DOCTYPE, html, head, title, style, body, h1, p' } },
+    { id:'cplace', icon:'🗂', min:1, title:{ en:'Head or Body?', es:'¿Head o body?' }, line:{ en:'What goes where on the page', es:'Qué va en cada parte de la página' } },
+    { id:'corder', icon:'🧱', min:2, title:{ en:'Put It in Order', es:'Ponlo en orden' }, line:{ en:'Build the Captain Byte page, line by line', es:'Arma la página de Captain Byte, línea por línea' } },
+    { id:'ctype',  icon:'⌨️', min:4, title:{ en:'Type It With Me', es:'Escríbelo conmigo' }, line:{ en:'Type captain-byte.html, every line', es:'Escribe captain-byte.html, cada línea' } },
+    { id:'cexit',  icon:'🎟', min:1, title:{ en:'Exit Ticket', es:'Boleto de salida' }, line:{ en:'3 questions before you go', es:'3 preguntas antes de irte' } }
+  ];
+
+  // a question: the prompt (code or words), the answer, and the wrong choices
+  const C1_WORDS = [
+    { q:'website', a:{ en:'Pages on the internet you can visit', es:'Páginas en internet que puedes visitar' } },
+    { q:'browser', a:{ en:'The app that reads code and shows the page', es:'La app que lee el código y muestra la página' } },
+    { q:'HTML', a:{ en:'HyperText Markup Language: what is on a page', es:'HyperText Markup Language: lo que hay en la página' } },
+    { q:'CSS', a:{ en:'Cascading Style Sheets: how a page looks', es:'Cascading Style Sheets: cómo se ve la página' } },
+    { q:'tag', a:{ en:'A keyword in < > that tells the browser what to show', es:'Una palabra en < > que le dice al navegador qué mostrar' } },
+    { q:'opening tag', a:{ en:'Starts an element, like <h1>', es:'Empieza un elemento, como <h1>' } },
+    { q:'closing tag', a:{ en:'Ends an element and has a /, like </h1>', es:'Termina un elemento y tiene /, como </h1>' } },
+    { q:'element', a:{ en:'Everything from the start tag to the end tag', es:'Todo desde la etiqueta de inicio hasta la de cierre' } },
+    { q:'head', a:{ en:'Information about the page (not shown on it)', es:'Información sobre la página (no se ve en ella)' } },
+    { q:'body', a:{ en:'Everything you see on the page', es:'Todo lo que ves en la página' } }
+  ];
+  const C1_SORT = [
+    { q:{ en:'Headings', es:'Títulos' }, a:'HTML' }, { q:{ en:'Text', es:'Texto' }, a:'HTML' },
+    { q:{ en:'Pictures', es:'Imágenes' }, a:'HTML' }, { q:{ en:'Links', es:'Enlaces' }, a:'HTML' },
+    { q:{ en:'What is on a page', es:'Lo que hay en una página' }, a:'HTML' }, { q:{ en:'The skeleton of a page', es:'El esqueleto de una página' }, a:'HTML' },
+    { q:{ en:'Colors', es:'Colores' }, a:'CSS' }, { q:{ en:'Fonts', es:'Fuentes' }, a:'CSS' },
+    { q:{ en:'Sizes', es:'Tamaños' }, a:'CSS' }, { q:{ en:'Spacing', es:'Espacio' }, a:'CSS' },
+    { q:{ en:'How a page looks', es:'Cómo se ve una página' }, a:'CSS' }, { q:{ en:'The paint', es:'La pintura' }, a:'CSS' }
+  ];
+  // anatomy: an element, split into its three parts
+  const C1_ELEMENTS = [
+    ['<h1>', 'Computer Science Class', '</h1>'], ['<p>', 'My first paragraph.', '</p>'],
+    ['<title>', 'My first Title', '</title>'], ['<h1>', 'Captain Byte', '</h1>']
+  ];
+  const C1_TAGS = ['<p>', '</body>', '<title>', '</h1>', '<head>', '</html>', '<body>', '</title>', '<h1>', '</p>'];
+  // every tag has a job (the slide "Example explained"); asked both ways round
+  const C1_JOBS = [
+    { tag:'<!DOCTYPE html>', job:{ en:'Says this is an HTML5 page', es:'Dice que es una página HTML5' } },
+    { tag:'<html>', job:{ en:'The root (main) element of the page', es:'El elemento raíz (principal) de la página' } },
+    { tag:'<head>', job:{ en:'Information about the page', es:'Información sobre la página' } },
+    { tag:'<title>', job:{ en:'The name in the browser tab', es:'El nombre en la pestaña del navegador' } },
+    { tag:'<style>', job:{ en:'Where the CSS goes (inside the head)', es:'Donde va el CSS (dentro del head)' } },
+    { tag:'<body>', job:{ en:'Everything you see on the page', es:'Todo lo que ves en la página' } },
+    { tag:'<h1>', job:{ en:'A large heading', es:'Un título grande' } },
+    { tag:'<p>', job:{ en:'A paragraph', es:'Un párrafo' } }
+  ];
+  const C1_PLACE = [
+    { q:'<title>Captain Byte</title>', a:'head' }, { q:'<style> … </style>', a:'head' },
+    { q:{ en:'The name in the browser tab', es:'El nombre en la pestaña' }, a:'head' }, { q:{ en:'All the CSS', es:'Todo el CSS' }, a:'head' },
+    { q:'<h1>Captain Byte</h1>', a:'body' }, { q:'<p>My first paragraph.</p>', a:'body' },
+    { q:{ en:'Everything you see on the page', es:'Todo lo que ves en la página' }, a:'body' }, { q:{ en:'Headings and paragraphs', es:'Títulos y párrafos' }, a:'body' }
+  ];
+  // the Captain Byte page (the code-along), then the same page with a style rule
+  const C1_PAGE = [
+    [0, '<!DOCTYPE html>'], [0, '<html>'], [0, '<head>'], [1, '<title>Captain Byte</title>'], [1, '<style>'],
+    [2, '/* All my CSS will go here */'], [1, '</style>'], [0, '</head>'], [0, '<body>'], [1, '<h1>Captain Byte</h1>'], [0, '</body>'], [0, '</html>']
+  ];
+  const C1_ORDER = [
+    [[0, '<html>'], [0, '<head>'], [1, '<title>Captain Byte</title>'], [0, '</head>'], [0, '<body>'], [1, '<h1>Captain Byte</h1>'], [0, '</body>'], [0, '</html>']],
+    [[0, '<!DOCTYPE html>'], [0, '<html>'], [0, '<head>'], [1, '<title>Page Title</title>'], [1, '<style>'], [2, 'h1 { color: orange; }'], [1, '</style>'], [0, '</head>'],
+      [0, '<body>'], [1, '<h1>My First Heading</h1>'], [1, '<p>My first paragraph.</p>'], [0, '</body>'], [0, '</html>']]
+  ];
+  // exit ticket: two to pick, then write an h1 (any food)
+  const C1_EXIT = [
+    { q:{ en:'What is the difference between HTML and CSS?', es:'¿Cuál es la diferencia entre HTML y CSS?' },
+      a:{ en:'HTML builds what is on the page. CSS styles how it looks.', es:'HTML construye lo que hay en la página. CSS le da estilo.' },
+      no:[{ en:'HTML styles the page. CSS builds it.', es:'HTML le da estilo. CSS la construye.' }, { en:'They are the same thing.', es:'Son lo mismo.' }] },
+    { q:{ en:'What goes in the <head>, and what goes in the <body>?', es:'¿Qué va en el <head> y qué va en el <body>?' },
+      a:{ en:'Head: the title and the CSS. Body: everything you see.', es:'Head: el título y el CSS. Body: todo lo que ves.' },
+      no:[{ en:'Head: the heading. Body: the title.', es:'Head: el título grande. Body: el nombre de la pestaña.' }, { en:'Everything goes in the head.', es:'Todo va en el head.' }] },
+    { q:{ en:'What is the #1 bug?', es:'¿Cuál es el error #1?' },
+      a:{ en:'A missing closing tag, like </h1>', es:'Falta una etiqueta de cierre, como </h1>' },
+      no:[{ en:'Too many paragraphs', es:'Demasiados párrafos' }, { en:'A title that is too long', es:'Un título muy largo' }] }
+  ];
+  // the last question: an h1 with something inside
+  const C1_H1 = s => /^\s*<h1>\s*[^<\s][^<]*<\/h1>\s*$/i.test(s);
+
+  /* MY HTML WEBSITE — the page each student types in the Classroom's editor
+     (it becomes their resume website). What it has so far: */
+  const SITE_MAX = 60000;
+  const SITE_PARTS = [
+    { id:'doctype', en:'<!DOCTYPE html>', test:s => /<!doctype\s+html>/i.test(s) },
+    { id:'html', en:'<html> … </html>', test:s => /<html[^>]*>[\s\S]*<\/html>/i.test(s) },
+    { id:'head', en:'<head> … </head>', test:s => /<head>[\s\S]*<\/head>/i.test(s) },
+    { id:'title', en:'<title> … </title>', test:s => /<title>[^<]*\S[^<]*<\/title>/i.test(s) },
+    { id:'style', en:'<style> … </style>', test:s => /<head>[\s\S]*<style>[\s\S]*<\/style>[\s\S]*<\/head>/i.test(s) },
+    { id:'body', en:'<body> … </body>', test:s => /<body>[\s\S]*<\/body>/i.test(s) },
+    { id:'h1', en:'<h1> … </h1>', test:s => /<body>[\s\S]*<h1>[^<]*\S[^<]*<\/h1>[\s\S]*<\/body>/i.test(s) }
+  ];
+  const siteInfo = s => { s = typeof s === 'string' ? s : ''; const has = SITE_PARTS.filter(p => p.test(s)).map(p => p.id);
+    return { len:s.length, has, ok:has.length === SITE_PARTS.length }; };
+
   /* how a score is made out of 100 */
   const score = (right, total) => total ? Math.min(100, Math.round(100 * right / total)) : 0;
 
-  const HTMLLESSONS = { ACTS, CARDS, TYPE, CLOSE, MATCH_WORDS, MATCH_TAGS, wrap, BUILD, FIX, PAGE_START, GOALS, score };
+  const HTMLLESSONS = { ACTS, CARDS, TYPE, CLOSE, MATCH_WORDS, MATCH_TAGS, wrap, BUILD, FIX, PAGE_START, GOALS, score,
+    C1_ACTS, C1_WORDS, C1_SORT, C1_ELEMENTS, C1_TAGS, C1_JOBS, C1_PLACE, C1_PAGE, C1_ORDER, C1_EXIT, C1_H1, SITE_MAX, SITE_PARTS, siteInfo };
   if(typeof module !== 'undefined') module.exports = HTMLLESSONS; else root.HTMLLESSONS = HTMLLESSONS;
 })(this);

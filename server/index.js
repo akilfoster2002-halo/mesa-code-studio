@@ -41,6 +41,7 @@ const { open, projectStats } = require('./store');
 const names = require('./names');
 const ai = require('./ai');
 const FEEDBACK = require('../public/js/feedback-def.js');
+const HTMLLESSONS = require('../public/js/html-lessons.js');
 
 const PORT = Number(process.env.PORT) || 8790;
 const PUBLIC = path.join(__dirname, '..', 'public');
@@ -448,7 +449,8 @@ async function api(req, res, url){
         (subs[x.owner] || (subs[x.owner] = {}))[x.assignment] = { turnedIn:!!x.data.turnedIn, at:x.data.at || null, files:(x.data.files || []).length,
           grade:x.data.grade == null ? null : x.data.grade };
       return send(res, 200, kids.sort((a, b) => a.name.localeCompare(b.name)).map(u => ({ username:u.username, name:u.name,
-        learn:{ levels:(learn[u.username] || {}).levels || {}, words:(learn[u.username] || {}).words || null, html:((learn[u.username] || {}).html || {}).acts || {} },
+        learn:{ levels:(learn[u.username] || {}).levels || {}, words:(learn[u.username] || {}).words || null, html:((learn[u.username] || {}).html || {}).acts || {},
+          site:HTMLLESSONS.siteInfo(((learn[u.username] || {}).html || {}).site) },
         design:designs[u.username] || null, projects:(over[u.username] || {}).projects || 0, blocks:(over[u.username] || {}).blocks || 0,
         last_login:(over[u.username] || {}).last_login || null, subs:subs[u.username] || {},
         locked:!!u.locked, games:games[u.username] || [], slips:slips[u.username] || [] })));
@@ -490,7 +492,7 @@ async function api(req, res, url){
   if(p[0] === 'learn' && !p[1]){
     if(m === 'GET'){ const d = await store.getLearn(user.username); return send(res, 200, { data:d ? d.data : null }); }
     if(m === 'PUT'){
-      const b = await readJSON(req, 100000);
+      const b = await readJSON(req, 200000);
       const old = (await store.getLearn(user.username) || {}).data || {};
       const merged = mergeLearn(old, b.data || {});
       await store.saveLearn(user.username, merged);
@@ -531,6 +533,13 @@ async function api(req, res, url){
       const owners = period ? new Set((await store.listUsers()).filter(u => u.period === period).map(u => u.username)) : null;
       const list = (await store.listFeedback()).filter(f => !owners || owners.has(f.owner));
       return send(res, 200, await withNames(list));
+    }
+    // one student's My HTML Website, to read and see
+    if(p[1] === 'site' && p[2] && !p[3] && m === 'GET'){
+      const u = await store.getUser(p[2]);
+      if(!u) return send(res, 404, { error:'none' });
+      const d = await store.getLearn(u.username);
+      return send(res, 200, { name:u.name, html:((d && d.data && d.data.html) || {}).site || '' });
     }
     if(p[1] === 'learn' && !p[2] && m === 'GET'){
       const users = (await store.listUsers()).filter(u => u.role === 'student');
@@ -660,6 +669,8 @@ function mergeLearn(old, add){
     out.html.acts = { ...(out.html.acts || {}), [id]:{ best, n:was.n + 1 } };
   }
   if(add.html && typeof add.html.page === 'string') out.html.page = add.html.page.slice(0, 20000);
+  // My HTML Website: the page the student types in the Classroom (it replaces the old copy)
+  if(add.html && typeof add.html.site === 'string') out.html.site = add.html.site.slice(0, HTMLLESSONS.SITE_MAX);
   return out;
 }
 

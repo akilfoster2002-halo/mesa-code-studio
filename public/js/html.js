@@ -6,7 +6,12 @@
    Routes (after #):
      #/            the seven activities, in order
      #/a/<id>      one activity (cards, type, close, match, build, fix, page)
+     #/c1          HTML Class 1: the lesson in the slides as one 15-minute
+                   assignment (8 short rounds; missed questions come back)
+     #/c1/<id>     one of its rounds
      #/teacher     best score per activity, per student (teacher only)
+   /html?embed is the same without the top bar: the Classroom shows it in a
+   frame on the assignment's own page (there is no HTML tab of its own).
 
    Every activity ends with a score out of 100; the best one is kept and
    "Again" plays it once more (that is the point: repetition).
@@ -14,8 +19,12 @@
    ===================================================================== */
 (function(){
   const { h, $ } = UI;
-  const { ACTS, CARDS, TYPE, CLOSE, MATCH_WORDS, MATCH_TAGS, wrap, BUILD, FIX, PAGE_START, GOALS, score } = HTMLLESSONS;
+  const { ACTS, CARDS, TYPE, CLOSE, MATCH_WORDS, MATCH_TAGS, wrap, BUILD, FIX, PAGE_START, GOALS, score,
+    C1_ACTS, C1_WORDS, C1_SORT, C1_ELEMENTS, C1_TAGS, C1_JOBS, C1_PLACE, C1_PAGE, C1_ORDER, C1_EXIT, C1_H1 } = HTMLLESSONS;
+  // which set an activity is in: the 7 practice activities, or HTML Class 1
+  const setOf = act => C1_ACTS.includes(act) ? { list:C1_ACTS, home:'#/c1', at:'#/c1/' } : { list:ACTS, home:'#/', at:'#/a/' };
   const app = $('#app');
+  const EMBED = new URLSearchParams(location.search).has('embed');
   let me = null, prog = { html:{} }, current = '';
   const L = o => o == null ? '' : typeof o === 'string' ? o : (I18N.lang === 'es' && o.es) || o.en;
 
@@ -36,9 +45,23 @@
     pictures:{ en:'Pictures', es:'Imágenes' }, finish:{ en:'I am done', es:'Terminé' }, reset:{ en:'Start over', es:'Empezar de nuevo' },
     sure:{ en:'Erase your page and start over?', es:'¿Borrar tu página y empezar de nuevo?' },
     teacher:{ en:'HTML progress', es:'Progreso HTML' }, allP:{ en:'All', es:'Todos' }, period:{ en:'Period', es:'Período' }, name:{ en:'Name', es:'Nombre' },
-    listen:{ en:'Listen', es:'Escuchar' }
+    listen:{ en:'Listen', es:'Escuchar' },
+    c1:{ en:'HTML Class 1: Intro to HTML & CSS', es:'HTML Clase 1: Introducción a HTML y CSS' },
+    c1goal:{ en:'I can explain what HTML and CSS do, and build the basic structure of a webpage.', es:'Puedo explicar qué hacen HTML y CSS, y construir la estructura básica de una página web.' },
+    c1again:{ en:'Missed ones come back until you get them.', es:'Las que fallas vuelven hasta que las aciertas.' },
+    whatMeans:{ en:'What does it mean?', es:'¿Qué significa?' }, whichWord:{ en:'Which word is it?', es:'¿Qué palabra es?' },
+    htmlOrCss:{ en:'HTML or CSS?', es:'¿HTML o CSS?' }, opening:{ en:'Opening', es:'Apertura' }, closing:{ en:'Closing', es:'Cierre' },
+    openOrClose:{ en:'Opening tag or closing tag?', es:'¿Etiqueta de apertura o de cierre?' },
+    tapPart:{ en:'Tap the {p}', es:'Toca {p}' }, pOpen:{ en:'opening tag', es:'la etiqueta de apertura' }, pContent:{ en:'content', es:'el contenido' }, pClose:{ en:'closing tag', es:'la etiqueta de cierre' },
+    element:{ en:'All together = an element', es:'Todo junto = un elemento' },
+    jobOf:{ en:'What is its job?', es:'¿Cuál es su trabajo?' }, whichTag:{ en:'Which tag does this job?', es:'¿Qué etiqueta hace este trabajo?' },
+    headOrBody:{ en:'Does it go in the head or the body?', es:'¿Va en el head o en el body?' },
+    typeLine:{ en:'Type this line:', es:'Escribe esta línea:' }, soFar:{ en:'captain-byte.html', es:'captain-byte.html' },
+    writeH1:{ en:'Write an <h1> tag with your favorite food inside.', es:'Escribe una etiqueta <h1> con tu comida favorita adentro.' },
+    check:{ en:'Check', es:'Revisar' }, h1Hint:{ en:'Like this: <h1>Pizza</h1>', es:'Así: <h1>Pizza</h1>' },
+    c1done:{ en:'Class 1 done!', es:'¡Clase 1 lista!' }
   };
-  const w = k => L(W[k]);
+  const w = (k, vars) => { let x = L(W[k]); if(vars) x = x.replace(/\{(\w+)\}/g, (m, v) => vars[v]); return x; };
 
   /* ---------------------------------------------------------------- api */
   async function api(path, opts={}){
@@ -107,7 +130,7 @@
     const count = h('span', { class:'hx-count' });
     const bar = h('div', { class:'hx-progress' }, h('i'));
     const main = h('main', { class:'hx-play' },
-      h('div', { class:'hx-crumbs' }, h('a', { class:'btn', href:'#/' }, '◀ ', h('span', { class:'lbl2' }, w('all'))),
+      h('div', { class:'hx-crumbs' }, h('a', { class:'btn', href:setOf(act).home }, '◀ ', h('span', { class:'lbl2' }, w('all'))),
         h('b', {}, act.icon + ' ' + L(act.title)), h('span', { class:'grow' }), count), bar, body);
     app.replaceChildren(topbar(), main);
     return { main, step:(n, of) => { count.textContent = Math.min(n + 1, of) + ' / ' + of; bar.firstChild.style.width = (100 * n / of) + '%'; },
@@ -118,7 +141,7 @@
     const before = bestOf(act.id);
     await save({ acts:{ [act.id]:{ best:sc } } });
     s.done();
-    const i = ACTS.indexOf(act), nxt = ACTS[i + 1];
+    const set = setOf(act), i = set.list.indexOf(act), nxt = set.list[i + 1];
     s.main.lastChild.replaceWith(h('div', { class:'hx-end' },
       h('div', { class:'hx-end-ico' }, sc >= 90 ? '🏆' : sc >= 70 ? '🎉' : '👍'),
       h('b', { class:'hx-end-t' }, w('done')), stars(sc), h('div', { class:'hx-end-s' }, w('score') + ': ', pct(sc)),
@@ -126,7 +149,7 @@
       sc < 100 ? h('small', {}, w('beat')) : null,
       h('div', { class:'hx-end-btns' },
         h('button', { class:'btn big', type:'button', onclick:() => route(true) }, '↻ ' + w('again')),
-        nxt ? h('a', { class:'btn primary big', href:'#/a/' + nxt.id }, nxt.icon + ' ' + w('next') + ' ▶') : h('a', { class:'btn primary big', href:'#/' }, '🏠 ' + w('all')))));
+        nxt ? h('a', { class:'btn primary big', href:set.at + nxt.id }, nxt.icon + ' ' + w('next') + ' ▶') : h('a', { class:'btn primary big', href:set.home }, '🏠 ' + w('all')))));
   }
 
   /* ------------------------------------------------------------ routing */
@@ -137,10 +160,12 @@
     try { speechSynthesis.cancel(); } catch(e){}
     if(!me){ try { me = await api('/me'); } catch(e){ me = null; } if(me) try { await loadProgress(); } catch(e){} }
     if(!me) return loginView();
-    document.body.className = 'v-html';
+    document.body.className = 'v-html' + (EMBED ? ' hx-embed' : '');
     const am = hash.match(/^#\/a\/([a-z]+)$/);
     const act = am && ACTS.find(a => a.id === am[1]);
     if(act) return VIEWS[act.id](act);
+    const cm = hash.match(/^#\/c1(?:\/([a-z]+))?$/);
+    if(cm){ const c = cm[1] && C1_ACTS.find(a => a.id === cm[1]); return c ? C1_VIEWS[c.id](c) : class1View(); }
     if(hash === '#/teacher' && me.role === 'teacher') return teacherView();
     return homeView();
   }
@@ -177,6 +202,8 @@
     app.replaceChildren(topbar(), h('main', { class:'hx-main' },
       h('div', { class:'hx-hero' }, h('span', { class:'hx-hero-tag' }, '</>'),
         h('div', {}, h('b', {}, w('what')), h('small', {}, '⏱ ' + total + ' ' + w('min') + ' · ' + doneN + ' / ' + ACTS.length + ' ✓')), ear(w('what'))),
+      h('a', { class:'hx-step hx-c1link', href:'#/c1' }, h('span', { class:'hx-step-ico' }, '1️⃣'),
+        h('div', { class:'hx-step-txt' }, h('b', {}, w('c1')), h('small', {}, '⏱ 15 ' + w('min'))), h('span', { class:'ln-card-go' }, '▶')),
       h('div', { class:'hx-path' }, ...ACTS.map((a, i) => {
         const b = bestOf(a.id), played = playedOf(a.id);
         return h('a', { class:'hx-step' + (played ? ' done' : '') + (a === next ? ' next' : ''), href:'#/a/' + a.id },
@@ -402,6 +429,165 @@
     update();
   }
 
+  /* ====================================================== HTML Class 1
+     The lesson in the slides, as one 15-minute assignment. Each round is
+     a run of quick questions; a missed one goes to the back of the round
+     and comes back, so every idea is answered right before the round ends.
+     Score: right the first time, out of 100. */
+  function class1View(){
+    const next = C1_ACTS.find(a => !playedOf(a.id));
+    const doneN = C1_ACTS.filter(a => playedOf(a.id)).length;
+    app.replaceChildren(topbar(), h('main', { class:'hx-main' },
+      h('div', { class:'hx-hero' }, h('span', { class:'hx-hero-tag' }, '1'),
+        h('div', {}, h('b', {}, w('c1')), h('small', {}, '🎯 ' + w('c1goal')), h('small', {}, '⏱ 15 ' + w('min') + ' · ' + doneN + ' / ' + C1_ACTS.length + ' ✓ · ↻ ' + w('c1again'))),
+        ear(w('c1goal'))),
+      h('div', { class:'hx-path' }, ...C1_ACTS.map((a, i) => {
+        const b = bestOf(a.id), played = playedOf(a.id);
+        return h('a', { class:'hx-step' + (played ? ' done' : '') + (a === next ? ' next' : ''), href:'#/c1/' + a.id },
+          h('span', { class:'hx-num' }, played ? '✓' : String(i + 1)), h('span', { class:'hx-step-ico' }, a.icon),
+          h('div', { class:'hx-step-txt' }, h('b', {}, L(a.title)), h('small', {}, L(a.line))),
+          h('span', { class:'hx-step-meta' }, played ? [stars(b), h('small', {}, w('best') + ' ' + b + '%')] : h('small', {}, '⏱ ' + a.min + ' ' + w('min'))),
+          h('span', { class:'ln-card-go' }, '▶'));
+      }))));
+  }
+  /* the question runner: items are { key, label, prompt(), opts:[…], answer, row, mono }.
+     A wrong tap marks the item missed and sends it to the back; it must
+     still be answered right before the round can end. */
+  function quiz(act, items, extra){
+    const queue = shuffle(items), missed = new Set();
+    let cleared = 0;
+    const box = h('div', { class:'hx-stage' });
+    const s = shell(act, box);
+    function draw(){
+      s.step(cleared, items.length);
+      if(!queue.length) return extra ? extra(s, box, score(items.length - missed.size, items.length)) : finish(act, score(items.length - missed.size, items.length), s);
+      const it = queue[0];
+      let wrong = false;
+      const q = it.prompt();
+      box.replaceChildren(h('div', { class:'hx-label' }, it.label), q,
+        h('div', { class:'hx-opts' + (it.row ? '' : ' col') }, ...shuffle(it.opts).map(o => h('button', { class:'hx-opt' + (it.mono ? '' : ' hx-words'), type:'button', onclick:e => {
+          if(o !== it.answer){ wrong = true; missed.add(it.key); e.currentTarget.classList.add('bad'); e.currentTarget.disabled = true; shake(q); return; }
+          lock(e.currentTarget); e.currentTarget.classList.add('good');
+          setTimeout(() => { queue.shift(); if(wrong) queue.push(it); else cleared++; draw(); }, wrong ? 1100 : 600);
+        } }, o))));
+    }
+    draw();
+  }
+  const bigCode = x => h('div', { class:'hx-q' }, code(x));
+  const bigWords = x => h('div', { class:'hx-q hx-qw' }, x);
+  const others = (all, not, n) => shuffle(all.filter(x => x !== not)).slice(0, n);
+
+  function cwordsView(act){
+    const means = C1_WORDS.map(x => L(x.a)), words = C1_WORDS.map(x => x.q);
+    quiz(act, [
+      ...C1_WORDS.map(x => ({ key:'m' + x.q, label:w('whatMeans'), prompt:() => bigCode(x.q), answer:L(x.a), opts:[L(x.a), ...others(means, L(x.a), 2)] })),
+      ...C1_WORDS.map(x => ({ key:'w' + x.q, label:w('whichWord'), prompt:() => bigWords(L(x.a)), answer:x.q, opts:[x.q, ...others(words, x.q, 2)], mono:true, row:true }))]);
+  }
+  function csortView(act){
+    quiz(act, C1_SORT.map(x => ({ key:L(x.q), label:w('htmlOrCss'), prompt:() => bigWords(L(x.q)), answer:x.a, opts:['HTML', 'CSS'], mono:true, row:true })));
+  }
+  function cpartsView(act){
+    const names = [w('pOpen'), w('pContent'), w('pClose')];
+    quiz(act, [
+      ...C1_ELEMENTS.flatMap((el, n) => [0, 2].concat(n < 2 ? [1] : []).map(k => ({ key:'p' + n + k, label:w('tapPart', { p:names[k] }),
+        prompt:() => h('div', {}, bigCode(el.join('')), h('small', { class:'hx-note' }, w('element'))), answer:el[k], opts:el, mono:true, row:true }))),
+      ...C1_TAGS.map(tg => ({ key:'t' + tg, label:w('openOrClose'), prompt:() => bigCode(tg), answer:tg.startsWith('</') ? '👎 ' + w('closing') : '👍 ' + w('opening'),
+        opts:['👍 ' + w('opening'), '👎 ' + w('closing')], row:true }))]);
+  }
+  function cjobsView(act){
+    const jobs = C1_JOBS.map(x => L(x.job)), tags = C1_JOBS.map(x => x.tag);
+    quiz(act, [
+      ...C1_JOBS.map(x => ({ key:'j' + x.tag, label:w('jobOf'), prompt:() => bigCode(x.tag), answer:L(x.job), opts:[L(x.job), ...others(jobs, L(x.job), 2)] })),
+      ...C1_JOBS.map(x => ({ key:'t' + x.tag, label:w('whichTag'), prompt:() => bigWords(L(x.job)), answer:x.tag, opts:[x.tag, ...others(tags, x.tag, 2)], mono:true, row:true }))]);
+  }
+  function cplaceView(act){
+    quiz(act, C1_PLACE.map(x => ({ key:L(x.q), label:w('headOrBody'), prompt:() => typeof x.q === 'string' ? bigCode(x.q) : bigWords(L(x.q)),
+      answer:'<' + x.a + '>', opts:['<head>', '<body>'], mono:true, row:true })));
+  }
+  // a whole page in a sandboxed frame (its <style> stays inside it), with its <title> on the tab
+  const page = src => browser(h('iframe', { class:'hx-pageframe', sandbox:'', srcdoc:src, title:'page' }), (src.match(/<title>(.*?)<\/title>/) || [])[1] || '…');
+  function corderView(act){
+    let r = 0, mistakes = 0;
+    const lines = C1_ORDER.reduce((n, b) => n + b.length, 0);
+    const box = h('div', { class:'hx-stage wide' });
+    const s = shell(act, box);
+    function draw(){
+      s.step(r, C1_ORDER.length);
+      if(r >= C1_ORDER.length) return finish(act, score(lines, lines + mistakes), s);
+      const pg = C1_ORDER[r];
+      let k = 0;
+      const built = h('div', { class:'hx-built' });
+      const pieces = h('div', { class:'hx-pieces' }, ...shuffle(pg).map(l => h('button', { class:'hx-piece', type:'button', onclick:e => {
+        if(l[1] !== pg[k][1]){ mistakes++; shake(e.currentTarget); return; }
+        e.currentTarget.remove(); k++;
+        built.append(h('div', { class:'hx-bline', style:{ paddingLeft:(l[0] * 22 + 8) + 'px' } }, l[1]));
+        if(k === pg.length){ built.classList.add('won'); setTimeout(() => { r++; draw(); }, 1100); }
+      } }, l[1])));
+      box.replaceChildren(h('div', { class:'hx-buildcols' },
+        h('div', {}, h('div', { class:'hx-label' }, w('makeThis')), page(pg.map(l => l[1]).join('\n'))),
+        h('div', {}, h('div', { class:'hx-label' }, w('tapNext')), built, pieces)));
+    }
+    draw();
+  }
+  // type the Captain Byte page one line at a time; the file grows above and the page shows beside it
+  function ctypeView(act){
+    let i = 0, typed = 0, mistakes = 0;
+    const box = h('div', { class:'hx-stage wide' });
+    const s = shell(act, box);
+    function draw(){
+      s.step(i, C1_PAGE.length);
+      if(i >= C1_PAGE.length) return finish(act, score(typed, typed + mistakes), s);
+      const [ind, target] = C1_PAGE[i];
+      const chars = [...target].map(ch => h('span', {}, ch));
+      const line = h('div', { class:'hx-typeline' }, ...chars);
+      const miss = h('span', { class:'hx-miss' }, w('mistakes') + ': ' + mistakes);
+      const file = h('div', { class:'hx-built hx-file' }, ...C1_PAGE.slice(0, i).map(([n, l]) => h('div', { class:'hx-bline', style:{ paddingLeft:(n * 22 + 8) + 'px' } }, l)));
+      const view = h('div', {}, page(C1_PAGE.slice(0, i).map(l => l[1]).join('\n')));
+      const inp = h('input', { class:'hx-typein', autocomplete:'off', autocapitalize:'none', autocorrect:'off', spellcheck:'false', 'aria-label':target,
+        onpaste:e => e.preventDefault(), ondrop:e => e.preventDefault() });
+      let ok = 0;
+      inp.oninput = () => {
+        const v = inp.value;
+        if(!target.startsWith(v)){
+          let n = 0; while(n < v.length && v[n] === target[n]) n++;
+          if(v.length > ok){ mistakes++; miss.textContent = w('mistakes') + ': ' + mistakes; shake(line); }
+          inp.value = v.slice(0, n);
+        }
+        if(inp.value.length > ok) typed += inp.value.length - ok;
+        ok = inp.value.length;
+        chars.forEach((c, k) => c.className = k < ok ? 'ok' : k === ok ? 'cur' : '');
+        if(inp.value === target){ inp.disabled = true; line.classList.add('won'); setTimeout(() => { i++; draw(); }, 600); }
+      };
+      chars[0].className = 'cur';
+      box.replaceChildren(h('div', { class:'hx-buildcols' },
+        h('div', {}, h('div', { class:'hx-label' }, '📄 ' + w('soFar')), file),
+        h('div', {}, h('div', { class:'hx-label' }, w('typeLine')), line, inp,
+          h('div', { class:'hx-foot' }, i < 2 ? h('small', { class:'hx-keys' }, '⌨️ ' + w('shiftLt')) : h('span'), miss), view)));
+      inp.focus();
+    }
+    draw();
+  }
+  // the exit ticket: three to pick, then write an <h1> with a favorite food
+  function cexitView(act){
+    quiz(act, C1_EXIT.map((x, n) => ({ key:'e' + n, label:'🎟 ' + (n + 1) + ' / ' + (C1_EXIT.length + 1), prompt:() => bigWords(L(x.q)), answer:L(x.a), opts:[L(x.a), ...x.no.map(L)] })),
+      (s, box, sc) => {
+        let tries = 0;
+        const out = h('div', {}, page(''));
+        const inp = h('input', { class:'hx-typein', autocomplete:'off', autocapitalize:'none', autocorrect:'off', spellcheck:'false', placeholder:'<h1>…</h1>',
+          oninput:() => out.replaceChildren(page(inp.value)) });
+        const msg = h('small', { class:'hx-keys' }, '');
+        const go = () => {
+          if(!C1_H1(inp.value)){ tries++; msg.textContent = '💡 ' + w('h1Hint'); shake(inp); return; }
+          finish(act, Math.round((sc * C1_EXIT.length + (tries ? 0 : 100)) / (C1_EXIT.length + 1)), s);
+        };
+        inp.onkeydown = e => { if(e.key === 'Enter') go(); };
+        box.replaceChildren(h('div', { class:'hx-label' }, '🎟 ' + (C1_EXIT.length + 1) + ' / ' + (C1_EXIT.length + 1)), bigWords(w('writeH1')), inp, msg, out,
+          h('button', { class:'btn primary big', type:'button', onclick:go }, '✓ ' + w('check')));
+        inp.focus();
+      });
+  }
+  const C1_VIEWS = { cwords:cwordsView, csort:csortView, cparts:cpartsView, cjobs:cjobsView, cplace:cplaceView, corder:corderView, ctype:ctypeView, cexit:cexitView };
+
   const VIEWS = { cards:cardsView, type:typeView, close:closeView, match:matchView, build:buildView, fix:fixView, page:pageView };
 
   /* ------------------------------------------------------------ teacher */
@@ -420,10 +606,10 @@
           ...periods.map(p => h('button', { class:'tab' + (p === tab ? ' on' : ''), type:'button', onclick:() => { tab = p; draw(); } }, w('period') + ' ' + p))),
         h('div', { class:'twrap' }, h('table', { class:'ttable' },
           h('thead', {}, h('tr', {}, h('th', {}, w('name')), tab === 'all' ? h('th', {}, w('period')) : null,
-            ...ACTS.map(a => h('th', { title:L(a.title) }, a.icon)))),
+            ...ACTS.map(a => h('th', { title:L(a.title) }, a.icon)), ...C1_ACTS.map(a => h('th', { class:'hx-c1', title:'Class 1 · ' + L(a.title) }, a.icon)))),
           h('tbody', {}, ...list.map(r => h('tr', {},
             h('td', {}, h('b', {}, r.name), h('div', { class:'muted' }, r.username)), tab === 'all' ? h('td', {}, r.period) : null,
-            ...ACTS.map(a => { const v = (r.html || {})[a.id]; return h('td', {}, v ? pct(v.best) : '—'); })))))));
+            ...[...ACTS, ...C1_ACTS].map(a => { const v = (r.html || {})[a.id]; return h('td', { class:C1_ACTS.includes(a) ? 'hx-c1' : null }, v ? pct(v.best) : '—'); })))))));
     };
     draw();
   }

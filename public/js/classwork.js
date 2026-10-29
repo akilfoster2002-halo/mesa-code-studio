@@ -15,6 +15,9 @@
      blocks. Turning it in is the editor lock: they can still open and play it,
      not change it, until the teacher gives it back. The tools (Blocks, Learn,
      Design, HTML) stay in the top bar; the teacher's own assignments go beside it. */
+  const HL = root.HTMLLESSONS || require('./html-lessons.js');
+  const C1 = HL.C1_ACTS;                                     // HTML Class 1's rounds
+  const prog = (n, of, text) => ({ state:n >= of ? 'done' : n > 0 ? 'started' : 'none', pct:of ? Math.round(100 * Math.min(n, of) / of) : 0, text });
   const FEEDBACK_SLIPS = 4;           // Game Feedback: finished slips on this many classmates' games
   // `at`: when it was posted, for its place in the Stream (newest first)
   const TOPICS = [
@@ -30,6 +33,20 @@
         line:{ en:'Play ' + FEEDBACK_SLIPS + ' classmates’ games and fill out a feedback slip for each', es:'Juega ' + FEEDBACK_SLIPS + ' juegos de tus compañeros y llena una tarjeta para cada uno' },
         status:d => { const n = (d.slips || []).length;
           return { state:n >= FEEDBACK_SLIPS ? 'done' : n > 0 ? 'started' : 'none', pct:Math.round(100 * Math.min(n, FEEDBACK_SLIPS) / FEEDBACK_SLIPS), text:n + ' / ' + FEEDBACK_SLIPS + ' 💬' }; } }
+    ] },
+    { id:'web', icon:'</>', title:{ en:'Web pages: HTML', es:'Páginas web: HTML' }, items:[
+      { id:'html1', kind:'assignment', at:'2026-10-29T14:00:00Z', icon:'1️⃣', title:{ en:'HTML Class 1: Intro to HTML & CSS', es:'HTML Clase 1: Introducción a HTML y CSS' }, href:'/html#/c1', frame:'/html?embed#/c1',
+        line:{ en:'15 minutes, 8 quick rounds: the words, HTML vs CSS, tags and elements, head and body, then type your first page', es:'15 minutos, 8 rondas: las palabras, HTML o CSS, etiquetas y elementos, head y body, y escribe tu primera página' },
+        status:d => { const acts = (d.learn && d.learn.html) || {}, n = C1.filter(a => acts[a.id]).length;
+          const avg = n ? Math.round(C1.reduce((t, a) => t + ((acts[a.id] || {}).best || 0), 0) / C1.length) : 0;
+          return { state:n >= C1.length ? 'done' : n > 0 ? 'started' : 'none', pct:Math.round(100 * n / C1.length), text:n + ' / ' + C1.length + (n ? ' · ' + avg + '%' : '') }; } },
+      { id:'html', kind:'assignment', at:'2026-10-29T14:05:00Z', icon:'🌐', title:{ en:'HTML Practice', es:'Práctica de HTML' }, href:'/html#/', frame:'/html?embed#/',
+        line:{ en:'7 activities to practice the tags: flash cards, typing, closing tags, fix the bug…', es:'7 actividades para practicar las etiquetas: tarjetas, escribir, cerrar etiquetas, arreglar errores…' },
+        status:d => { const acts = (d.learn && d.learn.html) || {}, n = HL.ACTS.filter(a => acts[a.id]).length; return prog(n, HL.ACTS.length, n + ' / ' + HL.ACTS.length); } },
+      { id:'site', kind:'assignment', at:'2026-10-29T14:10:00Z', site:true, icon:'💻', title:{ en:'My HTML Website', es:'Mi sitio web HTML' },
+        line:{ en:'Type your resume.html in the editor. Every class you add to it.', es:'Escribe tu resume.html en el editor. Cada clase le añades algo.' },
+        status:d => { const x = (d.learn && d.learn.site) || { len:0, has:[], ok:false }, of = HL.SITE_PARTS.length;
+          return { state:x.ok ? 'done' : x.len ? 'started' : 'none', pct:Math.round(100 * x.has.length / of), text:x.has.length + ' / ' + of + ' 🏷' }; } }
     ] }
   ];
   const ITEMS = TOPICS.flatMap(t => t.items.map(it => ({ ...it, topic:t })));
@@ -65,7 +82,8 @@
   function studentData(learn, design, projects, subs, locked, slips){
     const ps = Array.isArray(projects) ? projects : [];
     return { subs:subs || {}, locked:!!locked, slips:slips || [],
-      learn:{ levels:(learn && learn.levels) || {}, words:(learn && learn.words) || null, html:(learn && learn.html && learn.html.acts) || {} },
+      learn:{ levels:(learn && learn.levels) || {}, words:(learn && learn.words) || null, html:(learn && learn.html && learn.html.acts) || {},
+        site:HL.siteInfo(learn && learn.html && learn.html.site) },
       design:design ? { done:Array.isArray(design.done) ? design.done.length : 0, approved:!!design.approved, turnedIn:!!design.turnedIn } : null,
       projects:ps.length, blocks:ps.reduce((a, p) => Math.max(a, (p.stats && p.stats.blocks) || 0), 0)
     };

@@ -48,6 +48,8 @@
     sureGame:{ en:'Turn in your game? You can still play it, but not change it.', es:'¿Entregar tu juego? Todavía puedes jugarlo, pero no cambiarlo.' },
     gameLocked:{ en:'Locked. You can still play it. To change it, ask your teacher to give it back.', es:'Bloqueado. Todavía puedes jugarlo. Para cambiarlo, pide a tu maestro que te lo devuelva.' },
     noGame:{ en:'No game yet', es:'Aún no hay juego' },
+    saved:{ en:'Saved', es:'Guardado' }, notSaved:{ en:'Not saved yet', es:'Aún no guardado' },
+    saveRefresh:{ en:'Save & refresh', es:'Guardar y actualizar' }, seeSite:{ en:'See it', es:'Verlo' },
     addGame:{ en:'Add a game', es:'Añadir un juego' }, addFirst:{ en:'Add a classmate’s game to give feedback on.', es:'Añade el juego de un compañero para comentarlo.' },
     removeGame:{ en:'Remove', es:'Quitar' }, noGames:{ en:'No more classmates’ games.', es:'No hay más juegos de compañeros.' },
     playHint:{ en:'Press the flag to play.', es:'Presiona la bandera para jugar.' },
@@ -357,11 +359,20 @@
         } }, '🗑 ' + w('del'))) : null);
     const body = h('div', { class:'cr-a-body' }, head, below,
       L(it.line) ? (a ? richText(a.text) : h('p', {}, L(it.line))) : null,
-      a || it.slips ? null : h('div', {}, h('a', { class:'btn primary', href:it.href }, it.icon + ' ' + w('open'))));
+      a || it.slips || it.frame || it.site ? null : h('div', {}, h('a', { class:'btn primary', href:it.href }, it.icon + ' ' + w('open'))));
     app.replaceChildren(topbar(period, 'work'), h('main', { class:'cr-main' },
       h('a', { class:'cr-back', href:'#/c/' + period + '/work' }, '◀ ' + w('back')),
       h('div', { class:'cr-a' + (teacher ? ' teacher' : '') }, body, teacher ? null : side), teacher ? h('div', { class:'cr-sw' }) : null));
     if(!teacher && it.slips) return feedbackWork(period, it, body, side);
+    // HTML: the lesson runs right here, in a frame (there is no HTML tab), or the student's own website editor
+    if(!teacher && (it.frame || it.site)){
+      const st = status(it, mine);
+      side.append(h('div', { class:'cr-card cr-yours' }, h('div', { class:'cr-yours-h' }, h('b', {}, w('yourWork')), stateChip(st, it)),
+        h('div', { class:'cr-st' }, bar(st.pct), h('small', {}, st.text))));
+      body.parentNode.after(it.site ? siteEditor(period, it) : h('iframe', { class:'cr-lesson', src:it.frame, title:L(it.title),
+        onload:e => { try { const d = e.target.contentDocument; new ResizeObserver(() => { e.target.style.height = Math.max(560, d.body.scrollHeight + 30) + 'px'; }).observe(d.body); } catch(x){} } }));
+      return;
+    }
     if(!teacher){
       if(a) return yourWork(period, a, side);
       const st = status(it, mine), turned = it.turnin && st.state === 'done';
@@ -377,6 +388,60 @@
         } }, '📤 ' + w('turnIn')) : null));
     }
     studentWork(period, it, $('.cr-sw'));
+  }
+
+  /* My HTML Website: a plain editor. Type, then Save (or Ctrl+S) and the
+     page beside it refreshes, as in class: Edit → Save → Refresh. It also
+     saves by itself a few seconds after typing stops. */
+  function siteEditor(period, it){
+    const HL = window.HTMLLESSONS;
+    const ed = h('textarea', { class:'cr-code', spellcheck:'false', autocapitalize:'none', autocomplete:'off', 'aria-label':L(it.title), maxlength:HL.SITE_MAX });
+    const nums = h('div', { class:'cr-nums' });
+    const view = h('iframe', { class:'cr-site-frame', sandbox:'', title:'resume.html' });
+    const tab = h('span', { class:'cr-site-tab' }, '…');
+    const msg = h('small', { class:'cr-site-msg muted' });
+    const parts = h('div', { class:'cr-site-parts' });
+    let saved = '', timer = null;
+    const lines = () => { nums.textContent = Array.from({ length:ed.value.split('\n').length }, (x, i) => i + 1).join('\n'); };
+    const refresh = () => { view.srcdoc = ed.value; tab.textContent = (ed.value.match(/<title>([^<]*)<\/title>/i) || [])[1] || 'resume.html';
+      const has = HL.siteInfo(ed.value).has;
+      parts.replaceChildren(...HL.SITE_PARTS.map(p => h('span', { class:'cr-chip' + (has.includes(p.id) ? ' done' : '') }, (has.includes(p.id) ? '✓ ' : '') + p.en))); };
+    const save = async () => {
+      clearTimeout(timer);
+      if(ed.value === saved){ refresh(); msg.textContent = '✓ ' + w('saved'); return; }
+      const text = ed.value;
+      try { await put('/learn', { data:{ html:{ site:text } } }); saved = text; msg.textContent = '✓ ' + w('saved'); refresh(); }
+      catch(e){ msg.textContent = '⚠ ' + t('Could not reach the server.'); }
+    };
+    ed.oninput = () => { lines(); msg.textContent = w('notSaved'); clearTimeout(timer); timer = setTimeout(save, 4000); };
+    ed.onkeydown = e => {
+      if((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's'){ e.preventDefault(); save(); }
+      if(e.key === 'Tab'){ e.preventDefault(); ed.setRangeText('  ', ed.selectionStart, ed.selectionEnd, 'end'); ed.oninput(); }
+    };
+    ed.onscroll = () => { nums.scrollTop = ed.scrollTop; };
+    api('/learn').then(r => { ed.value = saved = (((r && r.data) || {}).html || {}).site || ''; lines(); refresh(); msg.textContent = ''; });
+    lines();
+    return h('div', { class:'cr-site' },
+      h('div', { class:'cr-site-bar' }, h('b', {}, '📄 resume.html'), h('span', { class:'grow' }), msg,
+        h('button', { class:'btn primary', type:'button', onclick:save, title:'Ctrl+S' }, '💾 ' + w('saveRefresh'))),
+      h('div', { class:'cr-site-cols' },
+        h('div', { class:'cr-editor' }, nums, ed),
+        h('div', { class:'cr-site-view' }, h('div', { class:'cr-site-top' }, h('i'), h('i'), h('i'), tab), view)),
+      parts);
+  }
+  // the teacher sees one student's website: the page, or its code
+  async function showSite(r){
+    const f = await api('/admin/site/' + encodeURIComponent(r.username));
+    const frame = h('iframe', { class:'cr-view-frame', sandbox:'', title:f.name });
+    frame.srcdoc = f.html;
+    const code = h('pre', { class:'cr-view-code', hidden:true }, f.html || '—');
+    const tabs = [w('page'), w('code')].map((label, i) => h('button', { class:'cr-tab' + (i ? '' : ' on'), type:'button', onclick:() => {
+      tabs.forEach((b, k) => b.classList.toggle('on', k === i)); frame.hidden = !!i; code.hidden = !i; } }, label));
+    const back = h('div', { class:'cr-view', onclick:e => { if(e.target === back) back.remove(); } },
+      h('div', { class:'cr-view-card' },
+        h('div', { class:'cr-view-top' }, h('b', {}, '💻 ' + f.name + ' · resume.html'), h('nav', { class:'cr-tabs' }, ...tabs), h('span', { class:'grow' }),
+          h('button', { class:'btn', type:'button', onclick:() => back.remove() }, '✕ ' + w('close'))), frame, code));
+    document.body.append(back);
   }
 
   /* Game Feedback, all on the assignment page: the student adds classmates'
@@ -571,6 +636,7 @@
         return h('div', { class:'cr-person cr-swrow' }, avatar(r.name, color(period)), h('div', { class:'cr-sw-name' }, h('b', {}, r.name), h('div', { class:'muted' }, r.username)),
           it.slips ? h('div', { class:'cr-slips' }, ...(r.slips.length ? r.slips.map(x => h('button', { class:'cr-chip', type:'button', title:w('seeSlip'), onclick:() => showSlip(x.project, r.username) }, '💬 ' + x.game + ' · ' + x.owner))
             : [h('small', { class:'muted' }, w('noSlips'))])) :
+          it.site ? h('div', { class:'cr-st' }, bar(st.pct), h('small', {}, st.text), r.learn.site.len ? h('button', { class:'btn small', type:'button', onclick:() => showSite(r) }, '👁 ' + w('seeSite')) : null) :
           it.games ? h('div', { class:'cr-games row' }, ...(r.games.length ? r.games.map(g => gameTile(g, h('small', { class:'muted' }, g.blocks + ' 🧩'))) : [h('small', { class:'muted' }, w('noGame'))]))
             : h('div', { class:'cr-st' }, bar(st.pct), h('small', {}, st.text)), h('span', { class:'grow' }),
           stateChip(st, it),

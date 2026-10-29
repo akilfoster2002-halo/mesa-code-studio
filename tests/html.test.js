@@ -43,10 +43,14 @@ test('the first page starts with goals left to do, and a full page meets them al
 test('Classwork: Game Design (the block game) and Game Feedback are the built-in assignments', () => {
   const C = require('../public/js/classwork.js');
   assert.strictEqual(new Set(C.ITEMS.map(i => i.id)).size, C.ITEMS.length);
-  for(const it of C.ITEMS){ assert.ok(it.href && it.title.en && it.title.es && it.line.en && it.line.es, it.id); assert.match(it.id, /^[a-z0-9-]{1,30}$/); }
+  for(const it of C.ITEMS){ assert.ok((it.href || it.site) && it.title.en && it.title.es && it.line.en && it.line.es, it.id); assert.match(it.id, /^[a-z0-9-]{1,30}$/); }
   const empty = C.studentData(null, null, []);
   for(const a of C.ASSIGNMENTS) assert.strictEqual(C.status(a, empty).state, 'none', a.id);
-  assert.deepStrictEqual(C.ASSIGNMENTS.map(a => a.id), ['game', 'feedback']);   // their block game, then feedback on classmates' games
+  assert.deepStrictEqual(C.ASSIGNMENTS.map(a => a.id), ['game', 'feedback', 'html1', 'html', 'site']);   // their block game, feedback on classmates' games, HTML Class 1
+  const c1 = acts => C.status(C.ITEMS.find(i => i.id === 'html1'), C.studentData({ html:{ acts } }, null, []));
+  assert.strictEqual(c1({}).state, 'none');
+  assert.deepStrictEqual([c1({ cwords:{ best:80 } }).state, c1({ cwords:{ best:80 } }).text], ['started', '1 / 8 · 10%']);
+  assert.strictEqual(c1(Object.fromEntries(H.C1_ACTS.map(a => [a.id, { best:100 }]))).state, 'done');
   const fb = n => C.status(C.ITEMS.find(i => i.id === 'feedback'), C.studentData(null, null, [], {}, false, Array(n).fill({})));
   assert.deepStrictEqual([fb(0).state, fb(3).state, fb(4).state, fb(1).text], ['none', 'started', 'done', '1 / 4 💬']);
   const by = d => C.status(C.ITEMS.find(i => i.id === 'game'), d);
@@ -63,4 +67,31 @@ test('Classwork: a graded assignment shows the grade out of its points', () => {
   const st = C.status(it, { subs:{ 'a-x':{ turnedIn:true, at:'2026-11-01T10:00:00Z', files:1, grade:15 } } });
   assert.deepStrictEqual([st.state, st.graded, st.text, st.pct], ['done', true, '15 / 20', 75]);
   assert.strictEqual(C.status(C.custom({ id:'a-y', title:'Old' }), { subs:{ 'a-y':{ grade:90 } } }).text, '90 / 100');
+});
+
+test('HTML Class 1: 15 minutes in 8 rounds, from the slides; ids the server keeps; the exit h1 check', () => {
+  assert.strictEqual(H.C1_ACTS.reduce((n, a) => n + a.min, 0), 15);
+  for(const a of H.C1_ACTS){ assert.match(a.id, /^[a-z]{2,12}$/); assert.ok(a.title.en && a.title.es && a.line.en && a.line.es, a.id); }
+  assert.ok(!H.C1_ACTS.some(a => H.ACTS.some(b => b.id === a.id)), 'no clash with the practice activities');
+  // the 10 words for today, in the slide's order
+  assert.deepStrictEqual(H.C1_WORDS.map(x => x.q), ['website', 'browser', 'HTML', 'CSS', 'tag', 'opening tag', 'closing tag', 'element', 'head', 'body']);
+  for(const x of [...H.C1_WORDS, ...H.C1_JOBS]) assert.ok((x.a || x.job).en && (x.a || x.job).es);
+  // the pages to put in order are real pages: every tag opened is closed, in order
+  for(const pg of [H.C1_PAGE, ...H.C1_ORDER]){
+    const stack = [];
+    for(const [, l] of pg) for(const m of l.matchAll(/<(\/?)([a-z0-9]+)[^>]*>/g)){ if(m[1]) assert.strictEqual(stack.pop(), m[2]); else stack.push(m[2]); }
+    assert.deepStrictEqual(stack, []);
+  }
+  for(const ok of ['<h1>Pizza</h1>', ' <h1> Tacos al pastor </h1> ']) assert.ok(H.C1_H1(ok), ok);
+  for(const no of ['<h1></h1>', '<h1>Pizza<h1>', 'Pizza', '<h2>Pizza</h2>', '<h1>Pizza</h1><p>x</p>']) assert.ok(!H.C1_H1(no), no);
+});
+
+test('My HTML Website: the skeleton parts it has, and done once it has them all', () => {
+  const C = require('../public/js/classwork.js');
+  const page = '<!DOCTYPE html>\n<html>\n<head>\n<title>Me - Resume</title>\n<style>\n</style>\n</head>\n<body>\n<h1>Me</h1>\n</body>\n</html>';
+  assert.deepStrictEqual(H.siteInfo(page), { len:page.length, has:H.SITE_PARTS.map(p => p.id), ok:true });
+  assert.deepStrictEqual(H.siteInfo('<h1>Me</h1>').has, []);                        // an h1 has to be in the body
+  assert.strictEqual(H.siteInfo(page.replace('</h1>', '')).ok, false);              // the #1 bug: a missing closing tag
+  const st = text => C.status(C.ITEMS.find(i => i.id === 'site'), C.studentData({ html:{ site:text } }, null, []));
+  assert.deepStrictEqual([st('').state, st('<html><body></body></html>').state, st(page).state], ['none', 'started', 'done']);
 });

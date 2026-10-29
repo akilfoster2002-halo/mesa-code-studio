@@ -23,7 +23,16 @@ student goes straight to their own class. Each class has:
   **＋ Add a game**, picks a classmate's game, plays it right there (`/studio?play#/p/<id>`, the
   stage alone) and fills out the feedback slip beside it. Done at 4 finished slips. The teacher
   clicks a student's slip to read it, with the game beside it.
-- The top bar's tabs are Classroom, Blocks and HTML (Learn and Design are off the bar).
+- **HTML assignments** (no HTML tab: each runs on its own assignment page):
+  - **HTML Class 1: Intro to HTML & CSS** — the class 1 slides as 8 quick rounds, about 15 min
+    (the 10 words, HTML or CSS, anatomy of a tag, every tag's job, head or body, put the Captain
+    Byte page in order, type it line by line, exit ticket). A missed question goes to the back of
+    the round and comes back. It is `/html?embed#/c1` in a frame.
+  - **HTML Practice** — the 7 practice activities (`/html?embed#/`).
+  - **My HTML Website** — a plain editor (line numbers, Tab indents, **Save & refresh** or Ctrl+S,
+    and it saves by itself) with the page beside it. Saved as `learn.html.site`; done once it has
+    the skeleton (DOCTYPE, html, head, title, style, body, h1). The teacher presses 👁 to see it.
+- The top bar's tabs are Classroom and Blocks.
 - **＋ Create assignment** (teacher, on Classwork) — title, instructions, topic, due date, for one
   class or all of them. Students open it, **＋ Add HTML file** (up to 5 `.html` files, 400 KB each)
   and **Turn in** (Unsubmit to change it). The assignment page lists **every student by name** with

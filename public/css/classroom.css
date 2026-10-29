@@ -226,3 +226,21 @@ button.cr-game{cursor:pointer;font:inherit;text-align:left;width:100%;grid-templ
 .cr-slips button.cr-chip{border:0;cursor:pointer;font-family:inherit}
 @media (max-width:900px){ .cr-fbcols{grid-template-columns:1fr} }
 .cr-view-card>.cr-fbcols{padding:12px;overflow:auto}
+/* HTML lessons in a frame on the assignment page */
+.cr-lesson{width:100%;min-height:560px;border:1px solid #dadce0;border-radius:10px;margin-top:16px;background:#fff6f1;display:block}
+/* My HTML Website: a plain editor and the page it makes */
+.cr-site{display:grid;gap:8px;margin-top:16px}
+.cr-site-bar{display:flex;align-items:center;gap:10px}
+.cr-site-cols{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:12px}
+.cr-editor{display:grid;grid-template-columns:auto 1fr;background:#1e1e2e;border-radius:10px;overflow:hidden;height:520px}
+.cr-nums{padding:12px 8px 12px 12px;color:#6c7086;text-align:right;font:15px/1.5 "Ubuntu Mono",Menlo,monospace;white-space:pre;overflow:hidden;user-select:none}
+.cr-code{border:0;outline:0;resize:none;background:transparent;color:#f5f5f5;padding:12px;font:15px/1.5 "Ubuntu Mono",Menlo,monospace;tab-size:2;white-space:pre;overflow:auto;caret-color:#fff}
+.cr-site-view{border:1px solid #dadce0;border-radius:10px;overflow:hidden;display:grid;grid-template-rows:auto 1fr;height:520px;background:#fff}
+.cr-site-top{display:flex;align-items:center;gap:5px;background:#eef0f3;padding:6px 10px}
+.cr-site-top i{width:10px;height:10px;border-radius:50%;background:#d3d7dd}
+.cr-site-tab{margin-left:8px;background:#fff;border-radius:8px 8px 0 0;padding:2px 12px;font-size:13px;color:#555}
+.cr-site-frame{width:100%;height:100%;border:0}
+.cr-site-parts{display:flex;flex-wrap:wrap;gap:6px}
+.cr-site-parts .cr-chip{background:#f1f3f4;color:#5f6368;font-family:"Ubuntu Mono",Menlo,monospace}
+.cr-site-parts .cr-chip.done{background:#e6f4ea;color:#137333}
+@media (max-width:900px){ .cr-site-cols{grid-template-columns:1fr} }
