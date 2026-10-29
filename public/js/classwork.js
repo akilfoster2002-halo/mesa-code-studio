@@ -8,26 +8,21 @@
 
    status(item, d) → { state:'none'|'started'|'done', pct, text } where d is
    one student's { learn:{ levels, words, html }, design:{ done, approved, turnedIn },
-   projects, blocks, subs }. Runs in the page and in Node.
+   projects, blocks, locked (the game is turned in), subs }. Runs in the page and in Node.
    ===================================================================== */
 (function(root){
-  const DESIGN_STEPS = 15;            // the steps in design-steps.js
-
-  /* the one built-in assignment: the Game Design Packet. It is done when the
-     student turns it in (that also locks it, until the teacher gives it back).
-     The tools (Blocks, Learn, HTML) stay in the top bar; the teacher's own
-     assignments are added beside it. */
+  /* the one built-in assignment: Game Design, the game the student builds in
+     blocks. Turning it in is the editor lock: they can still open and play it,
+     not change it, until the teacher gives it back. The tools (Blocks, Learn,
+     Design, HTML) stay in the top bar; the teacher's own assignments go beside it. */
   const TOPICS = [
     { id:'design', icon:'🎨', title:{ en:'Game design', es:'Diseño de juegos' }, items:[
-      { id:'packet', kind:'assignment', turnin:true, icon:'📝', title:{ en:'Game Design Packet', es:'Paquete de diseño de juego' }, href:'/design', teacher:'/design#/teacher',
-        student:u => '/design#/teacher/' + encodeURIComponent(u),
-        line:{ en:'Plan your game in ' + DESIGN_STEPS + ' steps, then turn it in', es:'Planea tu juego en ' + DESIGN_STEPS + ' pasos y entrégalo' },
+      { id:'game', kind:'assignment', turnin:true, games:true, icon:'🕹', title:{ en:'Game Design', es:'Diseño de juegos' }, href:'/studio#/',
+        line:{ en:'Build your game in blocks, then turn it in', es:'Construye tu juego con bloques y luego entrégalo' },
         status:d => {
-          const n = (d.design && d.design.done) || 0;
-          const s = d.design && d.design.turnedIn ? { state:'done', pct:100, text:n + ' / ' + DESIGN_STEPS + ' · 🔒' }
-            : { state:n > 0 ? 'started' : 'none', pct:Math.round(100 * Math.min(n, DESIGN_STEPS) / DESIGN_STEPS), text:n + ' / ' + DESIGN_STEPS };
-          if(d.design && d.design.approved) s.text += ' · ✓ OK';
-          return s;
+          const n = d.blocks || 0, txt = n + ' 🧩';
+          if(d.locked) return { state:'done', pct:100, text:txt + ' · 🔒' };
+          return { state:n > 0 ? 'started' : 'none', pct:n > 0 ? 50 : 0, text:txt };
         } }
     ] }
   ];
@@ -61,9 +56,9 @@
 
   /* one student's data, from what the tools save (the same shape the
      teacher's /api/room/:p/grades gives for every student) */
-  function studentData(learn, design, projects, subs){
+  function studentData(learn, design, projects, subs, locked){
     const ps = Array.isArray(projects) ? projects : [];
-    return { subs:subs || {},
+    return { subs:subs || {}, locked:!!locked,
       learn:{ levels:(learn && learn.levels) || {}, words:(learn && learn.words) || null, html:(learn && learn.html && learn.html.acts) || {} },
       design:design ? { done:Array.isArray(design.done) ? design.done.length : 0, approved:!!design.approved, turnedIn:!!design.turnedIn } : null,
       projects:ps.length, blocks:ps.reduce((a, p) => Math.max(a, (p.stats && p.stats.blocks) || 0), 0)

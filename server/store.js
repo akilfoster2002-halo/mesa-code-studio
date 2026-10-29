@@ -60,6 +60,7 @@ class FileStore {
   async setTip(username, v){ const u = this.db.users[username]; if(u){ u.helper_tip = v || null; this._save(); } }
   async setDisabled(username, v){ const u = this.db.users[username]; if(u){ u.disabled = !!v; this._save(); } }
   async setLocked(period, v){ for(const u of Object.values(this.db.users)) if(u.role === 'student' && u.period === period) u.locked = !!v; this._save(); }
+  async setUserLocked(username, v){ const u = this.db.users[username]; if(u){ u.locked = !!v; this._save(); } }
   async lastVersionLabel(id){ const vs = this.db.versions[id] || []; return vs.length ? vs[vs.length-1].label : null; }
   /* one row per account: how far each student has got */
   async overview(){
@@ -353,6 +354,7 @@ class PgStore {
   async setTip(username, v){ await this.q('UPDATE cs_users SET helper_tip=$2 WHERE username=$1', [username, v || null]); }
   async setDisabled(username, v){ await this.q('UPDATE cs_users SET disabled=$2 WHERE username=$1', [username, !!v]); }
   async setLocked(period, v){ await this.q(`UPDATE cs_users SET locked=$2 WHERE role='student' AND period=$1`, [period, !!v]); }
+  async setUserLocked(username, v){ await this.q('UPDATE cs_users SET locked=$2 WHERE username=$1', [username, !!v]); }
   async lastVersionLabel(id){
     const r = await this.q('SELECT label FROM cs_versions WHERE project=$1 ORDER BY created DESC LIMIT 1', [id]);
     return r.rows[0] ? r.rows[0].label : null;

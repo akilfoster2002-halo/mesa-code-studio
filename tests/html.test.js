@@ -40,18 +40,19 @@ test('the first page starts with goals left to do, and a full page meets them al
   for(const g of H.GOALS) assert.ok(g.test(full), g.id);
 });
 
-test('Classwork: the Game Design Packet is the one built-in assignment, done when turned in', () => {
+test('Classwork: Game Design (the block game) is the one built-in assignment, done when turned in', () => {
   const C = require('../public/js/classwork.js');
   assert.strictEqual(new Set(C.ITEMS.map(i => i.id)).size, C.ITEMS.length);
   for(const it of C.ITEMS){ assert.ok(it.href && it.title.en && it.title.es && it.line.en && it.line.es, it.id); assert.match(it.id, /^[a-z0-9-]{1,30}$/); }
   const empty = C.studentData(null, null, []);
   for(const a of C.ASSIGNMENTS) assert.strictEqual(C.status(a, empty).state, 'none', a.id);
-  assert.deepStrictEqual(C.ASSIGNMENTS.map(a => a.id), ['packet']);     // the one built-in assignment
-  const by = d => C.status(C.ITEMS.find(i => i.id === 'packet'), d);
-  const d = C.studentData(null, { done:[1, 2, 3] }, []);
-  assert.deepStrictEqual([by(d).state, by(d).text], ['started', '3 / 15']);
-  const t = C.studentData(null, { done:[1, 2, 3], turnedIn:true }, []);
-  assert.deepStrictEqual([by(t).state, by(t).pct], ['done', 100]);     // turned in = done
+  assert.deepStrictEqual(C.ASSIGNMENTS.map(a => a.id), ['game']);       // the one built-in assignment: their block game
+  const by = d => C.status(C.ITEMS.find(i => i.id === 'game'), d);
+  assert.strictEqual(by(C.studentData(null, null, [])).state, 'none');
+  const d = C.studentData(null, null, [{ stats:{ blocks:40 } }, { stats:{ blocks:12 } }]);
+  assert.deepStrictEqual([by(d).state, by(d).text], ['started', '40 🧩']);
+  const t = C.studentData(null, null, [{ stats:{ blocks:40 } }], {}, true);
+  assert.deepStrictEqual([by(t).state, by(t).pct], ['done', 100]);     // turned in = locked
 });
 
 test('Classwork: a graded assignment shows the grade out of its points', () => {

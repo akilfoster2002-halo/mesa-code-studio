@@ -13,11 +13,12 @@ student goes straight to their own class. Each class has:
 
 - **Stream** — the teacher's posts (one class or "Post to all my classes"; links are clickable)
   and an **Upcoming** box of work due soon.
-- **Classwork** — the **Game Design Packet** (the one built-in assignment) and the teacher's own
-  assignments. The tools (Blocks, Learn, HTML) stay in the top bar. Teachers can hide an item or give
-  it a due date. A student's packet is done when it is **turned in**, which **locks** it: the
-  student cannot change it until the teacher presses **Give back** (on the assignment page or the
-  Design teacher list). **🔒 Turn in all** turns in and locks every packet in a class.
+- **Classwork** — **Game Design** (the one built-in assignment: the student's game in the block
+  editor) and the teacher's own assignments. The tools (Blocks, Learn, Design, HTML) stay in the top
+  bar. A game is done when it is **turned in**, which is the editor lock: the student can still open
+  and play it, not change it, until the teacher presses **Give back**. **🔒 Turn in all** locks a
+  whole class. The **Stream** shows each assignment as a card; the teacher's Game Design card shows
+  every student's game (its picture and their name, 🔒 when turned in).
 - **＋ Create assignment** (teacher, on Classwork) — title, instructions, topic, due date, for one
   class or all of them. Students open it, **＋ Add HTML file** (up to 5 `.html` files, 400 KB each)
   and **Turn in** (Unsubmit to change it). The assignment page lists **every student by name** with

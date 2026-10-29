@@ -44,9 +44,10 @@
     viewA:{ en:'View assignment', es:'Ver tarea' }, yourWork:{ en:'Your work', es:'Tu trabajo' }, addFile:{ en:'Add HTML file', es:'Añadir archivo HTML' },
     turnIn:{ en:'Turn in', es:'Entregar' }, unsubmit:{ en:'Unsubmit', es:'Anular entrega' }, turnedIn:{ en:'Turned in', es:'Entregado' },
     giveBack:{ en:'Give back', es:'Devolver' }, giveBackT:{ en:'Unlock it so the student can change it', es:'Desbloquéalo para que el estudiante lo cambie' },
-    allIn:{ en:'Turn in all', es:'Entregar todos' }, sureAllIn:{ en:'Turn in and lock every student’s packet in this class?', es:'¿Entregar y bloquear el paquete de cada estudiante de esta clase?' },
-    sureTurnIn:{ en:'Turn in your plan? You cannot change it after.', es:'¿Entregar tu plan? Después no lo puedes cambiar.' },
-    lockedM:{ en:'Locked. To change it, ask your teacher to give it back.', es:'Bloqueado. Para cambiarlo, pide a tu maestro que te lo devuelva.' },
+    allIn:{ en:'Turn in all', es:'Entregar todos' }, sureAllIn:{ en:'Turn in and lock every student’s game in this class?', es:'¿Entregar y bloquear el juego de cada estudiante de esta clase?' },
+    sureGame:{ en:'Turn in your game? You can still play it, but not change it.', es:'¿Entregar tu juego? Todavía puedes jugarlo, pero no cambiarlo.' },
+    gameLocked:{ en:'Locked. You can still play it. To change it, ask your teacher to give it back.', es:'Bloqueado. Todavía puedes jugarlo. Para cambiarlo, pide a tu maestro que te lo devuelva.' },
+    noGame:{ en:'No game yet', es:'Aún no hay juego' },
     late:{ en:'late', es:'tarde' }, needFile:{ en:'Add your .html file, then turn it in.', es:'Añade tu archivo .html y luego entrégalo.' },
     tooBig:{ en:'That file is too big (400 KB at most).', es:'Ese archivo es muy grande (máximo 400 KB).' },
     notHtml:{ en:'Pick an .html file.', es:'Elige un archivo .html.' }, studentWork:{ en:'Student work', es:'Trabajo de los estudiantes' },
@@ -78,9 +79,14 @@
       ...room.assignments.map(a => api('/room/' + period + '/assignments/' + a.id + '/work').catch(() => null))]);
     const by = {};
     room.assignments.forEach((a, i) => { const x = subs[i]; if(x) by[a.id] = subOf(x); });
-    mine = studentData(l && l.data, d && d.data, ps, by);
+    mine = studentData(l && l.data, d && d.data, ps, by, me.locked);
+    myGames = (Array.isArray(ps) ? ps : []).filter(p => p.stats && p.stats.blocks > 0).sort((a, b) => b.stats.blocks - a.stats.blocks);
   }
   // what status() needs from one student's work on an assignment
+  let myGames = [];
+  // a game: its picture and name; opens it in the editor (a teacher can open anyone's)
+  const gameTile = (g, extra) => h('a', { class:'cr-game', href:'/studio#/p/' + g.id, title:g.name },
+    g.thumb ? h('img', { src:g.thumb, alt:'' }) : h('span', { class:'cr-game-blank' }, '◆'), h('span', { class:'cr-game-n' }, g.name), extra || null);
   const subOf = x => ({ turnedIn:x.turnedIn, at:x.at, files:x.files.length, grade:x.grade });
   // every item in this class: the built-in ones and the teacher's own assignments
   const allItems = () => [...room.assignments.map(custom), ...ITEMS];
@@ -241,6 +247,13 @@
       if(it.custom) rows = (await api('/room/' + period + '/assignments/' + it.id + '/work')).map(r => ({ name:r.name, st:status(it, { subs:{ [it.id]:subOf(r) } }) }));
       else { gradeRows = gradeRows && gradeRows.period === period ? gradeRows : { period, rows:api('/room/' + period + '/grades') };
         rows = (await gradeRows.rows).map(r => ({ name:r.name, st:status(it, r) })); }
+      if(it.games){                       // every student's game, its picture and their name
+        const gs = await gradeRows.rows, n = gs.filter(r => r.locked).length;
+        box.replaceChildren(h('small', { class:'cr-n' }, n + ' / ' + gs.length + ' ' + w('turnedIn').toLowerCase()),
+          h('div', { class:'cr-games' }, ...gs.map(r => { const g = r.games[0], who = h('span', { class:'cr-game-who' }, r.name, r.locked ? ' 🔒' : '');
+            return g ? gameTile(g, who) : h('div', { class:'cr-game none' }, h('span', { class:'cr-game-blank' }, '—'), h('span', { class:'cr-game-n' }, w('noGame')), who); })));
+        return;
+      }
       const n = rows.filter(r => r.st.state === 'done').length;
       box.replaceChildren(h('small', { class:'cr-n' }, n + ' / ' + rows.length + ' ' + (it.custom || it.turnin ? w('turnedIn') : w('done')).toLowerCase()),
         h('div', { class:'cr-kids' }, ...rows.map(r => h('a', { class:'cr-kid ' + r.st.state, href:'#/c/' + period + '/a/' + it.id, title:r.st.text },
@@ -341,13 +354,14 @@
       if(a) return yourWork(period, a, side);
       const st = status(it, mine), turned = it.turnin && st.state === 'done';
       return side.append(h('div', { class:'cr-card cr-yours' }, h('div', { class:'cr-yours-h' }, h('b', {}, w('yourWork')), stateChip(st, it)),
-        h('div', { class:'cr-st' }, bar(st.pct), h('small', {}, st.text)),
-        turned ? h('small', { class:'muted' }, '🔒 ' + w('lockedM')) : null,
+        it.games ? (myGames.length ? h('div', { class:'cr-games mine' }, ...myGames.map(g => gameTile(g))) : h('small', { class:'muted' }, w('noGame')))
+          : h('div', { class:'cr-st' }, bar(st.pct), h('small', {}, st.text)),
+        turned ? h('small', { class:'muted' }, '🔒 ' + w('gameLocked')) : null,
         h('a', { class:'btn' + (turned ? '' : ' primary'), href:it.href }, it.icon + ' ' + w('open')),
-        it.turnin && !turned ? h('button', { class:'btn', type:'button', onclick:async e => {
-          if(!confirm(w('sureTurnIn'))) return;
+        it.turnin && !turned ? h('button', { class:'btn', type:'button', disabled:it.games && !myGames.length, onclick:async e => {
+          if(!confirm(w('sureGame'))) return;
           e.target.disabled = true;
-          try { await put('/design/turnin', {}, 'POST'); route(true); } catch(x){ e.target.disabled = false; }
+          try { await put('/game/turnin', {}, 'POST'); me.locked = true; route(true); } catch(x){ e.target.disabled = false; }
         } }, '📤 ' + w('turnIn')) : null));
     }
     studentWork(period, it, $('.cr-sw'));
@@ -447,24 +461,24 @@
     }
     const rows = await api('/room/' + period + '/grades');
     const n = rows.filter(r => status(it, r).state === 'done').length;
-    // the Game Design Packet: turned in = locked; the teacher gives one back, or turns in the whole class
+    // the game: turned in = locked in the editor; the teacher gives one back, or turns in the whole class
     const turn = (path, body, ask) => async e => {
       if(ask && !confirm(ask)) return;
       e.target.disabled = true;
-      try { await put('/admin/designs/' + path, body, 'POST'); } catch(x){}
+      try { await put('/admin/' + path, body, 'POST'); } catch(x){}
       studentWork(period, it, box);
     };
     box.replaceChildren(h('section', { class:'cr-topic' }, h('h2', { class:'cr-topic-h' }, w('studentWork'),
         h('small', { class:'cr-n' }, n + ' ' + (it.turnin ? w('turnedIn') : w('done')).toLowerCase() + ' · ' + rows.length + ' ' + w('students').toLowerCase()),
-        it.turnin && n < rows.length ? h('button', { class:'btn small cr-allin', type:'button', onclick:turn('turnin', { on:true, period }, w('sureAllIn')) }, '🔒 ' + w('allIn')) : null),
+        it.turnin && n < rows.length ? h('button', { class:'btn small cr-allin', type:'button', onclick:turn('lock', { locked:true, period }, w('sureAllIn')) }, '🔒 ' + w('allIn')) : null),
       ...rows.map(r => { const st = status(it, r);
         return h('div', { class:'cr-person cr-swrow' }, avatar(r.name, color(period)), h('div', { class:'cr-sw-name' }, h('b', {}, r.name), h('div', { class:'muted' }, r.username)),
-          h('div', { class:'cr-st' }, bar(st.pct), h('small', {}, st.text)), h('span', { class:'grow' }),
-          it.student && st.state !== 'none' ? h('a', { class:'btn small', href:it.student(r.username) }, '📄 ' + w('openWork')) : null,
+          it.games ? h('div', { class:'cr-games row' }, ...(r.games.length ? r.games.map(g => gameTile(g, h('small', { class:'muted' }, g.blocks + ' 🧩'))) : [h('small', { class:'muted' }, w('noGame'))]))
+            : h('div', { class:'cr-st' }, bar(st.pct), h('small', {}, st.text)), h('span', { class:'grow' }),
           stateChip(st, it),
           it.turnin ? (st.state === 'done'
-            ? h('button', { class:'btn small', type:'button', title:w('giveBackT'), onclick:turn(r.username + '/turnin', { on:false }) }, '↩ ' + w('giveBack'))
-            : h('button', { class:'btn small', type:'button', onclick:turn(r.username + '/turnin', { on:true }) }, '🔒 ' + w('turnIn'))) : null); })));
+            ? h('button', { class:'btn small', type:'button', title:w('giveBackT'), onclick:turn('students/' + r.username + '/lock', { locked:false }) }, '↩ ' + w('giveBack'))
+            : h('button', { class:'btn small', type:'button', onclick:turn('students/' + r.username + '/lock', { locked:true }) }, '🔒 ' + w('turnIn'))) : null); })));
   }
 
   /* -------------------------------------------------------------- people */

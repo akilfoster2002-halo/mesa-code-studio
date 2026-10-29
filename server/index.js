@@ -22,6 +22,9 @@
        Turning the packet in locks it: POST /api/design/turnin (the student; only
        a teacher can give it back), teacher: POST /api/admin/designs/:u/turnin { on },
        POST /api/admin/designs/turnin { on, period } (every student in a period)
+     The Game Design assignment in the Classroom is the student's block game. Turning it
+     in is the editor lock (they can still open and play it): POST /api/game/turnin (the
+     student); teacher: POST /api/admin/students/:u/lock { locked }, POST /api/admin/lock (a period)
 
    Accounts live in the database. The class list (private/roster.json, made
    by tools/make-logins.js) is never in the repo: `npm run seed` adds any new
@@ -431,6 +434,10 @@ async function api(req, res, url){
       const learn = Object.fromEntries((await store.listLearn()).map(d => [d.owner, d.data || {}]));
       const designs = Object.fromEntries((await store.listDesigns()).map(d => [d.owner, d.summary]));
       const over = Object.fromEntries((await store.overview()).map(r => [r.username, r]));
+      // each student's games (with blocks in them), the biggest first
+      const games = Object.fromEntries((await store.classGames(period)).map(u => [u.username, u.projects
+        .filter(pr => (pr.stats && pr.stats.blocks) > 0).sort((a, b) => b.stats.blocks - a.stats.blocks)
+        .map(pr => ({ id:pr.id, name:pr.name, thumb:pr.thumb || null, blocks:pr.stats.blocks, updated:pr.updated }))]));
       const subs = {};
       for(const x of await store.listSubmissions(room.assignments.map(a => a.id)))
         (subs[x.owner] || (subs[x.owner] = {}))[x.assignment] = { turnedIn:!!x.data.turnedIn, at:x.data.at || null, files:(x.data.files || []).length,
@@ -438,7 +445,8 @@ async function api(req, res, url){
       return send(res, 200, kids.sort((a, b) => a.name.localeCompare(b.name)).map(u => ({ username:u.username, name:u.name,
         learn:{ levels:(learn[u.username] || {}).levels || {}, words:(learn[u.username] || {}).words || null, html:((learn[u.username] || {}).html || {}).acts || {} },
         design:designs[u.username] || null, projects:(over[u.username] || {}).projects || 0, blocks:(over[u.username] || {}).blocks || 0,
-        last_login:(over[u.username] || {}).last_login || null, subs:subs[u.username] || {} })));
+        last_login:(over[u.username] || {}).last_login || null, subs:subs[u.username] || {},
+        locked:!!u.locked, games:games[u.username] || [] })));
     }
   }
 
@@ -482,6 +490,10 @@ async function api(req, res, url){
     }
   }
 
+  if(p[0] === 'game' && p[1] === 'turnin' && !p[2] && m === 'POST' && !teacher){
+    await store.setUserLocked(user.username, true);
+    return send(res, 200, { ok:true });
+  }
   if(p[0] === 'design' && p[1] === 'turnin' && !p[2] && m === 'POST'){
     const d = await store.getDesign(user.username);
     await store.saveDesign(user.username, turnIn(d && d.data, true));
@@ -582,6 +594,13 @@ async function api(req, res, url){
       const pw = String(b.password || '').trim().toLowerCase();
       if(pw.length < 4) return send(res, 400, { error:'short' });
       await store.upsertUser({ ...u, ...auth.makeHash(pw) });
+      return send(res, 200, { ok:true });
+    }
+    if(p[1] === 'students' && p[3] === 'lock' && m === 'POST'){
+      const u = await store.getUser(p[2]);
+      if(!u || u.role !== 'student') return send(res, 404, { error:'none' });
+      const b = await readJSON(req, 2000);
+      await store.setUserLocked(u.username, !!b.locked);
       return send(res, 200, { ok:true });
     }
     if(p[1] === 'students' && p[3] === 'tip' && m === 'POST'){

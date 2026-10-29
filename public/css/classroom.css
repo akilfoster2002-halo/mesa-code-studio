@@ -188,3 +188,14 @@
 .cr-kid.done{background:#e6f4ea;border-color:#a8dab5}
 .cr-kid.started{background:#fef7e0;border-color:#fde293}
 .cr-kid b{font-size:12px}
+/* games: a picture and a name */
+.cr-games{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:10px}
+.cr-games.row{display:flex;flex-wrap:wrap;gap:8px}
+.cr-games.row .cr-game{width:110px}
+.cr-games.mine{grid-template-columns:repeat(auto-fill,minmax(110px,1fr))}
+.cr-game{display:grid;gap:3px;text-decoration:none;color:#3c4043;border:1px solid #dadce0;border-radius:10px;padding:5px;background:#fff;font-size:12.5px;min-width:0}
+a.cr-game:hover{border-color:#1967d2;box-shadow:0 1px 3px rgba(60,64,67,.3)}
+.cr-game img,.cr-game-blank{width:100%;aspect-ratio:4/3;object-fit:cover;border-radius:6px;background:#f1f3f4;display:grid;place-items:center;color:#9aa0a6;font-size:22px}
+.cr-game-n{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#5f6368}
+.cr-game-who{font-weight:600;color:#202124;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cr-game.none{opacity:.6}

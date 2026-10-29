@@ -512,3 +512,17 @@ test('game design packet: turning it in locks it; only a teacher gives it back',
   assert.strictEqual(grades.find(r => r.username === 'ana').design.turnedIn, true);
   await call(t.cookie, '/admin/designs/turnin', { method:'POST', body:'{"on":false}' });
 });
+
+test('Game Design: the student turns in their game (the editor lock); the teacher gives it back', async () => {
+  const { cookie } = await login('ana', 'tiger42');
+  assert.strictEqual((await call(cookie, '/game/turnin', { method:'POST', body:'{}' })).status, 200);
+  assert.strictEqual((await (await call(cookie, '/me')).json()).locked, true);
+  assert.strictEqual((await call(cookie, '/admin/students/ana/lock', { method:'POST', body:'{"locked":false}' })).status, 403);
+  const t = await login('teach', 'apple-pear');
+  const me = await (await call(cookie, '/me')).json();
+  let row = (await (await call(t.cookie, '/room/' + me.period + '/grades')).json()).find(r => r.username === 'ana');
+  assert.strictEqual(row.locked, true);
+  assert.ok(Array.isArray(row.games));
+  await call(t.cookie, '/admin/students/ana/lock', { method:'POST', body:'{"locked":false}' });
+  assert.strictEqual((await (await call(cookie, '/me')).json()).locked, false);
+});
