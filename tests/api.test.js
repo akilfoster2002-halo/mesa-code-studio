@@ -389,6 +389,13 @@ test('Class Games: a classmate can play your game read-only and leave one feedba
   assert.strictEqual(got[0].complete, false);
   assert.strictEqual((await (await call(t.cookie, '/admin/feedback?period=2')).json()).length, 1);
   assert.strictEqual((await call(b.cookie, '/admin/feedback')).status, 403);
+  // Game Feedback counts a slip once it is filled out all the way
+  assert.deepStrictEqual((await (await call(b.cookie, '/class/games')).json()).given, []);
+  const full = { checks:{ moves:'a', enemy:'b', lose:'c', win:'d', score:'e', more:'f' }, level:4, texts:{ liked:'jumps', next:'a snake' } };
+  await call(b.cookie, '/feedback/' + p.id, { method:'PUT', body:JSON.stringify({ data:full }) });
+  assert.deepStrictEqual((await (await call(b.cookie, '/class/games')).json()).given, [p.id]);
+  const dev = (await (await call(t.cookie, '/room/2/grades')).json()).find(r => r.username === 'dev');
+  assert.deepStrictEqual(dev.slips, [{ project:p.id, game:'Frog Run', owner:'Ana' }]);
 });
 
 test('a locked period can open and play its games but not change them', async () => {

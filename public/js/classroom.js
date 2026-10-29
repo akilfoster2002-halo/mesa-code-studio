@@ -48,6 +48,9 @@
     sureGame:{ en:'Turn in your game? You can still play it, but not change it.', es:'¿Entregar tu juego? Todavía puedes jugarlo, pero no cambiarlo.' },
     gameLocked:{ en:'Locked. You can still play it. To change it, ask your teacher to give it back.', es:'Bloqueado. Todavía puedes jugarlo. Para cambiarlo, pide a tu maestro que te lo devuelva.' },
     noGame:{ en:'No game yet', es:'Aún no hay juego' },
+    pickGame:{ en:'Pick a classmate’s game below. Play it, fill out the slip, press Submit.', es:'Elige un juego de un compañero abajo. Juégalo, llena la tarjeta y presiona Enviar.' },
+    classGames:{ en:'Classmates’ games', es:'Juegos de tus compañeros' }, noGames:{ en:'No games yet.', es:'Todavía no hay juegos.' },
+    noSlips:{ en:'No slips yet', es:'Aún no hay tarjetas' }, seeSlip:{ en:'Open the game to see the slips', es:'Abre el juego para ver las tarjetas' },
     late:{ en:'late', es:'tarde' }, needFile:{ en:'Add your .html file, then turn it in.', es:'Añade tu archivo .html y luego entrégalo.' },
     tooBig:{ en:'That file is too big (400 KB at most).', es:'Ese archivo es muy grande (máximo 400 KB).' },
     notHtml:{ en:'Pick an .html file.', es:'Elige un archivo .html.' }, studentWork:{ en:'Student work', es:'Trabajo de los estudiantes' },
@@ -75,15 +78,19 @@
 
   /* a student's own work, from the tools' own saves and their turned-in assignments */
   async function loadMine(period){
-    const [l, d, ps, ...subs] = await Promise.all([api('/learn').catch(() => ({})), api('/design').catch(() => ({})), api('/projects').catch(() => []),
+    const [l, d, ps, cg, ...subs] = await Promise.all([api('/learn').catch(() => ({})), api('/design').catch(() => ({})), api('/projects').catch(() => []),
+      api('/class/games').catch(() => ({ given:[], people:[] })),
       ...room.assignments.map(a => api('/room/' + period + '/assignments/' + a.id + '/work').catch(() => null))]);
     const by = {};
     room.assignments.forEach((a, i) => { const x = subs[i]; if(x) by[a.id] = subOf(x); });
-    mine = studentData(l && l.data, d && d.data, ps, by, me.locked);
+    mine = studentData(l && l.data, d && d.data, ps, by, me.locked, cg.given || []);
+    // classmates' games, to play and fill out a feedback slip for
+    classmates = (cg.people || []).filter(u => u.username !== me.username)
+      .flatMap(u => u.projects.filter(p => p.blocks > 0).map(p => ({ ...p, ownerName:u.name, done:(cg.given || []).includes(p.id) })));
     myGames = (Array.isArray(ps) ? ps : []).filter(p => p.stats && p.stats.blocks > 0).sort((a, b) => b.stats.blocks - a.stats.blocks);
   }
   // what status() needs from one student's work on an assignment
-  let myGames = [];
+  let myGames = [], classmates = [];
   // a game: its picture and name; opens it in the editor (a teacher can open anyone's)
   const gameTile = (g, extra) => h('a', { class:'cr-game', href:'/studio#/p/' + g.id, title:g.name },
     g.thumb ? h('img', { src:g.thumb, alt:'' }) : h('span', { class:'cr-game-blank' }, '◆'), h('span', { class:'cr-game-n' }, g.name), extra || null);
@@ -227,7 +234,7 @@
           h('small', {}, (it.custom ? it.custom.by + ' · ' + fmtDate(it.custom.at.slice(0, 10)) : w('assignment')) + (due ? ' · ' + w('due') + ' ' + fmtDate(due) : ''))),
         h('span', { class:'grow' }), st ? stateChip(st, it) : null), kids); };
     const feed = [...allItems().filter(it => it.kind === 'assignment' && visible(it)).map(it => ({ it, at:it.custom ? it.custom.at : '' })), ...room.posts]
-      .sort((a, b) => !a.at ? -1 : !b.at ? 1 : b.at.localeCompare(a.at));
+      .sort((a, b) => !a.at || !b.at ? (!b.at) - (!a.at) : b.at.localeCompare(a.at));
     app.replaceChildren(topbar(period, ''), h('main', { class:'cr-main' },
       h('div', { class:'cr-banner', style:{ background:color(period) } }, h('b', {}, w('cls')), h('span', {}, w('period') + ' ' + period)),
       h('div', { class:'cr-stream' },
@@ -350,12 +357,17 @@
     app.replaceChildren(topbar(period, 'work'), h('main', { class:'cr-main' },
       h('a', { class:'cr-back', href:'#/c/' + period + '/work' }, '◀ ' + w('back')),
       h('div', { class:'cr-a' + (teacher ? ' teacher' : '') }, body, teacher ? null : side), teacher ? h('div', { class:'cr-sw' }) : null));
+    // Game Feedback: every classmate's game, to open and fill out the slip beside it
+    if(!teacher && it.slips) body.append(h('section', { class:'cr-topic' }, h('h2', { class:'cr-topic-h' }, '🎮 ' + w('classGames')),
+      classmates.length ? h('div', { class:'cr-games' }, ...classmates.map(g => gameTile(g,
+        h('span', { class:'cr-game-who' }, g.ownerName, g.done ? ' ✅' : g.reviewed ? ' ✏️' : '')))) : h('small', { class:'muted' }, w('noGames'))));
     if(!teacher){
       if(a) return yourWork(period, a, side);
       const st = status(it, mine), turned = it.turnin && st.state === 'done';
       return side.append(h('div', { class:'cr-card cr-yours' }, h('div', { class:'cr-yours-h' }, h('b', {}, w('yourWork')), stateChip(st, it)),
         it.games ? (myGames.length ? h('div', { class:'cr-games mine' }, ...myGames.map(g => gameTile(g))) : h('small', { class:'muted' }, w('noGame')))
           : h('div', { class:'cr-st' }, bar(st.pct), h('small', {}, st.text)),
+        it.slips ? h('small', { class:'muted' }, '👆 ' + w('pickGame')) : null,
         turned ? h('small', { class:'muted' }, '🔒 ' + w('gameLocked')) : null,
         h('a', { class:'btn' + (turned ? '' : ' primary'), href:it.href }, it.icon + ' ' + w('open')),
         it.turnin && !turned ? h('button', { class:'btn', type:'button', disabled:it.games && !myGames.length, onclick:async e => {
@@ -473,6 +485,8 @@
         it.turnin && n < rows.length ? h('button', { class:'btn small cr-allin', type:'button', onclick:turn('lock', { locked:true, period }, w('sureAllIn')) }, '🔒 ' + w('allIn')) : null),
       ...rows.map(r => { const st = status(it, r);
         return h('div', { class:'cr-person cr-swrow' }, avatar(r.name, color(period)), h('div', { class:'cr-sw-name' }, h('b', {}, r.name), h('div', { class:'muted' }, r.username)),
+          it.slips ? h('div', { class:'cr-slips' }, ...(r.slips.length ? r.slips.map(x => h('a', { class:'cr-chip', href:'/studio#/p/' + x.project, title:w('seeSlip') }, '💬 ' + x.game + ' · ' + x.owner))
+            : [h('small', { class:'muted' }, w('noSlips'))])) :
           it.games ? h('div', { class:'cr-games row' }, ...(r.games.length ? r.games.map(g => gameTile(g, h('small', { class:'muted' }, g.blocks + ' 🧩'))) : [h('small', { class:'muted' }, w('noGame'))]))
             : h('div', { class:'cr-st' }, bar(st.pct), h('small', {}, st.text)), h('span', { class:'grow' }),
           stateChip(st, it),

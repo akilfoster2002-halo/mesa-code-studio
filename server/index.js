@@ -438,6 +438,11 @@ async function api(req, res, url){
       const games = Object.fromEntries((await store.classGames(period)).map(u => [u.username, u.projects
         .filter(pr => (pr.stats && pr.stats.blocks) > 0).sort((a, b) => b.stats.blocks - a.stats.blocks)
         .map(pr => ({ id:pr.id, name:pr.name, thumb:pr.thumb || null, blocks:pr.stats.blocks, updated:pr.updated }))]));
+      // Game Feedback: the slips each student filled out all the way, and on whose games
+      const fbNames = Object.fromEntries((await store.classGames(period)).flatMap(u => u.projects.map(pr => [pr.id, { game:pr.name, owner:u.name }])));
+      const slips = {};
+      for(const f of await store.listFeedback()) if(FEEDBACK.complete(f.data || {}))
+        (slips[f.reviewer] || (slips[f.reviewer] = [])).push({ project:f.project, ...(fbNames[f.project] || { game:'', owner:'' }) });
       const subs = {};
       for(const x of await store.listSubmissions(room.assignments.map(a => a.id)))
         (subs[x.owner] || (subs[x.owner] = {}))[x.assignment] = { turnedIn:!!x.data.turnedIn, at:x.data.at || null, files:(x.data.files || []).length,
@@ -446,7 +451,7 @@ async function api(req, res, url){
         learn:{ levels:(learn[u.username] || {}).levels || {}, words:(learn[u.username] || {}).words || null, html:((learn[u.username] || {}).html || {}).acts || {} },
         design:designs[u.username] || null, projects:(over[u.username] || {}).projects || 0, blocks:(over[u.username] || {}).blocks || 0,
         last_login:(over[u.username] || {}).last_login || null, subs:subs[u.username] || {},
-        locked:!!u.locked, games:games[u.username] || [] })));
+        locked:!!u.locked, games:games[u.username] || [], slips:slips[u.username] || [] })));
     }
   }
 
@@ -457,7 +462,8 @@ async function api(req, res, url){
     const mineDone = new Set((await store.listFeedback({ reviewer:user.username })).map(f => f.project));
     const counts = {};
     for(const f of await store.listFeedback()) counts[f.project] = (counts[f.project] || 0) + 1;
-    return send(res, 200, { period, me:user.username, people:people.map(u => ({ ...u,
+    const given = (await store.listFeedback({ reviewer:user.username })).filter(f => FEEDBACK.complete(f.data || {})).map(f => f.project);
+    return send(res, 200, { period, me:user.username, given, people:people.map(u => ({ ...u,
       projects:u.projects.filter(pr => (pr.stats && pr.stats.blocks) > 0 || u.username === user.username)
         .map(pr => ({ id:pr.id, name:pr.name, thumb:pr.thumb, updated:pr.updated, blocks:(pr.stats && pr.stats.blocks) || 0,
           reviewed:mineDone.has(pr.id), slips:counts[pr.id] || 0 })) })) });

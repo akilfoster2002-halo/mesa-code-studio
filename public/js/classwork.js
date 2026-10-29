@@ -8,13 +8,14 @@
 
    status(item, d) → { state:'none'|'started'|'done', pct, text } where d is
    one student's { learn:{ levels, words, html }, design:{ done, approved, turnedIn },
-   projects, blocks, locked (the game is turned in), subs }. Runs in the page and in Node.
+   projects, blocks, locked (the game is turned in), slips (finished feedback), subs }. Runs in the page and in Node.
    ===================================================================== */
 (function(root){
   /* the one built-in assignment: Game Design, the game the student builds in
      blocks. Turning it in is the editor lock: they can still open and play it,
      not change it, until the teacher gives it back. The tools (Blocks, Learn,
      Design, HTML) stay in the top bar; the teacher's own assignments go beside it. */
+  const FEEDBACK_SLIPS = 2;           // Game Feedback: finished slips on this many classmates' games
   const TOPICS = [
     { id:'design', icon:'🎨', title:{ en:'Game design', es:'Diseño de juegos' }, items:[
       { id:'game', kind:'assignment', turnin:true, games:true, icon:'🕹', title:{ en:'Game Design', es:'Diseño de juegos' }, href:'/studio#/',
@@ -23,7 +24,11 @@
           const n = d.blocks || 0, txt = n + ' 🧩';
           if(d.locked) return { state:'done', pct:100, text:txt + ' · 🔒' };
           return { state:n > 0 ? 'started' : 'none', pct:n > 0 ? 50 : 0, text:txt };
-        } }
+        } },
+      { id:'feedback', kind:'assignment', slips:FEEDBACK_SLIPS, icon:'💬', title:{ en:'Game Feedback', es:'Comentarios de juegos' }, href:'/studio#/class',
+        line:{ en:'Play ' + FEEDBACK_SLIPS + ' classmates’ games and fill out a feedback slip for each', es:'Juega ' + FEEDBACK_SLIPS + ' juegos de tus compañeros y llena una tarjeta para cada uno' },
+        status:d => { const n = (d.slips || []).length;
+          return { state:n >= FEEDBACK_SLIPS ? 'done' : n > 0 ? 'started' : 'none', pct:Math.round(100 * Math.min(n, FEEDBACK_SLIPS) / FEEDBACK_SLIPS), text:n + ' / ' + FEEDBACK_SLIPS + ' 💬' }; } }
     ] }
   ];
   const ITEMS = TOPICS.flatMap(t => t.items.map(it => ({ ...it, topic:t })));
@@ -56,9 +61,9 @@
 
   /* one student's data, from what the tools save (the same shape the
      teacher's /api/room/:p/grades gives for every student) */
-  function studentData(learn, design, projects, subs, locked){
+  function studentData(learn, design, projects, subs, locked, slips){
     const ps = Array.isArray(projects) ? projects : [];
-    return { subs:subs || {}, locked:!!locked,
+    return { subs:subs || {}, locked:!!locked, slips:slips || [],
       learn:{ levels:(learn && learn.levels) || {}, words:(learn && learn.words) || null, html:(learn && learn.html && learn.html.acts) || {} },
       design:design ? { done:Array.isArray(design.done) ? design.done.length : 0, approved:!!design.approved, turnedIn:!!design.turnedIn } : null,
       projects:ps.length, blocks:ps.reduce((a, p) => Math.max(a, (p.stats && p.stats.blocks) || 0), 0)
