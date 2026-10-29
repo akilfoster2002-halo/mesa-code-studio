@@ -180,8 +180,7 @@
   }
   const logo = () => h('a', { class:'logo', href:'#/' }, h('span', { class:'logo-mark' }, '🎨'), h('span', {}, 'Game Design Studio'));
   function topbar(extra){
-    return h('header', { class:'top gd-top' }, logo(), h('span', { class:'grow' }), ...(extra || []),
-      h('a', { class:'btn ghost', href:'/#/', title:w('studio') }, '◆ ', h('span', { class:'lbl' }, w('studio'))),
+    return h('header', { class:'top gd-top' }, logo(), SITENAV.bar('design'), h('span', { class:'grow' }), ...(extra || []),
       me.role === 'teacher' ? h('a', { class:'btn ghost', href:'#/teacher' }, '🍎 ', h('span', { class:'lbl' }, w('designs'))) : null,
       langBtn(), h('span', { class:'who' }, '👤 ' + me.name),
       h('button', { class:'btn ghost', type:'button', onclick:logout }, t('Log out')));

@@ -37,18 +37,19 @@
       I18N.lang === 'es' ? 'EN' : 'ES');
   }
   function logo(){ return h('a', { class:'logo', href:'#/' }, h('span', { class:'logo-mark' }, '◆'), h('span', {}, 'Code Studio')); }
+  // the top bar of every page but the editor: logo, then the site's parts
+  const logoNav = () => [logo(), SITENAV.bar('blocks')];
   function userBits(compact){
     if(!me) return [];
     const go = [
       me.role === 'teacher' ? { label:t('Dashboard'), value:'#/teacher' } : null,
-      { label:t('Class Games'), value:'#/class' },
-      { label:t('Game design'), value:'/design' },
-      { label:t('Learn'), value:'/learn' }].filter(Boolean);
+      { label:t('Class Games'), value:'#/class' }].filter(Boolean);
+    const parts = SITENAV.PARTS.filter(p => p.id !== 'blocks').map(p => ({ label:p.icon + '  ' + (I18N.lang === 'es' ? p.es : p.en), value:p.href }));
     // in the editor the pages go in one menu, so the bar stays short
     if(compact) return [
       h('button', { class:'btn ghost menu-btn', type:'button', onclick:e => {
         const r = e.currentTarget.getBoundingClientRect();
-        UI.menu(r.left, r.bottom + 4, [...go, { sep:true }, { label:t('Tour'), value:'tour' }, { label:t('Log out'), value:'out' }], v => {
+        UI.menu(r.left, r.bottom + 4, [...go, { sep:true }, ...parts, { sep:true }, { label:t('Tour'), value:'tour' }, { label:t('Log out'), value:'out' }], v => {
           if(v === 'tour') TOUR.start(); else if(v === 'out') logout(); else if(v.startsWith('#')) location.hash = v; else location.href = v;
         });
       } }, t('Menu') + ' ▾'),
@@ -83,7 +84,7 @@
     const pm = hash.match(/^#\/p\/([^/]+)(\/edit)?$/);
     if(pm) return editorView(pm[1], !!pm[2]);
     if(hash === '#/teacher' && me.role === 'teacher') return teacherView();
-    const top = title => h('header', { class:'top' }, logo(), h('h1', {}, title), h('span', { class:'grow' }), langBtn(), ...userBits());
+    const top = title => h('header', { class:'top' }, ...logoNav(), h('h1', {}, title), h('span', { class:'grow' }), langBtn(), ...userBits());
     if(hash === '#/class/mine') return CLASSGAMES.mineView(app, me, top);
     if(hash === '#/class') return CLASSGAMES.classView(app, me, top);
     return projectsView();
@@ -141,7 +142,7 @@
     const grid = h('div', { class:'pgrid' }, h('div', { class:'loading' }, t('Loading…')));
     const trash = h('div', { class:'trash' });
     app.replaceChildren(
-      h('header', { class:'top' }, logo(), h('h1', {}, t('My Projects')), h('span', { class:'grow' }), langBtn(), ...userBits()),
+      h('header', { class:'top' }, ...logoNav(), h('h1', {}, t('My Projects')), h('span', { class:'grow' }), langBtn(), ...userBits()),
       h('main', { class:'pmain' }, grid, trash));
     let list = [];
     try { list = await api('/projects'); } catch(e){ grid.replaceChildren(h('div', { class:'msg' }, t('Could not reach the server.'))); return; }
@@ -540,7 +541,7 @@
   async function teacherView(){
     document.body.className = 'v-teacher';
     const main = h('main', { class:'tmain' }, h('div', { class:'loading' }, t('Loading…')));
-    app.replaceChildren(h('header', { class:'top' }, logo(), h('h1', {}, '🍎 ' + t('Dashboard')), h('span', { class:'grow' }),
+    app.replaceChildren(h('header', { class:'top' }, ...logoNav(), h('h1', {}, '🍎 ' + t('Dashboard')), h('span', { class:'grow' }),
       h('a', { class:'btn ghost', href:'#/' }, '🗂 ' + t('My Projects')), langBtn(), ...userBits()), main);
     let rows = [];
     async function load(){ rows = await api('/admin/overview'); draw(); }

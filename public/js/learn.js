@@ -120,10 +120,8 @@
   const langBtn = () => h('button', { class:'btn ghost lang', type:'button', title:'English / Español', onclick:() => { I18N.set(I18N.lang === 'es' ? 'en' : 'es'); route(true); } }, I18N.lang === 'es' ? 'EN' : 'ES');
   function topbar(extra){
     return h('header', { class:'top ln-top' },
-      h('a', { class:'logo', href:'#/' }, h('span', { class:'logo-mark' }, '🎮'), h('span', {}, w('learn'))),
+      h('a', { class:'logo', href:'#/' }, h('span', { class:'logo-mark' }, '🎮'), h('span', {}, w('learn'))), SITENAV.bar('learn'),
       h('span', { class:'grow' }), ...(extra || []),
-      h('a', { class:'btn ghost', href:'/#/' }, '◆ ', h('span', { class:'lbl' }, w('studio'))),
-      h('a', { class:'btn ghost', href:'/design' }, '🎨 ', h('span', { class:'lbl' }, w('design'))),
       me.role === 'teacher' ? h('a', { class:'btn ghost', href:'#/teacher' }, '🍎 ', h('span', { class:'lbl' }, w('teacher'))) : null,
       langBtn(), h('span', { class:'who' }, '👤 ' + me.name),
       h('button', { class:'btn ghost', type:'button', onclick:async () => { await fetch('/api/logout', { method:'POST' }).catch(() => {}); me = null; location.hash = '#/'; route(true); } }, t('Log out')));

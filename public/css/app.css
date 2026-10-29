@@ -655,3 +655,12 @@ body.peer .hlaunch{display:none}
 .fb-panel{top:48px}
 .cg-checks .cg-text{display:block;margin:4px 0}
 .cg-checks{display:block}
+
+/* ------------------------------------------- the site's parts (sitenav.js) */
+.sitenav{display:flex;gap:3px;background:rgba(0,0,0,.18);border-radius:999px;padding:3px;margin:0 6px}
+.sitenav-a{display:flex;align-items:center;gap:5px;color:#fff;text-decoration:none;font-weight:700;font-size:14px;padding:5px 12px;border-radius:999px;white-space:nowrap}
+.sitenav-a:hover{background:rgba(255,255,255,.18)}
+.sitenav-a.on{background:#fff;color:var(--top)}
+.sitenav-i{font-size:14px;font-family:"Ubuntu Mono",Menlo,monospace}
+@media (max-width:900px){ .sitenav-l{display:none} .sitenav-a{padding:5px 10px} }
+@media (max-width:1000px){ header.top>h1{display:none} }

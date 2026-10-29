@@ -57,6 +57,27 @@ same logins, English/Español, 🔊 read-aloud.
 - Stars are saved per student (`cs_learn`) and only ever go up. Teachers: 🍎 **Learn progress**
   shows stars and levels per chapter, by period.
 
+## Intro to HTML (/html)
+
+**https://mesa-code-studio.onrender.com/html** (`</> HTML` in the top bar): about 30 minutes of
+short, repeat-until-it-sticks activities on the first HTML tags. Same logins, English/Español.
+
+1. 🃏 **Flash Cards** — 14 tags; "Not yet" sends a card to the back until it is known.
+2. ⌨️ **Type It** — type 14 real lines; a wrong key does not go in; the page shows what it makes.
+3. 🔒 **Close the Tag** — 10 quick rounds: pick the closing tag.
+4. 🎯 **What Did It Make?** — see a page, pick the code that made it.
+5. 🧱 **Build a Page** — tap the lines of 4 pages in order (`<html>`, `<head>`, `<body>`…).
+6. 🐞 **Fix the Tag** — pick the line with no bug; 💡 says what the bug was.
+7. ✏️ **My First Page** — a code box beside a live page, tag buttons, Code Studio pictures
+   (`<img src="star.png">`), and 5 goals to tick off. The page is saved.
+
+Each ends with a score out of 100; the best is kept (inside `cs_learn`, key `html`) and **Again**
+plays it once more. Content is in `public/js/html-lessons.js` (`tests/html.test.js` checks it).
+Teachers: 🍎 **HTML progress** shows the best score per activity, by period.
+
+The four parts of the site — ◆ Blocks, 🎮 Learn, 🎨 Design, `</>` HTML — are tabs in every top bar
+(`public/js/sitenav.js`); in the editor they are in the Menu.
+
 ## Game Design Studio (/design)
 
 **https://mesa-code-studio.onrender.com/design**: planning a game before building it, about an

@@ -305,6 +305,20 @@ test('learn progress only grows, and teachers see it', async () => {
   assert.strictEqual(row.levels, 2); assert.strictEqual(row.stars, 5); assert.strictEqual(row.byChapter.steps, 2);
 });
 
+test('HTML scores keep the best, the page is kept, and learn stars are not touched', async () => {
+  const { cookie } = await login('ana', 'tiger42');
+  const put = data => call(cookie, '/learn', { method:'PUT', body:JSON.stringify({ data }) });
+  await put({ html:{ acts:{ cards:{ best:80 } } } });
+  await put({ html:{ acts:{ cards:{ best:50 }, type:{ best:140 }, 'Bad id':{ best:9 } }, page:'<h1>Ana</h1>' } });
+  const got = (await (await call(cookie, '/learn')).json()).data;
+  assert.deepStrictEqual(got.html.acts, { cards:{ best:80, n:2 }, type:{ best:100, n:1 } });
+  assert.strictEqual(got.html.page, '<h1>Ana</h1>');
+  assert.strictEqual(got.levels['steps-1'].stars, 3);
+  const t = await login('teach', 'apple-pear');
+  const row = (await (await call(t.cookie, '/admin/learn')).json()).find(r => r.username === 'ana');
+  assert.strictEqual(row.html.cards.best, 80);
+});
+
 test('block helper AI: blocks nested inside a hat are moved under it', () => {
   const ai = require('../server/ai');
   const r = ai.check({ text:'x', steps:[{ sprite:'Alien', script:[{ op:'event_whenflagclicked', do:[{ op:'looks_show' }, { op:'control_forever', do:[{ op:'motion_movesteps', STEPS:2 }] }] }] }] });

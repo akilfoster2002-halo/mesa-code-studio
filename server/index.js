@@ -13,7 +13,8 @@
                    POST /api/admin/students/:u/tip (a note shown first in their Block Helper; empty clears it)
      A teacher may also open, change and restore any student's project; the
      student's work from before the change is kept in its history.
-     Learn games (/learn): GET/PUT /api/learn (stars per level, best word-match time;
+     Learn games (/learn) and Intro to HTML (/html): GET/PUT /api/learn (stars per level, best word-match time,
+       html activity scores and the student's page;
        a save only ever adds: each level keeps its most stars); teacher: GET /api/admin/learn
      Game Design Studio (/design): GET/PUT /api/design (the student's own packet);
        teacher: GET /api/admin/designs, GET /api/admin/designs/:u,
@@ -121,6 +122,7 @@ function serveStatic(req, res, pathname){
   if(pathname === '/') pathname = '/index.html';
   if(pathname === '/design' || pathname === '/design/') pathname = '/design.html';
   if(pathname === '/learn' || pathname === '/learn/') pathname = '/learn.html';
+  if(pathname === '/html' || pathname === '/html/') pathname = '/html.html';
   const file = path.normalize(path.join(PUBLIC, decodeURIComponent(pathname)));
   if(!file.startsWith(PUBLIC)) return send(res, 403, 'forbidden');
   fs.stat(file, (err, st) => {
@@ -354,7 +356,8 @@ async function api(req, res, url){
         for(const [id, v] of Object.entries(lv)){ const c = id.split('-')[0]; byChapter[c] = (byChapter[c] || 0) + 1; }
         return { username:u.username, name:u.name, period:u.period, disabled:!!u.disabled, updated:d ? d.updated : null,
           levels:Object.keys(lv).length, stars:Object.values(lv).reduce((n, v) => n + (v.stars || 0), 0), byChapter,
-          words: d && d.data && d.data.words ? d.data.words : null };
+          words: d && d.data && d.data.words ? d.data.words : null,
+          html: d && d.data && d.data.html && d.data.html.acts ? d.data.html.acts : {} };
       }));
     }
     if(p[1] === 'designs' && !p[2] && m === 'GET'){
@@ -441,6 +444,15 @@ function mergeLearn(old, add){
   const w = add.words;
   if(w && Number.isFinite(w.secs) && w.secs > 0 && (!out.words || w.secs < out.words.secs))
     out.words = { secs:Math.round(w.secs), mistakes:Math.max(0, Math.round(Number(w.mistakes) || 0)) };
+  // Intro to HTML (/html): best score 0-100 per activity, times played, and the student's own page
+  out.html = { ...(old.html || {}) };
+  for(const [id, v] of Object.entries((add.html && add.html.acts) || {})){
+    if(!/^[a-z]{2,12}$/.test(id)) continue;
+    const was = (out.html.acts || {})[id] || { best:0, n:0 };
+    const best = Math.max(was.best, Math.max(0, Math.min(100, Math.round(Number(v && v.best) || 0))));
+    out.html.acts = { ...(out.html.acts || {}), [id]:{ best, n:was.n + 1 } };
+  }
+  if(add.html && typeof add.html.page === 'string') out.html.page = add.html.page.slice(0, 20000);
   return out;
 }
 
