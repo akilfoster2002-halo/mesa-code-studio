@@ -19,8 +19,8 @@ student goes straight to their own class. Each class has:
   and play it, not change it, until the teacher presses **Give back**. **🔒 Turn in all** locks a
   whole class. The **Stream** shows each assignment as a card; the teacher's Game Design card shows
   every student's game (its picture and their name, 🔒 when turned in).
-- **Game Feedback** (built in, after Game Design) — students play 2 classmates' games and fill out
-  the feedback slip beside each one (the same slip as Class Games). Done at 2 finished slips; the
+- **Game Feedback** (built in, after Game Design) — students play 4 classmates' games and fill out
+  the feedback slip beside each one (the same slip as Class Games). Done at 4 finished slips; the
   teacher sees whose games each student reviewed.
 - **＋ Create assignment** (teacher, on Classwork) — title, instructions, topic, due date, for one
   class or all of them. Students open it, **＋ Add HTML file** (up to 5 `.html` files, 400 KB each)

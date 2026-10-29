@@ -15,7 +15,7 @@
      blocks. Turning it in is the editor lock: they can still open and play it,
      not change it, until the teacher gives it back. The tools (Blocks, Learn,
      Design, HTML) stay in the top bar; the teacher's own assignments go beside it. */
-  const FEEDBACK_SLIPS = 2;           // Game Feedback: finished slips on this many classmates' games
+  const FEEDBACK_SLIPS = 4;           // Game Feedback: finished slips on this many classmates' games
   const TOPICS = [
     { id:'design', icon:'🎨', title:{ en:'Game design', es:'Diseño de juegos' }, items:[
       { id:'game', kind:'assignment', turnin:true, games:true, icon:'🕹', title:{ en:'Game Design', es:'Diseño de juegos' }, href:'/studio#/',

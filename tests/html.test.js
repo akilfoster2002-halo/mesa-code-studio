@@ -48,7 +48,7 @@ test('Classwork: Game Design (the block game) and Game Feedback are the built-in
   for(const a of C.ASSIGNMENTS) assert.strictEqual(C.status(a, empty).state, 'none', a.id);
   assert.deepStrictEqual(C.ASSIGNMENTS.map(a => a.id), ['game', 'feedback']);   // their block game, then feedback on classmates' games
   const fb = n => C.status(C.ITEMS.find(i => i.id === 'feedback'), C.studentData(null, null, [], {}, false, Array(n).fill({})));
-  assert.deepStrictEqual([fb(0).state, fb(1).state, fb(2).state, fb(1).text], ['none', 'started', 'done', '1 / 2 💬']);
+  assert.deepStrictEqual([fb(0).state, fb(3).state, fb(4).state, fb(1).text], ['none', 'started', 'done', '1 / 4 💬']);
   const by = d => C.status(C.ITEMS.find(i => i.id === 'game'), d);
   assert.strictEqual(by(C.studentData(null, null, [])).state, 'none');
   const d = C.studentData(null, null, [{ stats:{ blocks:40 } }, { stats:{ blocks:12 } }]);
