@@ -109,7 +109,8 @@
   const today = () => new Date().toISOString().slice(0, 10);
   const fmtDate = s => new Date(s + (s.length === 10 ? 'T12:00:00' : '')).toLocaleDateString(I18N.lang === 'es' ? 'es' : 'en', { month:'short', day:'numeric' });
   const fmtWhen = s => { const d = new Date(s); return d.toLocaleDateString(I18N.lang === 'es' ? 'es' : 'en', { month:'short', day:'numeric' }) + ', ' + d.toLocaleTimeString(I18N.lang === 'es' ? 'es' : 'en', { hour:'numeric', minute:'2-digit' }); };
-  const setting = it => it.custom ? { due:it.custom.due } : (room && room.work[it.id]) || {};
+  // a teacher's own assignment carries its due date; a built-in one has the class's setting, or its own default (`due` in classwork.js)
+  const setting = it => it.custom ? { due:it.custom.due } : (room && room.work[it.id]) || (it.due ? { due:it.due } : {});
   const visible = it => me.role === 'teacher' || !setting(it).hidden;
   const avatar = (name, c) => h('span', { class:'cr-av', style:{ background:c || '#5f6368' } }, (name || '?').trim()[0].toUpperCase());
   // post text: line breaks kept, links clickable, nothing else is HTML
