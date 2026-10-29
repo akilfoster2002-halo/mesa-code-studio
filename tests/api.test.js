@@ -459,3 +459,31 @@ test('Assignments: a teacher makes one, a student attaches an HTML file and turn
   const gone = await (await tc('/room/2/assignments/' + a.id, {}, 'DELETE')).json();
   assert.ok(!gone.assignments.some(x => x.id === a.id));
 });
+
+test('Grading: points on the assignment, the teacher grades and comments, the student sees both and can reply', async () => {
+  const t = await login('teach', 'apple-pear');
+  const tc = (path, body, method='POST') => call(t.cookie, path, { method, body:JSON.stringify(body) });
+  const room = await (await tc('/room/2/assignments', { title:'Graded page', points:20 })).json();
+  const a = room.assignments.find(x => x.title === 'Graded page');
+  assert.strictEqual(a.points, 20);
+  const w = '/room/2/assignments/' + a.id + '/work/';
+  assert.strictEqual((await tc(w + 'ana/grade', { grade:-3 }, 'PUT')).status, 400);
+  assert.strictEqual((await tc(w + 'cara/grade', { grade:5 }, 'PUT')).status, 404);       // not in period 2
+  const g = await (await tc(w + 'ana/grade', { grade:17.5 }, 'PUT')).json();
+  assert.strictEqual(g.grade, 17.5);
+  await tc(w + 'ana/comments', { text:'Nice heading! Add a list.' });
+  const ana = await login('ana', 'tiger42');
+  const mine = await (await call(ana.cookie, '/room/2/assignments/' + a.id + '/work')).json();
+  assert.strictEqual(mine.grade, 17.5);
+  assert.strictEqual(mine.comments[0].text, 'Nice heading! Add a list.');
+  assert.strictEqual((await call(ana.cookie, w + 'ana/grade', { method:'PUT', body:'{"grade":20}' })).status, 403);
+  const reply = await (await call(ana.cookie, w + 'ana/comments', { method:'POST', body:JSON.stringify({ text:'Thank you' }) })).json();
+  assert.strictEqual(reply.comments.length, 2);
+  assert.strictEqual((await call(ana.cookie, w + 'dev/comments', { method:'POST', body:JSON.stringify({ text:'hi' }) })).status, 403);
+  // turning in keeps the grade; the Grades tab gets it too
+  await call(ana.cookie, '/room/2/assignments/' + a.id + '/files', { method:'POST', body:JSON.stringify({ name:'p.html', html:'<p>x</p>' }) });
+  assert.strictEqual((await (await call(ana.cookie, '/room/2/assignments/' + a.id + '/turnin', { method:'POST', body:'{"on":true}' })).json()).grade, 17.5);
+  const grades = await (await call(t.cookie, '/room/2/grades')).json();
+  assert.strictEqual(grades.find(r => r.username === 'ana').subs[a.id].grade, 17.5);
+  assert.strictEqual((await (await tc(w + 'ana/grade', { grade:null }, 'PUT')).json()).grade, null);
+});

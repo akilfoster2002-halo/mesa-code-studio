@@ -154,3 +154,24 @@
 .cr-view-code{margin:0;padding:14px;overflow:auto;background:#202124;color:#e8eaed;font:14px/1.5 "Ubuntu Mono",Menlo,monospace;white-space:pre-wrap}
 .cr-view-frame[hidden],.cr-view-code[hidden]{display:none}
 @media (max-width:900px){ .cr-a{grid-template-columns:1fr} .cr-swrow .cr-files{grid-auto-flow:row} }
+
+/* grading: points, the grade box, private comments */
+.cr-pts{width:80px}
+.cr-pts-l{color:#3c4043;font-weight:600}
+.cr-chip.graded{background:#1e8e3e;color:#fff}
+.cr-grade{display:flex;align-items:center;gap:4px;font-weight:600;color:#5f6368;font-size:14px}
+.cr-grade-in{width:70px;text-align:right;font-weight:700;font-size:15px;padding:5px 6px}
+.cr-grade-in.saved{border-color:#1e8e3e;box-shadow:0 0 0 2px #ceead6}
+.cr-grade-in.bad{border-color:#d93025}
+.cr-cbtn{min-width:46px;justify-content:center} .cr-cbtn.has{background:#e8f0fe;border-color:#d2e3fc;color:#1967d2}
+.cr-switem{border-bottom:1px solid #e8eaed} .cr-switem .cr-person{border-bottom:0}
+.cr-thread-wrap{padding:0 6px 14px 52px} .cr-thread-wrap[hidden]{display:none}
+.cr-thread{display:grid;gap:10px}
+.cr-thread-h{font-weight:500;font-size:14.5px}
+.cr-comment{display:flex;gap:10px;align-items:flex-start;font-size:14px}
+.cr-comment .cr-av{width:28px;height:28px;font-size:13px}
+.cr-comment .cr-post-text{font-size:14px}
+.cr-comment-new{display:flex;gap:8px;align-items:flex-end}
+.cr-comment-in{flex:1;font:inherit;font-size:14px;resize:vertical;border-radius:999px;padding:8px 14px}
+.cr-aside{display:grid;gap:14px;align-content:start}
+.cr-gtable th small{display:block} .cr-g a{color:inherit;text-decoration:none} .cr-g a:hover{text-decoration:underline}

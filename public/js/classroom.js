@@ -15,7 +15,7 @@
 (function(){
   if(/^#\/(p\/|class|teacher)/.test(location.hash)) return location.replace('/studio' + location.hash);
   const { h, $ } = UI;
-  const { ITEMS, ASSIGNMENTS, TOPICS, custom, topicsWith, studentData, status } = CLASSWORK;
+  const { pointsOf, ITEMS, ASSIGNMENTS, TOPICS, custom, topicsWith, studentData, status } = CLASSWORK;
   const app = $('#app');
   let me = null, current = '', periods = [], room = null, mine = null;
   const L = o => o == null ? '' : typeof o === 'string' ? o : (I18N.lang === 'es' && o.es) || o.en;
@@ -48,7 +48,11 @@
     notHtml:{ en:'Pick an .html file.', es:'Elige un archivo .html.' }, studentWork:{ en:'Student work', es:'Trabajo de los estudiantes' },
     edit:{ en:'Edit', es:'Editar' }, sureDelA:{ en:'Delete this assignment and the work turned in for it?', es:'¿Eliminar esta tarea y el trabajo entregado?' },
     page:{ en:'Page', es:'Página' }, code:{ en:'Code', es:'Código' }, close:{ en:'Close', es:'Cerrar' }, back:{ en:'Classwork', es:'Trabajo de clase' },
-    noWork:{ en:'Nothing attached yet', es:'Nada adjunto todavía' }, openWork:{ en:'Open their work', es:'Abrir su trabajo' }
+    noWork:{ en:'Nothing attached yet', es:'Nada adjunto todavía' }, openWork:{ en:'Open their work', es:'Abrir su trabajo' },
+    points:{ en:'points', es:'puntos' }, pointsL:{ en:'Points', es:'Puntos' }, ungraded:{ en:'Ungraded', es:'Sin calificar' },
+    grade:{ en:'Grade', es:'Calificación' }, graded:{ en:'Graded', es:'Calificado' },
+    comments:{ en:'Private comments', es:'Comentarios privados' }, addComment:{ en:'Add a private comment…', es:'Añade un comentario privado…' },
+    send:{ en:'Send', es:'Enviar' }, outOf:{ en:'out of', es:'de' }, avgGrade:{ en:'Average', es:'Promedio' }
   };
   const w = k => L(W[k]);
   const COLORS = ['#1e8e3e', '#1967d2', '#d93025', '#e37400', '#9334e6', '#129eaf', '#c26401', '#5f6368'];
@@ -69,9 +73,11 @@
     const [l, d, ps, ...subs] = await Promise.all([api('/learn').catch(() => ({})), api('/design').catch(() => ({})), api('/projects').catch(() => []),
       ...room.assignments.map(a => api('/room/' + period + '/assignments/' + a.id + '/work').catch(() => null))]);
     const by = {};
-    room.assignments.forEach((a, i) => { const x = subs[i]; if(x) by[a.id] = { turnedIn:x.turnedIn, at:x.at, files:x.files.length }; });
+    room.assignments.forEach((a, i) => { const x = subs[i]; if(x) by[a.id] = subOf(x); });
     mine = studentData(l && l.data, d && d.data, ps, by);
   }
+  // what status() needs from one student's work on an assignment
+  const subOf = x => ({ turnedIn:x.turnedIn, at:x.at, files:x.files.length, grade:x.grade });
   // every item in this class: the built-in ones and the teacher's own assignments
   const allItems = () => [...room.assignments.map(custom), ...ITEMS];
   const allAssignments = () => [...room.assignments.map(custom), ...ASSIGNMENTS];
@@ -93,6 +99,7 @@
   function stateChip(st, it){
     const due = setting(it).due;
     if(!st) return null;
+    if(st.graded) return h('span', { class:'cr-chip graded' }, st.points ? st.grade + ' / ' + st.points : '✓ ' + w('graded'));
     if(st.state === 'done') return h('span', { class:'cr-chip done' }, '✓ ' + (it.custom ? w('turnedIn') : w('done')) + (st.late ? ' · ' + w('late') : ''));
     if(due && due < today()) return h('span', { class:'cr-chip late' }, w('missing'));
     return h('span', { class:'cr-chip' + (st.state === 'started' ? ' started' : '') }, st.state === 'started' ? w('started') + ' · ' + st.text : w('none'));
@@ -254,10 +261,11 @@
     const topic = h('select', { class:'inp' }, h('option', { value:'assignments' }, '📋 ' + w('noTopic')),
       ...TOPICS.map(t => h('option', { value:t.id, selected:a && a.topic === t.id ? true : null }, t.icon + ' ' + L(t.title))));
     const due = h('input', { type:'date', class:'inp', value:a && a.due || '' });
+    const pts = h('input', { type:'number', class:'inp cr-pts', min:0, max:1000, value:a ? pointsOf(a) : 100, title:'0 = ' + w('ungraded') });
     const all = h('input', { type:'checkbox' });
     const msg = h('span', { class:'cr-err' });
     const save = h('button', { class:'btn primary', type:'button', onclick:async () => {
-      const body = { title:title.value.trim(), text:text.value, topic:topic.value, due:due.value || null };
+      const body = { title:title.value.trim(), text:text.value, topic:topic.value, due:due.value || null, points:pts.value === '' ? 0 : Number(pts.value) };
       if(!body.title){ title.focus(); return; }
       save.disabled = true;
       try {
@@ -268,7 +276,7 @@
     } }, a ? w('save') : w('assign'));
     setTimeout(() => title.focus(), 0);
     return h('div', { class:'cr-card cr-form' }, h('b', { class:'cr-form-h' }, '📄 ' + (a ? w('edit') : w('create'))), title, text,
-      h('div', { class:'cr-form-row' }, h('label', {}, w('topic') + ' ', topic), h('label', {}, '📅 ' + w('setDue') + ' ', due),
+      h('div', { class:'cr-form-row' }, h('label', {}, w('topic') + ' ', topic), h('label', {}, '📅 ' + w('setDue') + ' ', due), h('label', {}, '💯 ' + w('pointsL') + ' ', pts),
         a ? null : h('label', { class:'cr-check' }, all, ' ' + w('toAll'))),
       h('div', { class:'cr-form-row' }, msg, h('span', { class:'grow' }), h('button', { class:'btn', type:'button', onclick:done }, w('cancel')), save));
   }
@@ -283,6 +291,7 @@
     const head = h('div', { class:'cr-a-head' }, h('span', { class:'cr-item-ico big' + (a ? ' own' : '') }, it.icon),
       h('div', { class:'cr-a-t' }, h('h1', {}, L(it.title)),
         h('small', { class:'muted' }, a ? a.by + ' · ' + fmtDate(a.at.slice(0, 10)) : w('assignment')),
+        a ? h('small', { class:'cr-pts-l' }, pointsOf(a) ? pointsOf(a) + ' ' + w('points') : w('ungraded')) : null,
         set.due ? h('small', { class:'cr-due' + (set.due < today() ? ' late' : '') }, w('due') + ' ' + fmtDate(set.due)) : null),
       teacher && a ? h('div', { class:'cr-a-tools' },
         h('button', { class:'btn', type:'button', onclick:() => below.replaceChildren(assignmentForm(period, a, () => below.replaceChildren())) }, '✏️ ' + w('edit')),
@@ -308,7 +317,7 @@
     let sub = await api(base + '/work');
     const msg = h('small', { class:'cr-err' });
     const draw = () => {
-      const st = status(custom(a), { subs:{ [a.id]:{ turnedIn:sub.turnedIn, at:sub.at, files:sub.files.length } } });
+      const st = status(custom(a), { subs:{ [a.id]:subOf(sub) } });
       const pick = h('input', { type:'file', accept:'.html,.htm,text/html', multiple:true, hidden:true, onchange:async () => {
         for(const f of pick.files){
           if(!/\.html?$/i.test(f.name)){ msg.textContent = w('notHtml'); continue; }
@@ -324,7 +333,8 @@
         sub.turnedIn ? null : [pick, h('button', { class:'btn cr-add', type:'button', onclick:() => pick.click() }, '＋ ' + w('addFile'))],
         msg,
         sub.turnedIn ? h('button', { class:'btn', type:'button', onclick:async () => { sub = await put(base + '/turnin', { on:false }, 'POST'); draw(); } }, w('unsubmit'))
-          : h('button', { class:'btn primary', type:'button', disabled:!sub.files.length, onclick:async () => { sub = await put(base + '/turnin', { on:true }, 'POST'); draw(); } }, w('turnIn'))));
+          : h('button', { class:'btn primary', type:'button', disabled:!sub.files.length, onclick:async () => { sub = await put(base + '/turnin', { on:true }, 'POST'); draw(); } }, w('turnIn'))),
+        h('div', { class:'cr-card cr-yours' }, comments(base + '/work/' + me.username + '/comments', sub.comments, r => { sub = r; draw(); })));
     };
     draw();
   }
@@ -351,7 +361,21 @@
     document.body.append(back);
   }
 
+  /* private comments between the teacher and one student; send(r) gets the saved work back */
+  function comments(url, list, sent){
+    const inp = h('textarea', { class:'inp cr-comment-in', rows:1, placeholder:w('addComment') });
+    const go = async () => { const text = inp.value.trim(); if(!text) return; btn.disabled = true;
+      try { sent(await put(url, { text }, 'POST')); } catch(e){ btn.disabled = false; } };
+    const btn = h('button', { class:'btn primary small', type:'button', onclick:go }, w('send'));
+    inp.onkeydown = e => { if(e.key === 'Enter' && !e.shiftKey){ e.preventDefault(); go(); } };
+    return h('div', { class:'cr-thread' }, h('b', { class:'cr-thread-h' }, '👤 ' + w('comments')),
+      ...list.map(c => h('div', { class:'cr-comment' }, avatar(c.name, c.teacher ? '#1967d2' : '#5f6368'),
+        h('div', {}, h('div', {}, h('b', {}, c.name), ' ', h('small', { class:'muted' }, fmtWhen(c.at))), richText(c.text)))),
+      h('div', { class:'cr-comment-new' }, inp, btn));
+  }
+
   /* the teacher's list: every student in the class, by name, with their work */
+  let openThread = null;
   async function studentWork(period, it, box){
     const a = it.custom;
     if(a){
@@ -360,10 +384,22 @@
       box.replaceChildren(h('section', { class:'cr-topic' }, h('h2', { class:'cr-topic-h' }, w('studentWork'),
           h('small', { class:'cr-n' }, n + ' ' + w('turnedIn').toLowerCase() + ' · ' + (rows.length - n) + ' ' + w('none').toLowerCase())),
         ...rows.map(r => {
-          const st = status(it, { subs:{ [a.id]:{ turnedIn:r.turnedIn, at:r.at, files:r.files.length } } });
-          return h('div', { class:'cr-person cr-swrow' }, avatar(r.name, color(period)), h('div', { class:'cr-sw-name' }, h('b', {}, r.name), h('div', { class:'muted' }, r.username)),
-            h('div', { class:'cr-files' }, ...(r.files.length ? r.files.map(f => fileChip('/room/' + period + '/assignments/' + a.id + '/work/' + r.username + '/files/' + f.id, f)) : [h('small', { class:'muted' }, w('noWork'))])),
-            h('span', { class:'grow' }), r.at ? h('small', { class:'muted' }, fmtWhen(r.at)) : null, stateChip(st, it));
+          const st = status(it, { subs:{ [a.id]:subOf(r) } });
+          const base = '/room/' + period + '/assignments/' + a.id + '/work/' + r.username;
+          const thread = h('div', { class:'cr-thread-wrap', hidden:openThread !== r.username },
+            openThread === r.username ? comments(base + '/comments', r.comments, x => { Object.assign(r, x); studentWork(period, it, box); }) : null);
+          const grade = h('input', { type:'number', class:'inp cr-grade-in', min:0, max:1000, step:'any', value:r.grade == null ? '' : r.grade,
+            placeholder:'—', 'aria-label':w('grade') + ' ' + r.name, onchange:async e => {
+              const v = e.target.value;
+              try { Object.assign(r, await put(base + '/grade', { grade:v === '' ? null : Number(v) })); e.target.classList.add('saved'); setTimeout(() => studentWork(period, it, box), 500); }
+              catch(x){ e.target.classList.add('bad'); }
+            } });
+          return h('div', { class:'cr-switem' }, h('div', { class:'cr-person cr-swrow' }, avatar(r.name, color(period)), h('div', { class:'cr-sw-name' }, h('b', {}, r.name), h('div', { class:'muted' }, r.username)),
+            h('div', { class:'cr-files' }, ...(r.files.length ? r.files.map(f => fileChip(base + '/files/' + f.id, f)) : [h('small', { class:'muted' }, w('noWork'))])),
+            h('span', { class:'grow' }), r.at ? h('small', { class:'muted' }, fmtWhen(r.at)) : null, stateChip(st, it),
+            pointsOf(a) ? h('label', { class:'cr-grade' }, grade, h('span', {}, '/ ' + pointsOf(a))) : null,
+            h('button', { class:'btn small cr-cbtn' + (r.comments.length ? ' has' : ''), type:'button', title:w('comments'),
+              onclick:() => { openThread = openThread === r.username ? null : r.username; studentWork(period, it, box); } }, '💬 ' + (r.comments.length || ''))), thread);
         })));
       return;
     }
@@ -402,13 +438,21 @@
       const st = status(it, r), due = setting(it).due;
       const late = st.state !== 'done' && due && due < today();
       return h('td', { class:'cr-g ' + st.state + (late || st.late ? ' late' : ''), title:st.text },
-        st.state === 'none' ? (late ? w('missing') : '—') : it.custom ? (st.state === 'done' ? '✓' + (st.late ? ' ' + w('late') : '') : st.text) : st.pct + '%');
+        it.custom ? h('a', { href:'#/c/' + period + '/a/' + it.id, title:w('grade') },          // to the assignment, to grade it
+          st.state === 'none' ? (late ? w('missing') : '—') : st.graded ? st.text : st.state === 'done' ? '✓' + (st.late ? ' ' + w('late') : '') : st.text)
+        : st.state === 'none' ? (late ? w('missing') : '—') : st.pct + '%');
     };
-    const avg = it => rows.length ? Math.round(rows.reduce((n, r) => n + status(it, r).pct, 0) / rows.length) : 0;
+    // built-in work: average progress; a teacher's assignment: average of the grades given so far
+    const avg = it => {
+      if(it.custom){ const gs = rows.map(r => status(it, r)).filter(s => s.graded && s.points);
+        return gs.length ? Math.round(gs.reduce((n, s) => n + s.pct, 0) / gs.length) + '%' : '—'; }
+      return (rows.length ? Math.round(rows.reduce((n, r) => n + status(it, r).pct, 0) / rows.length) : 0) + '%';
+    };
     main.replaceChildren(h('div', { class:'twrap cr-gwrap' }, h('table', { class:'ttable cr-gtable' },
       h('thead', {}, h('tr', {}, h('th', {}, w('name')), ...cols.map(it => h('th', { title:L(it.title) },
-        h('span', { class:'cr-gh-ico' }, it.icon), h('span', { class:'cr-gh-t' }, L(it.title)), setting(it).due ? h('small', {}, w('due') + ' ' + fmtDate(setting(it).due)) : null))),
-        h('tr', { class:'cr-avg' }, h('td', {}, w('avg')), ...cols.map(it => h('td', {}, avg(it) + '%')))),
+        h('span', { class:'cr-gh-ico' }, it.icon), h('span', { class:'cr-gh-t' }, L(it.title)),
+        it.custom ? h('small', { class:'muted' }, pointsOf(it.custom) ? w('outOf') + ' ' + pointsOf(it.custom) : w('ungraded')) : null, setting(it).due ? h('small', {}, w('due') + ' ' + fmtDate(setting(it).due)) : null))),
+        h('tr', { class:'cr-avg' }, h('td', {}, w('avg')), ...cols.map(it => h('td', {}, avg(it))))),
       h('tbody', {}, ...rows.map(r => h('tr', {}, h('td', {}, h('b', {}, r.name), h('div', { class:'muted' }, r.username)), ...cols.map(it => cell(it, r))))))));
   }
 

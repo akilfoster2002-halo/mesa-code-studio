@@ -53,3 +53,11 @@ test('Classwork: every item has a link and both languages, and progress works ou
   assert.strictEqual(by('html').text, '2 / 7');
   assert.strictEqual(by('html-page').state, 'done');
 });
+
+test('Classwork: a graded assignment shows the grade out of its points', () => {
+  const C = require('../public/js/classwork.js');
+  const it = C.custom({ id:'a-x', title:'Page', points:20 });
+  const st = C.status(it, { subs:{ 'a-x':{ turnedIn:true, at:'2026-11-01T10:00:00Z', files:1, grade:15 } } });
+  assert.deepStrictEqual([st.state, st.graded, st.text, st.pct], ['done', true, '15 / 20', 75]);
+  assert.strictEqual(C.status(C.custom({ id:'a-y', title:'Old' }), { subs:{ 'a-y':{ grade:90 } } }).text, '90 / 100');
+});

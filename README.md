@@ -24,6 +24,11 @@ student goes straight to their own class. Each class has:
   sandboxed frame, so it cannot reach the site) or as its code. Built-in assignments (the Game
   Design Packet, the mazes, Intro to HTML…) have the same page: every student's name, their
   progress, and for the packet a link straight to that student's packet.
+- **Grading** — each assignment has points (100 unless the teacher changes it; 0 = ungraded). On
+  the assignment page the teacher types a grade next to each student's name (it saves straight
+  away and the student sees it as e.g. 18 / 20) and opens 💬 **Private comments**, a thread
+  between the teacher and that one student; the student can reply from their Your work card.
+  Grades shows the grade (click it to go grade) and the class average of the grades given.
 - **People** (teacher) — the class list with last login, and the teacher dashboard.
 - **Grades** (teacher: every student × every assignment, with the class average) /
   **My work** (student).

@@ -295,7 +295,9 @@ async function api(req, res, url){
      POST /api/room/:p/assignments  teacher: { title, text, topic, due } a new assignment (PUT/DELETE …/:a)
      GET  /api/room/:p/assignments/:a/work   student: their files and turned-in state; teacher: every student's
      GET  …/work/:student/files/:f   one attached file, as { name, html } (shown in a sandboxed frame)
-     POST …/files { name, html } · DELETE …/files/:f · POST …/turnin { on }   (the student) */
+     POST …/files { name, html } · DELETE …/files/:f · POST …/turnin { on }   (the student)
+     PUT  …/work/:student/grade { grade }   teacher: out of the assignment's points (null clears it)
+     POST …/work/:student/comments { text } private comments, the teacher or that student */
   if(p[0] === 'room'){
     const users = await store.listUsers();
     const periods = [...new Set(users.filter(u => u.role === 'student' && !u.disabled && u.period).map(u => String(u.period)))].sort();
@@ -313,7 +315,9 @@ async function api(req, res, url){
       const a = room.assignments.find(x => x.id === p[3]);
       if(!a) return send(res, 404, { error:'none' });
       const summary = sub => { const d = (sub && sub.data) || {};
-        return { turnedIn:!!d.turnedIn, at:d.at || null, files:(d.files || []).map(f => ({ id:f.id, name:f.name, size:f.html.length })) }; };
+        return { turnedIn:!!d.turnedIn, at:d.at || null, files:(d.files || []).map(f => ({ id:f.id, name:f.name, size:f.html.length })),
+          grade:d.grade == null ? null : d.grade, gradedAt:d.gradedAt || null, comments:d.comments || [] }; };
+      const blank = { files:[], turnedIn:false, at:null, grade:null, comments:[] };
       if(p[4] === 'work' && !p[5] && m === 'GET'){
         if(!teacher) return send(res, 200, summary(await store.getSubmission(a.id, user.username)));
         const subs = Object.fromEntries((await store.listSubmissions([a.id])).map(x => [x.owner, x]));
@@ -327,9 +331,37 @@ async function api(req, res, url){
         // sent as data, never as a page from this site: it is shown in a sandboxed frame
         return file ? send(res, 200, { name:file.name, html:file.html }) : send(res, 404, { error:'none' });
       }
+      // private comments: between the teacher and one student, on that student's work
+      if(p[4] === 'work' && p[5] && p[6] === 'comments' && !p[7] && m === 'POST'){
+        if(!teacher && p[5] !== user.username) return send(res, 403, { error:'yours' });
+        const kid = users.find(u => u.username === p[5] && u.role === 'student' && String(u.period) === period);
+        if(!kid) return send(res, 404, { error:'none' });
+        const b = await readJSON(req, 6000);
+        const text = String(b.text || '').trim().slice(0, 2000);
+        if(!text) return send(res, 400, { error:'text' });
+        const sub = await store.getSubmission(a.id, kid.username);
+        const d = { ...blank, ...((sub && sub.data) || {}) };
+        d.comments = [...(d.comments || []), { by:user.username, name:user.name, teacher, text, at:new Date().toISOString() }].slice(-100);
+        await store.saveSubmission(a.id, kid.username, d);
+        return send(res, 200, summary({ data:d }));
+      }
+      // the teacher's grade (out of the assignment's points; null takes it away)
+      if(p[4] === 'work' && p[5] && p[6] === 'grade' && !p[7] && m === 'PUT'){
+        if(!teacher) return send(res, 403, { error:'teacher' });
+        const kid = users.find(u => u.username === p[5] && u.role === 'student' && String(u.period) === period);
+        if(!kid) return send(res, 404, { error:'none' });
+        const b = await readJSON(req, 1000);
+        const g = b.grade === null || b.grade === '' ? null : Number(b.grade);
+        if(g !== null && !(Number.isFinite(g) && g >= 0 && g <= 1000)) return send(res, 400, { error:'grade' });
+        const sub = await store.getSubmission(a.id, kid.username);
+        const d = { ...blank, ...((sub && sub.data) || {}) };
+        d.grade = g === null ? null : Math.round(g * 10) / 10; d.gradedAt = g === null ? null : new Date().toISOString();
+        await store.saveSubmission(a.id, kid.username, d);
+        return send(res, 200, summary({ data:d }));
+      }
       if(teacher) return send(res, 400, { error:'student' });
       const sub = await store.getSubmission(a.id, user.username);
-      const d = { files:[], turnedIn:false, at:null, ...((sub && sub.data) || {}) };
+      const d = { ...blank, ...((sub && sub.data) || {}) };
       if(p[4] === 'files' && !p[5] && m === 'POST'){
         if(d.turnedIn) return send(res, 409, { error:'turnedIn' });
         const b = await readJSON(req, MAX_FILE + 2000);
@@ -355,7 +387,8 @@ async function api(req, res, url){
       const title = String(b.title || '').trim().slice(0, 120);
       if(!title) return send(res, 400, { error:'title' });
       const fields = { title, text:String(b.text || '').trim().slice(0, 4000), topic:/^[a-z0-9-]{1,30}$/.test(b.topic || '') ? b.topic : 'assignments',
-        due:/^\d{4}-\d{2}-\d{2}$/.test(b.due || '') ? b.due : null, files:b.files !== false };
+        due:/^\d{4}-\d{2}-\d{2}$/.test(b.due || '') ? b.due : null, files:b.files !== false,
+        points:Number.isFinite(Number(b.points)) && b.points !== '' && b.points != null ? Math.max(0, Math.min(1000, Math.round(Number(b.points)))) : 100 };
       if(!p[3]) room.assignments.push({ id:'a-' + crypto.randomBytes(6).toString('base64url').toLowerCase().replace(/[^a-z0-9]/g, 'x'), ...fields, by:user.name, at:new Date().toISOString() });
       else { const a = room.assignments.find(x => x.id === p[3]); if(!a) return send(res, 404, { error:'none' }); Object.assign(a, fields); }
       await store.saveClass(period, room);
@@ -395,7 +428,8 @@ async function api(req, res, url){
       const over = Object.fromEntries((await store.overview()).map(r => [r.username, r]));
       const subs = {};
       for(const x of await store.listSubmissions(room.assignments.map(a => a.id)))
-        (subs[x.owner] || (subs[x.owner] = {}))[x.assignment] = { turnedIn:!!x.data.turnedIn, at:x.data.at || null, files:(x.data.files || []).length };
+        (subs[x.owner] || (subs[x.owner] = {}))[x.assignment] = { turnedIn:!!x.data.turnedIn, at:x.data.at || null, files:(x.data.files || []).length,
+          grade:x.data.grade == null ? null : x.data.grade };
       return send(res, 200, kids.sort((a, b) => a.name.localeCompare(b.name)).map(u => ({ username:u.username, name:u.name,
         learn:{ levels:(learn[u.username] || {}).levels || {}, words:(learn[u.username] || {}).words || null, html:((learn[u.username] || {}).html || {}).acts || {} },
         design:designs[u.username] || null, projects:(over[u.username] || {}).projects || 0, blocks:(over[u.username] || {}).blocks || 0,

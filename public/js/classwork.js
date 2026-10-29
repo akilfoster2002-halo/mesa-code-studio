@@ -83,11 +83,16 @@
   /* a teacher's own assignment (from /api/room): students attach HTML files
      and turn them in; d.subs[id] = { turnedIn, at, files } */
   const ASSIGNMENTS_TOPIC = { id:'assignments', icon:'📋', title:{ en:'Assignments', es:'Tareas' } };
+  const pointsOf = a => a.points == null ? 100 : a.points;
   function custom(a){
     return { id:a.id, kind:'assignment', custom:a, icon:'📄', title:a.title, line:a.text || '', topicId:a.topic || 'assignments',
       status:d => {
         const s = (d.subs || {})[a.id];
-        if(s && s.turnedIn) return { state:'done', pct:100, text:'✓', late:!!(a.due && s.at && s.at.slice(0, 10) > a.due) };
+        const late = !!(s && a.due && s.at && s.at.slice(0, 10) > a.due), points = pointsOf(a);
+        // graded: the grade out of the points (an ungraded assignment, 0 points, just shows ✓)
+        if(s && s.grade != null) return { state:'done', graded:true, grade:s.grade, points, late,
+          pct:points ? Math.min(100, Math.round(100 * s.grade / points)) : 100, text:points ? s.grade + ' / ' + points : '✓' };
+        if(s && s.turnedIn) return { state:'done', pct:100, text:'✓', late };
         return s && s.files ? { state:'started', pct:50, text:s.files + ' 📄' } : { state:'none', pct:0, text:'' };
       } };
   }
@@ -116,6 +121,6 @@
     return item.status({ ...d, learn:(d && d.learn) || {} });
   }
 
-  const CLASSWORK = { TOPICS, ITEMS, ASSIGNMENTS, ASSIGNMENTS_TOPIC, custom, topicsWith, studentData, status };
+  const CLASSWORK = { pointsOf, TOPICS, ITEMS, ASSIGNMENTS, ASSIGNMENTS_TOPIC, custom, topicsWith, studentData, status };
   if(typeof module !== 'undefined' && module.exports) module.exports = CLASSWORK; else root.CLASSWORK = CLASSWORK;
 })(typeof window !== 'undefined' ? window : this);
