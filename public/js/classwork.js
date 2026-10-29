@@ -48,6 +48,7 @@
     ] },
     { id:'design', icon:'🎨', title:{ en:'Game design', es:'Diseño de juegos' }, items:[
       { id:'packet', kind:'assignment', icon:'📝', title:{ en:'Game Design Packet', es:'Paquete de diseño de juego' }, href:'/design', teacher:'/design#/teacher',
+        student:u => '/design#/teacher/' + encodeURIComponent(u),
         line:{ en:'Plan your game in ' + DESIGN_STEPS + ' steps', es:'Planea tu juego en ' + DESIGN_STEPS + ' pasos' },
         status:d => {
           const n = (d.design && d.design.done) || 0;
@@ -78,13 +79,33 @@
     ] }
   ];
   const ITEMS = TOPICS.flatMap(t => t.items.map(it => ({ ...it, topic:t })));
+
+  /* a teacher's own assignment (from /api/room): students attach HTML files
+     and turn them in; d.subs[id] = { turnedIn, at, files } */
+  const ASSIGNMENTS_TOPIC = { id:'assignments', icon:'📋', title:{ en:'Assignments', es:'Tareas' } };
+  function custom(a){
+    return { id:a.id, kind:'assignment', custom:a, icon:'📄', title:a.title, line:a.text || '', topicId:a.topic || 'assignments',
+      status:d => {
+        const s = (d.subs || {})[a.id];
+        if(s && s.turnedIn) return { state:'done', pct:100, text:'✓', late:!!(a.due && s.at && s.at.slice(0, 10) > a.due) };
+        return s && s.files ? { state:'started', pct:50, text:s.files + ' 📄' } : { state:'none', pct:0, text:'' };
+      } };
+  }
+  // every topic with its items, the teacher's assignments put in the topic they chose
+  function topicsWith(assignments){
+    const cs = (assignments || []).map(custom);
+    const known = new Set(TOPICS.map(t => t.id));
+    const mine = cs.filter(c => !known.has(c.topicId));
+    return [...(mine.length ? [{ ...ASSIGNMENTS_TOPIC, items:mine }] : []),
+      ...TOPICS.map(t => ({ ...t, items:[...cs.filter(c => c.topicId === t.id), ...t.items] }))];
+  }
   const ASSIGNMENTS = ITEMS.filter(it => it.kind === 'assignment');
 
   /* one student's data, from what the tools save (the same shape the
      teacher's /api/room/:p/grades gives for every student) */
-  function studentData(learn, design, projects){
+  function studentData(learn, design, projects, subs){
     const ps = Array.isArray(projects) ? projects : [];
-    return {
+    return { subs:subs || {},
       learn:{ levels:(learn && learn.levels) || {}, words:(learn && learn.words) || null, html:(learn && learn.html && learn.html.acts) || {} },
       design:design ? { done:Array.isArray(design.done) ? design.done.length : 0, approved:!!design.approved } : null,
       projects:ps.length, blocks:ps.reduce((a, p) => Math.max(a, (p.stats && p.stats.blocks) || 0), 0)
@@ -95,6 +116,6 @@
     return item.status({ ...d, learn:(d && d.learn) || {} });
   }
 
-  const CLASSWORK = { TOPICS, ITEMS, ASSIGNMENTS, studentData, status };
+  const CLASSWORK = { TOPICS, ITEMS, ASSIGNMENTS, ASSIGNMENTS_TOPIC, custom, topicsWith, studentData, status };
   if(typeof module !== 'undefined' && module.exports) module.exports = CLASSWORK; else root.CLASSWORK = CLASSWORK;
 })(typeof window !== 'undefined' ? window : this);

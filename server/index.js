@@ -41,6 +41,7 @@ const PUBLIC = path.join(__dirname, '..', 'public');
 const MAX_PROJECT = 3 * 1024 * 1024;        // project JSON (assets live elsewhere)
 const MAX_ASSET = 12 * 1024 * 1024;         // one picture or sound
 const MAX_DESIGN = 2 * 1024 * 1024;         // a design packet, sketches included
+const MAX_FILE = 400 * 1024;                 // one HTML file a student attaches to an assignment
 
 const ASSET_TYPES = /^(image\/(png|jpeg|gif|webp|svg\+xml|bmp|avif)|audio\/[\w.+-]+|video\/(mp4|webm|ogg))$/;
 
@@ -290,7 +291,11 @@ async function api(req, res, url){
      GET  /api/room/:p         posts on the Stream + Classwork settings (hidden, due)
      POST /api/room/:p/posts   teacher: { text } a new post; DELETE /api/room/:p/posts/:id
      PUT  /api/room/:p/work/:item  teacher: { hidden, due }
-     GET  /api/room/:p/grades  teacher: every student's work in that period */
+     GET  /api/room/:p/grades  teacher: every student's work in that period
+     POST /api/room/:p/assignments  teacher: { title, text, topic, due } a new assignment (PUT/DELETE …/:a)
+     GET  /api/room/:p/assignments/:a/work   student: their files and turned-in state; teacher: every student's
+     GET  …/work/:student/files/:f   one attached file, as { name, html } (shown in a sandboxed frame)
+     POST …/files { name, html } · DELETE …/files/:f · POST …/turnin { on }   (the student) */
   if(p[0] === 'room'){
     const users = await store.listUsers();
     const periods = [...new Set(users.filter(u => u.role === 'student' && !u.disabled && u.period).map(u => String(u.period)))].sort();
@@ -299,9 +304,68 @@ async function api(req, res, url){
     if(!teacher && period !== String(user.period)) return send(res, 403, { error:'class' });
     if(!/^[\w-]{1,20}$/.test(period)) return send(res, 400, { error:'period' });
     const cls = (await store.getClass(period) || {}).data || {};
-    const room = { posts:Array.isArray(cls.posts) ? cls.posts : [], work:cls.work && typeof cls.work === 'object' ? cls.work : {} };
+    const room = { posts:Array.isArray(cls.posts) ? cls.posts : [], work:cls.work && typeof cls.work === 'object' ? cls.work : {},
+      assignments:Array.isArray(cls.assignments) ? cls.assignments : [] };
     if(!p[2] && m === 'GET') return send(res, 200, room);
+
+    /* a teacher's assignment: students attach HTML files and turn them in */
+    if(p[2] === 'assignments' && p[3] && p[4]){
+      const a = room.assignments.find(x => x.id === p[3]);
+      if(!a) return send(res, 404, { error:'none' });
+      const summary = sub => { const d = (sub && sub.data) || {};
+        return { turnedIn:!!d.turnedIn, at:d.at || null, files:(d.files || []).map(f => ({ id:f.id, name:f.name, size:f.html.length })) }; };
+      if(p[4] === 'work' && !p[5] && m === 'GET'){
+        if(!teacher) return send(res, 200, summary(await store.getSubmission(a.id, user.username)));
+        const subs = Object.fromEntries((await store.listSubmissions([a.id])).map(x => [x.owner, x]));
+        const kids = users.filter(u => u.role === 'student' && !u.disabled && String(u.period) === period).sort((x, y) => x.name.localeCompare(y.name));
+        return send(res, 200, kids.map(u => ({ username:u.username, name:u.name, ...summary(subs[u.username]) })));
+      }
+      if(p[4] === 'work' && p[5] && p[6] === 'files' && p[7] && !p[8] && m === 'GET'){
+        if(!teacher && p[5] !== user.username) return send(res, 403, { error:'yours' });
+        const f = (((await store.getSubmission(a.id, p[5])) || {}).data || {}).files || [];
+        const file = f.find(x => x.id === p[7]);
+        // sent as data, never as a page from this site: it is shown in a sandboxed frame
+        return file ? send(res, 200, { name:file.name, html:file.html }) : send(res, 404, { error:'none' });
+      }
+      if(teacher) return send(res, 400, { error:'student' });
+      const sub = await store.getSubmission(a.id, user.username);
+      const d = { files:[], turnedIn:false, at:null, ...((sub && sub.data) || {}) };
+      if(p[4] === 'files' && !p[5] && m === 'POST'){
+        if(d.turnedIn) return send(res, 409, { error:'turnedIn' });
+        const b = await readJSON(req, MAX_FILE + 2000);
+        const html = String(b.html || ''), name = String(b.name || '').replace(/[^\w .()-]/g, '').slice(0, 80) || 'page.html';
+        if(!html.trim() || html.length > MAX_FILE) return send(res, 400, { error:'size' });
+        if(d.files.length >= 5) return send(res, 400, { error:'count' });
+        d.files.push({ id:crypto.randomBytes(6).toString('base64url'), name, html });
+      } else if(p[4] === 'files' && p[5] && !p[6] && m === 'DELETE'){
+        if(d.turnedIn) return send(res, 409, { error:'turnedIn' });
+        d.files = d.files.filter(f => f.id !== p[5]);
+      } else if(p[4] === 'turnin' && !p[5] && m === 'POST'){
+        const b = await readJSON(req, 1000);
+        d.turnedIn = !!b.on; d.at = d.turnedIn ? new Date().toISOString() : null;
+      } else return send(res, 404, { error:'none' });
+      await store.saveSubmission(a.id, user.username, d);
+      return send(res, 200, summary({ data:d }));
+    }
+
     if(!teacher) return send(res, 403, { error:'teacher' });
+    // make, change or delete an assignment
+    if(p[2] === 'assignments' && (!p[3] ? m === 'POST' : !p[4] && m === 'PUT')){
+      const b = await readJSON(req, 20000);
+      const title = String(b.title || '').trim().slice(0, 120);
+      if(!title) return send(res, 400, { error:'title' });
+      const fields = { title, text:String(b.text || '').trim().slice(0, 4000), topic:/^[a-z0-9-]{1,30}$/.test(b.topic || '') ? b.topic : 'assignments',
+        due:/^\d{4}-\d{2}-\d{2}$/.test(b.due || '') ? b.due : null, files:b.files !== false };
+      if(!p[3]) room.assignments.push({ id:'a-' + crypto.randomBytes(6).toString('base64url').toLowerCase().replace(/[^a-z0-9]/g, 'x'), ...fields, by:user.name, at:new Date().toISOString() });
+      else { const a = room.assignments.find(x => x.id === p[3]); if(!a) return send(res, 404, { error:'none' }); Object.assign(a, fields); }
+      await store.saveClass(period, room);
+      return send(res, 200, room);
+    }
+    if(p[2] === 'assignments' && p[3] && !p[4] && m === 'DELETE'){
+      room.assignments = room.assignments.filter(x => x.id !== p[3]);
+      await store.saveClass(period, room);
+      return send(res, 200, room);
+    }
     if(p[2] === 'posts' && !p[3] && m === 'POST'){
       const b = await readJSON(req, 20000);
       const text = String(b.text || '').trim().slice(0, 4000);
@@ -329,10 +393,13 @@ async function api(req, res, url){
       const learn = Object.fromEntries((await store.listLearn()).map(d => [d.owner, d.data || {}]));
       const designs = Object.fromEntries((await store.listDesigns()).map(d => [d.owner, d.summary]));
       const over = Object.fromEntries((await store.overview()).map(r => [r.username, r]));
+      const subs = {};
+      for(const x of await store.listSubmissions(room.assignments.map(a => a.id)))
+        (subs[x.owner] || (subs[x.owner] = {}))[x.assignment] = { turnedIn:!!x.data.turnedIn, at:x.data.at || null, files:(x.data.files || []).length };
       return send(res, 200, kids.sort((a, b) => a.name.localeCompare(b.name)).map(u => ({ username:u.username, name:u.name,
         learn:{ levels:(learn[u.username] || {}).levels || {}, words:(learn[u.username] || {}).words || null, html:((learn[u.username] || {}).html || {}).acts || {} },
         design:designs[u.username] || null, projects:(over[u.username] || {}).projects || 0, blocks:(over[u.username] || {}).blocks || 0,
-        last_login:(over[u.username] || {}).last_login || null })));
+        last_login:(over[u.username] || {}).last_login || null, subs:subs[u.username] || {} })));
     }
   }
 

@@ -15,7 +15,7 @@
 (function(){
   if(/^#\/(p\/|class|teacher)/.test(location.hash)) return location.replace('/studio' + location.hash);
   const { h, $ } = UI;
-  const { TOPICS, ITEMS, ASSIGNMENTS, studentData, status } = CLASSWORK;
+  const { ITEMS, ASSIGNMENTS, TOPICS, custom, topicsWith, studentData, status } = CLASSWORK;
   const app = $('#app');
   let me = null, current = '', periods = [], room = null, mine = null;
   const L = o => o == null ? '' : typeof o === 'string' ? o : (I18N.lang === 'es' && o.es) || o.en;
@@ -37,7 +37,18 @@
     missing:{ en:'Missing', es:'Falta' }, teachers:{ en:'Teachers', es:'Maestros' }, students:{ en:'Students', es:'Estudiantes' },
     dashboard:{ en:'Teacher dashboard', es:'Panel del maestro' }, name:{ en:'Name', es:'Nombre' },
     yourClasses:{ en:'Your classes', es:'Tus clases' }, newTab:{ en:'opens in a new tab', es:'se abre en otra pestaña' },
-    lastIn:{ en:'Last login', es:'Último ingreso' }, never:{ en:'never', es:'nunca' }, avg:{ en:'Class average', es:'Promedio de la clase' }
+    lastIn:{ en:'Last login', es:'Último ingreso' }, never:{ en:'never', es:'nunca' }, avg:{ en:'Class average', es:'Promedio de la clase' },
+    create:{ en:'Create assignment', es:'Crear tarea' }, title:{ en:'Title', es:'Título' }, instructions:{ en:'Instructions (optional)', es:'Instrucciones (opcional)' },
+    topic:{ en:'Topic', es:'Tema' }, noTopic:{ en:'Assignments', es:'Tareas' }, assign:{ en:'Assign', es:'Asignar' }, save:{ en:'Save', es:'Guardar' },
+    cancel:{ en:'Cancel', es:'Cancelar' }, toAll:{ en:'Assign to all my classes', es:'Asignar a todas mis clases' },
+    viewA:{ en:'View assignment', es:'Ver tarea' }, yourWork:{ en:'Your work', es:'Tu trabajo' }, addFile:{ en:'Add HTML file', es:'Añadir archivo HTML' },
+    turnIn:{ en:'Turn in', es:'Entregar' }, unsubmit:{ en:'Unsubmit', es:'Anular entrega' }, turnedIn:{ en:'Turned in', es:'Entregado' },
+    late:{ en:'late', es:'tarde' }, needFile:{ en:'Add your .html file, then turn it in.', es:'Añade tu archivo .html y luego entrégalo.' },
+    tooBig:{ en:'That file is too big (400 KB at most).', es:'Ese archivo es muy grande (máximo 400 KB).' },
+    notHtml:{ en:'Pick an .html file.', es:'Elige un archivo .html.' }, studentWork:{ en:'Student work', es:'Trabajo de los estudiantes' },
+    edit:{ en:'Edit', es:'Editar' }, sureDelA:{ en:'Delete this assignment and the work turned in for it?', es:'¿Eliminar esta tarea y el trabajo entregado?' },
+    page:{ en:'Page', es:'Página' }, code:{ en:'Code', es:'Código' }, close:{ en:'Close', es:'Cerrar' }, back:{ en:'Classwork', es:'Trabajo de clase' },
+    noWork:{ en:'Nothing attached yet', es:'Nada adjunto todavía' }, openWork:{ en:'Open their work', es:'Abrir su trabajo' }
   };
   const w = k => L(W[k]);
   const COLORS = ['#1e8e3e', '#1967d2', '#d93025', '#e37400', '#9334e6', '#129eaf', '#c26401', '#5f6368'];
@@ -53,17 +64,23 @@
   }
   const put = (path, body, method='PUT') => api(path, { method, body:JSON.stringify(body) });
 
-  /* a student's own work, from the tools' own saves */
-  async function loadMine(){
-    const [l, d, ps] = await Promise.all([api('/learn').catch(() => ({})), api('/design').catch(() => ({})), api('/projects').catch(() => [])]);
-    mine = studentData(l && l.data, d && d.data, ps);
+  /* a student's own work, from the tools' own saves and their turned-in assignments */
+  async function loadMine(period){
+    const [l, d, ps, ...subs] = await Promise.all([api('/learn').catch(() => ({})), api('/design').catch(() => ({})), api('/projects').catch(() => []),
+      ...room.assignments.map(a => api('/room/' + period + '/assignments/' + a.id + '/work').catch(() => null))]);
+    const by = {};
+    room.assignments.forEach((a, i) => { const x = subs[i]; if(x) by[a.id] = { turnedIn:x.turnedIn, at:x.at, files:x.files.length }; });
+    mine = studentData(l && l.data, d && d.data, ps, by);
   }
+  // every item in this class: the built-in ones and the teacher's own assignments
+  const allItems = () => [...room.assignments.map(custom), ...ITEMS];
+  const allAssignments = () => [...room.assignments.map(custom), ...ASSIGNMENTS];
 
   /* ---------------------------------------------------------- helpers */
   const today = () => new Date().toISOString().slice(0, 10);
   const fmtDate = s => new Date(s + (s.length === 10 ? 'T12:00:00' : '')).toLocaleDateString(I18N.lang === 'es' ? 'es' : 'en', { month:'short', day:'numeric' });
   const fmtWhen = s => { const d = new Date(s); return d.toLocaleDateString(I18N.lang === 'es' ? 'es' : 'en', { month:'short', day:'numeric' }) + ', ' + d.toLocaleTimeString(I18N.lang === 'es' ? 'es' : 'en', { hour:'numeric', minute:'2-digit' }); };
-  const setting = it => (room && room.work[it.id]) || {};
+  const setting = it => it.custom ? { due:it.custom.due } : (room && room.work[it.id]) || {};
   const visible = it => me.role === 'teacher' || !setting(it).hidden;
   const avatar = (name, c) => h('span', { class:'cr-av', style:{ background:c || '#5f6368' } }, (name || '?').trim()[0].toUpperCase());
   // post text: line breaks kept, links clickable, nothing else is HTML
@@ -76,7 +93,7 @@
   function stateChip(st, it){
     const due = setting(it).due;
     if(!st) return null;
-    if(st.state === 'done') return h('span', { class:'cr-chip done' }, '✓ ' + w('done'));
+    if(st.state === 'done') return h('span', { class:'cr-chip done' }, '✓ ' + (it.custom ? w('turnedIn') : w('done')) + (st.late ? ' · ' + w('late') : ''));
     if(due && due < today()) return h('span', { class:'cr-chip late' }, w('missing'));
     return h('span', { class:'cr-chip' + (st.state === 'started' ? ' started' : '') }, st.state === 'started' ? w('started') + ' · ' + st.text : w('none'));
   }
@@ -104,14 +121,16 @@
     if(!me) return loginView();
     document.body.className = 'v-room';
     if(!periods.length) try { periods = await api('/room'); } catch(e){ periods = []; }
-    const m = hash.match(/^#\/c\/([\w-]+)(?:\/(work|people|grades))?$/);
+    const m = hash.match(/^#\/c\/([\w-]+)(?:\/(work|people|grades|a\/[\w-]+))?$/);
     if(!m){
       if(me.role !== 'teacher' && periods[0]){ location.replace('#/c/' + periods[0]); return; }
       return homeView();
     }
     const [, period, tab] = m;
     try { room = await api('/room/' + encodeURIComponent(period)); } catch(e){ room = { posts:[], work:{} }; if(e.status === 403){ location.replace('#/'); return; } }
-    if(me.role !== 'teacher') await loadMine();
+    if(!Array.isArray(room.assignments)) room.assignments = [];
+    if(me.role !== 'teacher') await loadMine(period);
+    if(tab && tab.startsWith('a/')){ const it = allItems().find(x => x.id === tab.slice(2) && x.kind === 'assignment' && visible(x)); if(it) return assignmentView(period, it); }
     if(tab === 'work') return workView(period);
     if(tab === 'people' && me.role === 'teacher') return peopleView(period);
     if(tab === 'grades') return me.role === 'teacher' ? gradesView(period) : myWorkView(period);
@@ -155,7 +174,7 @@
   /* ------------------------------------------------------------- stream */
   function streamView(period){
     const teacher = me.role === 'teacher';
-    const dueSoon = ITEMS.filter(it => visible(it) && setting(it).due && setting(it).due >= today())
+    const dueSoon = allItems().filter(it => visible(it) && setting(it).due && setting(it).due >= today())
       .filter(it => teacher || !mine || (status(it, mine) || {}).state !== 'done')
       .sort((a, b) => setting(a).due.localeCompare(setting(b).due)).slice(0, 4);
     const composer = teacher ? (() => {
@@ -183,7 +202,7 @@
       h('div', { class:'cr-banner', style:{ background:color(period) } }, h('b', {}, w('cls')), h('span', {}, w('period') + ' ' + period)),
       h('div', { class:'cr-stream' },
         h('aside', { class:'cr-card cr-upcoming' }, h('b', {}, w('upcoming')),
-          dueSoon.length ? dueSoon.map(it => h('a', { class:'cr-up', href:'#/c/' + period + '/work' }, h('small', {}, w('due') + ' ' + fmtDate(setting(it).due)), L(it.title)))
+          dueSoon.length ? dueSoon.map(it => h('a', { class:'cr-up', href:'#/c/' + period + (it.kind === 'assignment' ? '/a/' + it.id : '/work') }, h('small', {}, w('due') + ' ' + fmtDate(setting(it).due)), L(it.title)))
                          : h('small', { class:'muted' }, w('noDue')),
           h('a', { class:'cr-link', href:'#/c/' + period + '/work' }, w('viewAll'))),
         h('div', { class:'cr-feed' }, composer,
@@ -197,15 +216,15 @@
     const row = it => {
       const set = setting(it), st = !teacher && mine ? status(it, mine) : null, isOpen = openItem === it.id;
       const head = h('button', { class:'cr-item-head', type:'button', 'aria-expanded':String(isOpen), onclick:() => { openItem = isOpen ? null : it.id; workView(period); } },
-        h('span', { class:'cr-item-ico' + (it.kind === 'material' ? ' mat' : '') + (set.hidden ? ' off' : '') }, it.icon),
+        h('span', { class:'cr-item-ico' + (it.kind === 'material' ? ' mat' : '') + (it.custom ? ' own' : '') + (set.hidden ? ' off' : '') }, it.icon),
         h('span', { class:'cr-item-t' }, L(it.title), set.hidden ? h('span', { class:'cr-chip off' }, '🙈 ' + w('hidden')) : null),
         h('span', { class:'grow' }),
         set.due ? h('small', { class:'cr-due' + (set.due < today() && (!st || st.state !== 'done') ? ' late' : '') }, w('due') + ' ' + fmtDate(set.due)) : null,
         st ? stateChip(st, it) : null);
       if(!isOpen) return h('div', { class:'cr-item' }, head);
-      const go = h('a', { class:'btn primary', href:it.href, target:it.out ? '_blank' : null, rel:it.out ? 'noopener' : null, title:it.out ? w('newTab') : null }, it.icon + ' ' + w('open') + (it.out ? ' ↗' : ''));
-      const tools = teacher ? [
-        it.teacher ? h('a', { class:'btn', href:it.teacher }, '📊 ' + w('progress')) : null,
+      const view = it.kind === 'assignment' ? h('a', { class:'btn primary', href:'#/c/' + period + '/a/' + it.id }, '📋 ' + w('viewA')) : null;
+      const go = it.custom ? null : h('a', { class:'btn' + (view ? '' : ' primary'), href:it.href, target:it.out ? '_blank' : null, rel:it.out ? 'noopener' : null, title:it.out ? w('newTab') : null }, it.icon + ' ' + w('open') + (it.out ? ' ↗' : ''));
+      const tools = teacher && !it.custom ? [
         h('button', { class:'btn', type:'button', onclick:async () => { room = await put('/room/' + period + '/work/' + it.id, { ...set, hidden:!set.hidden }); workView(period); } },
           set.hidden ? '👁 ' + w('show') : '🙈 ' + w('hide')),
         h('label', { class:'cr-duein' }, '📅 ' + w('setDue') + ' ', h('input', { type:'date', class:'inp sm', value:set.due || '', onchange:async e => {
@@ -214,14 +233,149 @@
       return h('div', { class:'cr-item open' }, head,
         h('div', { class:'cr-item-body' },
           h('small', { class:'cr-kind' }, it.kind === 'assignment' ? '📋 ' + w('assignment') : '📎 ' + w('material')),
-          h('p', {}, L(it.line)), st ? h('div', { class:'cr-st' }, bar(st.pct), h('small', {}, st.text)) : null,
-          h('div', { class:'cr-item-btns' }, go, ...tools)));
+          L(it.line) ? h('p', {}, L(it.line)) : null, st ? h('div', { class:'cr-st' }, bar(st.pct), h('small', {}, st.text)) : null,
+          h('div', { class:'cr-item-btns' }, view, go, ...tools)));
     };
+    const form = h('div');
     app.replaceChildren(topbar(period, 'work'), h('main', { class:'cr-main narrow' },
-      ...TOPICS.map(tp => {
+      teacher ? h('div', { class:'cr-worktop' }, h('button', { class:'btn cr-create', type:'button', onclick:() => form.replaceChildren(assignmentForm(period, null, () => form.replaceChildren())) }, '＋ ' + w('create'))) : null,
+      form,
+      ...topicsWith(room.assignments).map(tp => {
         const items = tp.items.filter(visible);
         return items.length ? h('section', { class:'cr-topic' }, h('h2', { class:'cr-topic-h' }, h('span', {}, tp.icon), L(tp.title)), ...items.map(row)) : null;
       })));
+  }
+
+  /* the teacher's form for a new assignment (or changing one: a is the assignment) */
+  function assignmentForm(period, a, done){
+    const title = h('input', { class:'inp cr-in-title', placeholder:w('title'), value:a ? a.title : '', maxlength:120 });
+    const text = h('textarea', { class:'inp cr-in-text', rows:4, placeholder:w('instructions') });
+    text.value = a ? a.text : '';
+    const topic = h('select', { class:'inp' }, h('option', { value:'assignments' }, '📋 ' + w('noTopic')),
+      ...TOPICS.map(t => h('option', { value:t.id, selected:a && a.topic === t.id ? true : null }, t.icon + ' ' + L(t.title))));
+    const due = h('input', { type:'date', class:'inp', value:a && a.due || '' });
+    const all = h('input', { type:'checkbox' });
+    const msg = h('span', { class:'cr-err' });
+    const save = h('button', { class:'btn primary', type:'button', onclick:async () => {
+      const body = { title:title.value.trim(), text:text.value, topic:topic.value, due:due.value || null };
+      if(!body.title){ title.focus(); return; }
+      save.disabled = true;
+      try {
+        if(a) room = await put('/room/' + period + '/assignments/' + a.id, body);
+        else for(const p of all.checked ? periods : [period]){ const r = await put('/room/' + p + '/assignments', body, 'POST'); if(p === period) room = r; }
+        done(); route(true);
+      } catch(e){ save.disabled = false; msg.textContent = t('Could not reach the server.'); }
+    } }, a ? w('save') : w('assign'));
+    setTimeout(() => title.focus(), 0);
+    return h('div', { class:'cr-card cr-form' }, h('b', { class:'cr-form-h' }, '📄 ' + (a ? w('edit') : w('create'))), title, text,
+      h('div', { class:'cr-form-row' }, h('label', {}, w('topic') + ' ', topic), h('label', {}, '📅 ' + w('setDue') + ' ', due),
+        a ? null : h('label', { class:'cr-check' }, all, ' ' + w('toAll'))),
+      h('div', { class:'cr-form-row' }, msg, h('span', { class:'grow' }), h('button', { class:'btn', type:'button', onclick:done }, w('cancel')), save));
+  }
+
+  /* -------------------------------------------------------- one assignment
+     Instructions on the left. A student gets "Your work" (attach .html
+     files, turn in); the teacher gets every student's name with their work. */
+  async function assignmentView(period, it){
+    const teacher = me.role === 'teacher', a = it.custom, set = setting(it);
+    const side = h('div', { class:'cr-aside' });
+    const below = h('div');
+    const head = h('div', { class:'cr-a-head' }, h('span', { class:'cr-item-ico big' + (a ? ' own' : '') }, it.icon),
+      h('div', { class:'cr-a-t' }, h('h1', {}, L(it.title)),
+        h('small', { class:'muted' }, a ? a.by + ' · ' + fmtDate(a.at.slice(0, 10)) : w('assignment')),
+        set.due ? h('small', { class:'cr-due' + (set.due < today() ? ' late' : '') }, w('due') + ' ' + fmtDate(set.due)) : null),
+      teacher && a ? h('div', { class:'cr-a-tools' },
+        h('button', { class:'btn', type:'button', onclick:() => below.replaceChildren(assignmentForm(period, a, () => below.replaceChildren())) }, '✏️ ' + w('edit')),
+        h('button', { class:'btn', type:'button', onclick:async () => {
+          if(!confirm(w('sureDelA'))) return;
+          room = await put('/room/' + period + '/assignments/' + a.id, {}, 'DELETE'); location.hash = '#/c/' + period + '/work';
+        } }, '🗑 ' + w('del'))) : null);
+    const body = h('div', { class:'cr-a-body' }, head, below,
+      L(it.line) ? (a ? richText(a.text) : h('p', {}, L(it.line))) : null,
+      a ? null : h('div', {}, h('a', { class:'btn primary', href:it.href }, it.icon + ' ' + w('open'))));
+    app.replaceChildren(topbar(period, 'work'), h('main', { class:'cr-main' },
+      h('a', { class:'cr-back', href:'#/c/' + period + '/work' }, '◀ ' + w('back')),
+      h('div', { class:'cr-a' + (teacher ? ' teacher' : '') }, body, teacher ? null : side), teacher ? h('div', { class:'cr-sw' }) : null));
+    if(!teacher) return a ? yourWork(period, a, side) : side.append(h('div', { class:'cr-card cr-yours' }, h('b', {}, w('yourWork')),
+      (() => { const st = status(it, mine); return [stateChip(st, it), h('div', { class:'cr-st' }, bar(st.pct), h('small', {}, st.text))]; })(),
+      h('a', { class:'btn primary', href:it.href }, it.icon + ' ' + w('open'))));
+    studentWork(period, it, $('.cr-sw'));
+  }
+
+  /* a student's card: their files, Add HTML file, Turn in / Unsubmit */
+  async function yourWork(period, a, box){
+    const base = '/room/' + period + '/assignments/' + a.id;
+    let sub = await api(base + '/work');
+    const msg = h('small', { class:'cr-err' });
+    const draw = () => {
+      const st = status(custom(a), { subs:{ [a.id]:{ turnedIn:sub.turnedIn, at:sub.at, files:sub.files.length } } });
+      const pick = h('input', { type:'file', accept:'.html,.htm,text/html', multiple:true, hidden:true, onchange:async () => {
+        for(const f of pick.files){
+          if(!/\.html?$/i.test(f.name)){ msg.textContent = w('notHtml'); continue; }
+          if(f.size > 400 * 1024){ msg.textContent = w('tooBig'); continue; }
+          try { sub = await put(base + '/files', { name:f.name, html:await f.text() }, 'POST'); msg.textContent = ''; } catch(e){ msg.textContent = t('Could not reach the server.'); }
+        }
+        draw();
+      } });
+      box.replaceChildren(h('div', { class:'cr-card cr-yours' },
+        h('div', { class:'cr-yours-h' }, h('b', {}, w('yourWork')), stateChip(st, custom(a))),
+        sub.files.length ? h('div', { class:'cr-files' }, ...sub.files.map(f => fileChip(base + '/work/' + me.username + '/files/' + f.id, f,
+          sub.turnedIn ? null : async () => { sub = await put(base + '/files/' + f.id, {}, 'DELETE'); draw(); }))) : h('small', { class:'muted' }, w('needFile')),
+        sub.turnedIn ? null : [pick, h('button', { class:'btn cr-add', type:'button', onclick:() => pick.click() }, '＋ ' + w('addFile'))],
+        msg,
+        sub.turnedIn ? h('button', { class:'btn', type:'button', onclick:async () => { sub = await put(base + '/turnin', { on:false }, 'POST'); draw(); } }, w('unsubmit'))
+          : h('button', { class:'btn primary', type:'button', disabled:!sub.files.length, onclick:async () => { sub = await put(base + '/turnin', { on:true }, 'POST'); draw(); } }, w('turnIn'))));
+    };
+    draw();
+  }
+
+  /* one attached file: its name; click to see the page it makes */
+  function fileChip(url, f, remove){
+    return h('div', { class:'cr-file' },
+      h('button', { class:'cr-file-open', type:'button', onclick:() => showFile(url) }, h('span', { class:'cr-file-ico' }, '</>'),
+        h('span', {}, h('b', {}, f.name), h('small', {}, 'HTML · ' + Math.max(1, Math.round(f.size / 1024)) + ' KB'))),
+      remove ? h('button', { class:'cr-kebab', type:'button', title:w('del'), onclick:remove }, '✕') : null);
+  }
+  // the page in a sandboxed frame (its own origin: it cannot reach this site), or its code
+  async function showFile(url){
+    const f = await api(url);
+    const frame = h('iframe', { class:'cr-view-frame', sandbox:'allow-scripts', title:f.name });
+    frame.srcdoc = f.html;
+    const code = h('pre', { class:'cr-view-code', hidden:true }, f.html);
+    const tabs = [w('page'), w('code')].map((label, i) => h('button', { class:'cr-tab' + (i ? '' : ' on'), type:'button', onclick:() => {
+      tabs.forEach((b, k) => b.classList.toggle('on', k === i)); frame.hidden = !!i; code.hidden = !i; } }, label));
+    const back = h('div', { class:'cr-view', onclick:e => { if(e.target === back) back.remove(); } },
+      h('div', { class:'cr-view-card' },
+        h('div', { class:'cr-view-top' }, h('b', {}, '</> ' + f.name), h('nav', { class:'cr-tabs' }, ...tabs), h('span', { class:'grow' }),
+          h('button', { class:'btn', type:'button', onclick:() => back.remove() }, '✕ ' + w('close'))), frame, code));
+    document.body.append(back);
+  }
+
+  /* the teacher's list: every student in the class, by name, with their work */
+  async function studentWork(period, it, box){
+    const a = it.custom;
+    if(a){
+      const rows = await api('/room/' + period + '/assignments/' + a.id + '/work');
+      const n = rows.filter(r => r.turnedIn).length;
+      box.replaceChildren(h('section', { class:'cr-topic' }, h('h2', { class:'cr-topic-h' }, w('studentWork'),
+          h('small', { class:'cr-n' }, n + ' ' + w('turnedIn').toLowerCase() + ' · ' + (rows.length - n) + ' ' + w('none').toLowerCase())),
+        ...rows.map(r => {
+          const st = status(it, { subs:{ [a.id]:{ turnedIn:r.turnedIn, at:r.at, files:r.files.length } } });
+          return h('div', { class:'cr-person cr-swrow' }, avatar(r.name, color(period)), h('div', { class:'cr-sw-name' }, h('b', {}, r.name), h('div', { class:'muted' }, r.username)),
+            h('div', { class:'cr-files' }, ...(r.files.length ? r.files.map(f => fileChip('/room/' + period + '/assignments/' + a.id + '/work/' + r.username + '/files/' + f.id, f)) : [h('small', { class:'muted' }, w('noWork'))])),
+            h('span', { class:'grow' }), r.at ? h('small', { class:'muted' }, fmtWhen(r.at)) : null, stateChip(st, it));
+        })));
+      return;
+    }
+    const rows = await api('/room/' + period + '/grades');
+    const n = rows.filter(r => status(it, r).state === 'done').length;
+    box.replaceChildren(h('section', { class:'cr-topic' }, h('h2', { class:'cr-topic-h' }, w('studentWork'),
+        h('small', { class:'cr-n' }, n + ' ' + w('done').toLowerCase() + ' · ' + rows.length + ' ' + w('students').toLowerCase())),
+      ...rows.map(r => { const st = status(it, r);
+        return h('div', { class:'cr-person cr-swrow' }, avatar(r.name, color(period)), h('div', { class:'cr-sw-name' }, h('b', {}, r.name), h('div', { class:'muted' }, r.username)),
+          h('div', { class:'cr-st' }, bar(st.pct), h('small', {}, st.text)), h('span', { class:'grow' }),
+          it.student && st.state !== 'none' ? h('a', { class:'btn small', href:it.student(r.username) }, '📄 ' + w('openWork')) : null,
+          stateChip(st, it)); })));
   }
 
   /* -------------------------------------------------------------- people */
@@ -243,11 +397,12 @@
     const main = h('main', { class:'cr-main wide' });
     app.replaceChildren(topbar(period, 'grades'), main);
     const rows = await api('/room/' + period + '/grades');
-    const cols = ASSIGNMENTS.filter(visible);
+    const cols = allAssignments().filter(visible);
     const cell = (it, r) => {
       const st = status(it, r), due = setting(it).due;
       const late = st.state !== 'done' && due && due < today();
-      return h('td', { class:'cr-g ' + st.state + (late ? ' late' : ''), title:st.text }, st.state === 'none' ? (late ? w('missing') : '—') : st.pct + '%');
+      return h('td', { class:'cr-g ' + st.state + (late || st.late ? ' late' : ''), title:st.text },
+        st.state === 'none' ? (late ? w('missing') : '—') : it.custom ? (st.state === 'done' ? '✓' + (st.late ? ' ' + w('late') : '') : st.text) : st.pct + '%');
     };
     const avg = it => rows.length ? Math.round(rows.reduce((n, r) => n + status(it, r).pct, 0) / rows.length) : 0;
     main.replaceChildren(h('div', { class:'twrap cr-gwrap' }, h('table', { class:'ttable cr-gtable' },
@@ -259,11 +414,11 @@
 
   /* ------------------------------------------------- my work (a student) */
   function myWorkView(period){
-    const items = ASSIGNMENTS.filter(visible);
+    const items = allAssignments().filter(visible);
     app.replaceChildren(topbar(period, 'grades'), h('main', { class:'cr-main narrow' },
       h('section', { class:'cr-topic' }, h('h2', { class:'cr-topic-h' }, '📋 ' + w('myWork')),
         ...items.map(it => { const st = status(it, mine);
-          return h('a', { class:'cr-item cr-mine', href:it.href },
+          return h('a', { class:'cr-item cr-mine', href:'#/c/' + period + '/a/' + it.id },
             h('span', { class:'cr-item-ico' }, it.icon), h('div', { class:'cr-mine-t' }, h('b', {}, L(it.title)), h('div', { class:'cr-st' }, bar(st.pct), h('small', {}, st.text))),
             h('span', { class:'grow' }), setting(it).due ? h('small', { class:'cr-due' }, w('due') + ' ' + fmtDate(setting(it).due)) : null, stateChip(st, it)); }))));
   }

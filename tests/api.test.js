@@ -430,3 +430,32 @@ test('Classroom: teacher posts and sets due dates, a student sees only their own
   const gone = await (await tc('/room/2/posts/' + posted.posts[0].id, {}, 'DELETE')).json();
   assert.strictEqual(gone.posts.length, 0);
 });
+
+test('Assignments: a teacher makes one, a student attaches an HTML file and turns it in, the teacher sees it by name', async () => {
+  const t = await login('teach', 'apple-pear');
+  const tc = (path, body, method='POST') => call(t.cookie, path, { method, body:JSON.stringify(body) });
+  const room = await (await tc('/room/2/assignments', { title:'About me page', text:'Make a page', topic:'web', due:'2026-11-03' })).json();
+  const a = room.assignments.find(x => x.title === 'About me page');
+  assert.ok(a && a.id && a.due === '2026-11-03' && a.topic === 'web');
+  const ana = await login('ana', 'tiger42');
+  const sc = (path, body, method='POST') => call(ana.cookie, '/room/2/assignments/' + a.id + path, { method, body:JSON.stringify(body) });
+  assert.strictEqual((await sc('/files', { name:'empty.html', html:'   ' })).status, 400);
+  const added = await (await sc('/files', { name:'me<>.html', html:'<h1>Ana</h1>' })).json();
+  assert.strictEqual(added.files[0].name, 'me.html');
+  const done = await (await sc('/turnin', { on:true })).json();
+  assert.ok(done.turnedIn && done.at);
+  assert.strictEqual((await sc('/files', { name:'x.html', html:'<p>late</p>' })).status, 409);     // unsubmit first
+  const cara = await login('cara', 'fox77');
+  assert.strictEqual((await call(cara.cookie, '/room/2/assignments/' + a.id + '/work')).status, 403);
+  const list = await (await call(t.cookie, '/room/2/assignments/' + a.id + '/work')).json();
+  const row = list.find(r => r.username === 'ana');
+  assert.ok(row.turnedIn && row.name === 'Ana');
+  assert.ok(list.find(r => r.username === 'ben') && !list.some(r => r.username === 'cara'));
+  const file = await (await call(t.cookie, '/room/2/assignments/' + a.id + '/work/ana/files/' + row.files[0].id)).json();
+  assert.strictEqual(file.html, '<h1>Ana</h1>');
+  assert.strictEqual((await call((await login('dev', 'bear55')).cookie, '/room/2/assignments/' + a.id + '/work/ana/files/' + row.files[0].id)).status, 403);
+  const grades = await (await call(t.cookie, '/room/2/grades')).json();
+  assert.ok(grades.find(g => g.username === 'ana').subs[a.id].turnedIn);
+  const gone = await (await tc('/room/2/assignments/' + a.id, {}, 'DELETE')).json();
+  assert.ok(!gone.assignments.some(x => x.id === a.id));
+});

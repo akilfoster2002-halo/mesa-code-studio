@@ -172,6 +172,17 @@ class FileStore {
     cs[period] = { period, data, updated:now() }; this._save(); return cs[period];
   }
 
+  /* a student's work on a teacher's assignment (files they attached, turned in or not) */
+  async getSubmission(assignment, owner){ return (this.db.subs || {})[assignment + '|' + owner] || null; }
+  async saveSubmission(assignment, owner, data){
+    const ss = this.db.subs || (this.db.subs = {});
+    ss[assignment + '|' + owner] = { assignment, owner, data, updated:now() }; this._save(); return ss[assignment + '|' + owner];
+  }
+  async listSubmissions(assignments){
+    const want = new Set(assignments);
+    return Object.values(this.db.subs || {}).filter(x => want.has(x.assignment));
+  }
+
   /* Class Games feedback: one slip per reviewer per game */
   async getFeedback(project, reviewer){ return (this.db.feedback || {})[project + '|' + reviewer] || null; }
   async saveFeedback(project, reviewer, owner, data){
@@ -311,6 +322,13 @@ class PgStore {
         PRIMARY KEY (project, reviewer)
       );
       CREATE INDEX IF NOT EXISTS cs_feedback_owner ON cs_feedback(owner);
+      CREATE TABLE IF NOT EXISTS cs_submissions (
+        assignment TEXT NOT NULL,
+        owner      TEXT NOT NULL REFERENCES cs_users(username),
+        data       JSONB NOT NULL,
+        updated    TIMESTAMPTZ DEFAULT now(),
+        PRIMARY KEY (assignment, owner)
+      );
       CREATE TABLE IF NOT EXISTS cs_classes (
         period  TEXT PRIMARY KEY,
         data    JSONB NOT NULL,
@@ -447,6 +465,20 @@ class PgStore {
   }
   async listLearn(){
     const r = await this.q('SELECT owner,data,updated FROM cs_learn');
+    return r.rows.map(d => ({ ...d, updated:iso(d.updated) }));
+  }
+  async getSubmission(assignment, owner){
+    const r = await this.q('SELECT * FROM cs_submissions WHERE assignment=$1 AND owner=$2', [assignment, owner]);
+    const d = r.rows[0]; return d ? { ...d, updated:iso(d.updated) } : null;
+  }
+  async saveSubmission(assignment, owner, data){
+    const r = await this.q(`INSERT INTO cs_submissions (assignment,owner,data,updated) VALUES ($1,$2,$3,now())
+      ON CONFLICT (assignment,owner) DO UPDATE SET data=$3, updated=now() RETURNING *`, [assignment, owner, data]);
+    const d = r.rows[0]; return { ...d, updated:iso(d.updated) };
+  }
+  async listSubmissions(assignments){
+    if(!assignments.length) return [];
+    const r = await this.q('SELECT * FROM cs_submissions WHERE assignment = ANY($1)', [assignments]);
     return r.rows.map(d => ({ ...d, updated:iso(d.updated) }));
   }
   async getClass(period){

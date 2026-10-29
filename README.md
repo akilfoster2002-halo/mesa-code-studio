@@ -17,12 +17,20 @@ student goes straight to their own class. Each class has:
   More practice), each with **assignments** (they have progress) and **materials** (places to go).
   Tap an item to open it. Teachers can hide an item from a class, give it a due date, and jump to
   that tool's progress page. Students see Assigned / Started / Done / Missing.
+- **＋ Create assignment** (teacher, on Classwork) — title, instructions, topic, due date, for one
+  class or all of them. Students open it, **＋ Add HTML file** (up to 5 `.html` files, 400 KB each)
+  and **Turn in** (Unsubmit to change it). The assignment page lists **every student by name** with
+  their files and Assigned / Turned in / late / Missing; a file opens as the page it makes (in a
+  sandboxed frame, so it cannot reach the site) or as its code. Built-in assignments (the Game
+  Design Packet, the mazes, Intro to HTML…) have the same page: every student's name, their
+  progress, and for the packet a link straight to that student's packet.
 - **People** (teacher) — the class list with last login, and the teacher dashboard.
 - **Grades** (teacher: every student × every assignment, with the class average) /
   **My work** (student).
 
 Progress is worked out from what the tools already save; the list itself is
-`public/js/classwork.js`. Posts and the hide/due settings are in `cs_classes` (one row per period),
+`public/js/classwork.js`. Posts, the teacher's assignments and the hide/due settings are in
+`cs_classes` (one row per period); what students attach is in `cs_submissions`,
 API `/api/room`. The block editor moved to **/studio** (old `/#/p/<id>` links are sent there).
 
 ## What students get (the block editor, /studio)
