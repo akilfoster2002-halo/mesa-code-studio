@@ -191,6 +191,7 @@ class FileStore {
     fb[project + '|' + reviewer] = { project, reviewer, owner, data, updated:now() }; this._save();
     return fb[project + '|' + reviewer];
   }
+  async deleteFeedback(project, reviewer){ if(this.db.feedback){ delete this.db.feedback[project + '|' + reviewer]; this._save(); } }
   async listFeedback(filter={}){
     return Object.values(this.db.feedback || {}).filter(f => (!filter.owner || f.owner === filter.owner) &&
       (!filter.reviewer || f.reviewer === filter.reviewer) && (!filter.project || f.project === filter.project))
@@ -501,6 +502,7 @@ class PgStore {
       ON CONFLICT (project,reviewer) DO UPDATE SET data=$4, updated=now() RETURNING *`, [project, reviewer, owner, data]);
     const d = r.rows[0]; return { ...d, updated:iso(d.updated) };
   }
+  async deleteFeedback(project, reviewer){ await this.q('DELETE FROM cs_feedback WHERE project=$1 AND reviewer=$2', [project, reviewer]); }
   async listFeedback(filter={}){
     const where = [], args = [];
     for(const k of ['owner', 'reviewer', 'project']) if(filter[k]){ args.push(filter[k]); where.push(k + '=$' + args.length); }

@@ -396,6 +396,9 @@ test('Class Games: a classmate can play your game read-only and leave one feedba
   assert.deepStrictEqual((await (await call(b.cookie, '/class/games')).json()).given, [p.id]);
   const dev = (await (await call(t.cookie, '/room/2/grades')).json()).find(r => r.username === 'dev');
   assert.deepStrictEqual(dev.slips, [{ project:p.id, game:'Frog Run', owner:'Ana' }]);
+  // taking the game off the list removes my slip on it
+  assert.strictEqual((await call(b.cookie, '/feedback/' + p.id, { method:'DELETE' })).status, 200);
+  assert.deepStrictEqual((await (await call(b.cookie, '/class/games')).json()).given, []);
 });
 
 test('a locked period can open and play its games but not change them', async () => {

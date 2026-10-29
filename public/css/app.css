@@ -664,3 +664,9 @@ body.peer .hlaunch{display:none}
 .sitenav-i{font-size:14px;font-family:"Ubuntu Mono",Menlo,monospace}
 @media (max-width:900px){ .sitenav-l{display:none} .sitenav-a{padding:5px 10px} }
 @media (max-width:1000px){ header.top>h1{display:none} }
+
+/* /studio?play — the game alone, in the Classroom's frame */
+body.play-only .editor>.top,body.play-only .banner,body.play-only .hlaunch,body.play-only .helper,body.play-only .tour,
+body.play-only .stage-bar .btn{display:none!important}
+body.play-only.full-stage .right{padding:6px}
+body.play-only.full-stage .stage-wrap,body.play-only.full-stage .stage-bar{width:min(100vw - 12px,(100vh - 56px) * 4 / 3)}

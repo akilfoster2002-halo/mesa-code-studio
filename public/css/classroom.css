@@ -200,3 +200,29 @@ a.cr-game:hover{border-color:#1967d2;box-shadow:0 1px 3px rgba(60,64,67,.3)}
 .cr-game-who{font-weight:600;color:#202124;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .cr-game.none{opacity:.6}
 .cr-slips{display:flex;flex-wrap:wrap;gap:6px} .cr-slips a.cr-chip{text-decoration:none}
+/* Game Feedback on the assignment page: my games list, the game, its slip */
+.cr-fblist{display:grid;gap:6px}
+.cr-fbrow{display:flex;align-items:center;gap:8px;border:1px solid #dadce0;border-radius:10px;padding:4px 8px 4px 4px;background:#fff;cursor:pointer;text-align:left;font:inherit;color:#202124}
+.cr-fbrow.on{border-color:#1967d2;box-shadow:0 0 0 2px #d2e3fc}
+.cr-fbrow img,.cr-fbrow .cr-game-blank{width:48px;height:36px;object-fit:cover;border-radius:5px;font-size:14px}
+.cr-fbrow b{display:block;font-size:13.5px;font-weight:600} .cr-fbrow small{color:#5f6368;font-size:12px}
+.cr-fbwork{display:grid;gap:10px;margin-top:16px}
+.cr-fbhead{display:flex;align-items:center;gap:6px;border-top:1px solid #e0e0e0;padding-top:12px;font-size:16px}
+.cr-fbcols{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(0,1fr);gap:14px;align-items:start}
+.cr-play{display:grid;gap:4px}
+.cr-play-frame{width:100%;aspect-ratio:4/3.3;border:1px solid #dadce0;border-radius:10px;background:#fff}
+.cr-slip{display:grid;gap:10px;background:#fff;border:1px solid #dadce0;border-radius:10px;padding:12px}
+.cr-slip-h{font-size:15px}
+.cr-slip-q{display:grid;gap:4px;font-size:13.5px}
+.cr-slip-q>span{font-weight:600;color:#3c4043}
+.cr-slip-a{background:#f8f9fa;border-radius:6px;padding:6px 8px;white-space:pre-wrap}
+.cr-levels{display:flex;flex-wrap:wrap;gap:4px}
+.cr-level{border:1px solid #dadce0;border-radius:8px;background:#fff;padding:4px 8px;cursor:pointer;display:grid;justify-items:center;font:inherit;line-height:1.2}
+.cr-level small{font-size:11px;color:#5f6368}
+.cr-level.on{background:#e8f0fe;border-color:#1967d2;color:#1967d2}
+button.cr-game{cursor:pointer;font:inherit;text-align:left;width:100%;grid-template-columns:minmax(0,1fr);align-content:start}
+.cr-pick{max-width:760px;height:auto;max-height:100%}
+.cr-pick .cr-games{padding:12px;max-height:70vh;overflow:auto;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));align-content:start}
+.cr-slips button.cr-chip{border:0;cursor:pointer;font-family:inherit}
+@media (max-width:900px){ .cr-fbcols{grid-template-columns:1fr} }
+.cr-view-card>.cr-fbcols{padding:12px;overflow:auto}

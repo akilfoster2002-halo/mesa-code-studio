@@ -483,6 +483,8 @@ async function api(req, res, url){
       const f = await store.saveFeedback(pr.id, user.username, pr.owner, FEEDBACK.clean(b.data));
       return send(res, 200, { updated:f.updated });
     }
+    // take a game off my Game Feedback list (my own slip on it goes too)
+    if(m === 'DELETE'){ await store.deleteFeedback(pr.id, user.username); return send(res, 200, { ok:true }); }
   }
 
   if(p[0] === 'learn' && !p[1]){

@@ -48,9 +48,13 @@
     sureGame:{ en:'Turn in your game? You can still play it, but not change it.', es:'¿Entregar tu juego? Todavía puedes jugarlo, pero no cambiarlo.' },
     gameLocked:{ en:'Locked. You can still play it. To change it, ask your teacher to give it back.', es:'Bloqueado. Todavía puedes jugarlo. Para cambiarlo, pide a tu maestro que te lo devuelva.' },
     noGame:{ en:'No game yet', es:'Aún no hay juego' },
-    pickGame:{ en:'Pick a classmate’s game below. Play it, fill out the slip, press Submit.', es:'Elige un juego de un compañero abajo. Juégalo, llena la tarjeta y presiona Enviar.' },
-    classGames:{ en:'Classmates’ games', es:'Juegos de tus compañeros' }, noGames:{ en:'No games yet.', es:'Todavía no hay juegos.' },
-    noSlips:{ en:'No slips yet', es:'Aún no hay tarjetas' }, seeSlip:{ en:'Open the game to see the slips', es:'Abre el juego para ver las tarjetas' },
+    addGame:{ en:'Add a game', es:'Añadir un juego' }, addFirst:{ en:'Add a classmate’s game to give feedback on.', es:'Añade el juego de un compañero para comentarlo.' },
+    removeGame:{ en:'Remove', es:'Quitar' }, noGames:{ en:'No more classmates’ games.', es:'No hay más juegos de compañeros.' },
+    playHint:{ en:'Press the flag to play.', es:'Presiona la bandera para jugar.' },
+    slip:{ en:'Feedback slip', es:'Tarjeta de comentarios' }, levelQ:{ en:'What level is the game at?', es:'¿En qué nivel está el juego?' },
+    slipMissing:{ en:'Fill out every box, pick a level, then send.', es:'Llena cada casilla, elige un nivel y envía.' },
+    submitSlip:{ en:'Submit feedback', es:'Enviar comentarios' }, slipSent:{ en:'Feedback sent!', es:'¡Comentarios enviados!' },
+    noSlips:{ en:'No slips yet', es:'Aún no hay tarjetas' }, seeSlip:{ en:'Read the slip', es:'Leer la tarjeta' },
     late:{ en:'late', es:'tarde' }, needFile:{ en:'Add your .html file, then turn it in.', es:'Añade tu archivo .html y luego entrégalo.' },
     tooBig:{ en:'That file is too big (400 KB at most).', es:'Ese archivo es muy grande (máximo 400 KB).' },
     notHtml:{ en:'Pick an .html file.', es:'Elige un archivo .html.' }, studentWork:{ en:'Student work', es:'Trabajo de los estudiantes' },
@@ -353,21 +357,17 @@
         } }, '🗑 ' + w('del'))) : null);
     const body = h('div', { class:'cr-a-body' }, head, below,
       L(it.line) ? (a ? richText(a.text) : h('p', {}, L(it.line))) : null,
-      a ? null : h('div', {}, h('a', { class:'btn primary', href:it.href }, it.icon + ' ' + w('open'))));
+      a || it.slips ? null : h('div', {}, h('a', { class:'btn primary', href:it.href }, it.icon + ' ' + w('open'))));
     app.replaceChildren(topbar(period, 'work'), h('main', { class:'cr-main' },
       h('a', { class:'cr-back', href:'#/c/' + period + '/work' }, '◀ ' + w('back')),
       h('div', { class:'cr-a' + (teacher ? ' teacher' : '') }, body, teacher ? null : side), teacher ? h('div', { class:'cr-sw' }) : null));
-    // Game Feedback: every classmate's game, to open and fill out the slip beside it
-    if(!teacher && it.slips) body.append(h('section', { class:'cr-topic' }, h('h2', { class:'cr-topic-h' }, '🎮 ' + w('classGames')),
-      classmates.length ? h('div', { class:'cr-games' }, ...classmates.map(g => gameTile(g,
-        h('span', { class:'cr-game-who' }, g.ownerName, g.done ? ' ✅' : g.reviewed ? ' ✏️' : '')))) : h('small', { class:'muted' }, w('noGames'))));
+    if(!teacher && it.slips) return feedbackWork(period, it, body, side);
     if(!teacher){
       if(a) return yourWork(period, a, side);
       const st = status(it, mine), turned = it.turnin && st.state === 'done';
       return side.append(h('div', { class:'cr-card cr-yours' }, h('div', { class:'cr-yours-h' }, h('b', {}, w('yourWork')), stateChip(st, it)),
         it.games ? (myGames.length ? h('div', { class:'cr-games mine' }, ...myGames.map(g => gameTile(g))) : h('small', { class:'muted' }, w('noGame')))
           : h('div', { class:'cr-st' }, bar(st.pct), h('small', {}, st.text)),
-        it.slips ? h('small', { class:'muted' }, '👆 ' + w('pickGame')) : null,
         turned ? h('small', { class:'muted' }, '🔒 ' + w('gameLocked')) : null,
         h('a', { class:'btn' + (turned ? '' : ' primary'), href:it.href }, it.icon + ' ' + w('open')),
         it.turnin && !turned ? h('button', { class:'btn', type:'button', disabled:it.games && !myGames.length, onclick:async e => {
@@ -377,6 +377,90 @@
         } }, '📤 ' + w('turnIn')) : null));
     }
     studentWork(period, it, $('.cr-sw'));
+  }
+
+  /* Game Feedback, all on the assignment page: the student adds classmates'
+     games to it, plays each one here and fills out its slip beside it */
+  let reviewing = null;
+  function feedbackWork(period, it, body, side){
+    const added = classmates.filter(g => g.reviewed), n = added.filter(g => g.done).length;
+    const work = h('div', { class:'cr-fbwork' });
+    body.parentNode.after(work);                  // the game and its slip get the page's full width
+    const reload = async () => { await loadMine(period); assignmentView(period, it); };
+    const add = () => {
+      const left = classmates.filter(g => !g.reviewed);
+      const back = h('div', { class:'cr-view', onclick:e => { if(e.target === back) back.remove(); } },
+        h('div', { class:'cr-view-card cr-pick' }, h('div', { class:'cr-view-top' }, h('b', {}, '＋ ' + w('addGame')), h('span', { class:'grow' }),
+          h('button', { class:'btn', type:'button', onclick:() => back.remove() }, '✕ ' + w('close'))),
+          left.length ? h('div', { class:'cr-games' }, ...left.map(g => h('button', { class:'cr-game', type:'button', onclick:async () => {
+            await put('/feedback/' + g.id, { data:{} }); back.remove(); reviewing = g.id; reload();
+          } }, g.thumb ? h('img', { src:g.thumb, alt:'' }) : h('span', { class:'cr-game-blank' }, '◆'), h('span', { class:'cr-game-n' }, g.name),
+            h('span', { class:'cr-game-who' }, g.ownerName)))) : h('p', { class:'muted' }, w('noGames'))));
+      document.body.append(back);
+    };
+    side.append(h('div', { class:'cr-card cr-yours' }, h('div', { class:'cr-yours-h' }, h('b', {}, w('yourWork')), stateChip(status(it, mine), it)),
+      h('div', { class:'cr-st' }, bar(status(it, mine).pct), h('small', {}, n + ' / ' + it.slips + ' 💬')),
+      added.length ? h('div', { class:'cr-fblist' }, ...added.map(g => h('button', { class:'cr-fbrow' + (reviewing === g.id ? ' on' : ''), type:'button',
+        onclick:() => { reviewing = g.id; assignmentView(period, it); } },
+        g.thumb ? h('img', { src:g.thumb, alt:'' }) : h('span', { class:'cr-game-blank' }, '◆'),
+        h('span', {}, h('b', {}, g.name), h('small', {}, g.ownerName)), h('span', { class:'grow' }), g.done ? '✅' : '✏️'))) : h('small', { class:'muted' }, w('addFirst')),
+      added.length < classmates.length ? h('button', { class:'btn' + (n >= it.slips ? '' : ' primary'), type:'button', onclick:add }, '＋ ' + w('addGame')) : null));
+    const g = added.find(x => x.id === reviewing) || added.find(x => !x.done);
+    if(!g) return;
+    reviewing = g.id;
+    work.append(h('div', { class:'cr-fbhead' }, h('b', {}, '🎮 ' + g.name), h('small', { class:'muted' }, ' · ' + g.ownerName), h('span', { class:'grow' }),
+        g.done ? null : h('button', { class:'btn small', type:'button', title:w('removeGame'), onclick:async () => {
+          if(!confirm(w('removeGame') + '?')) return;
+          await put('/feedback/' + g.id, {}, 'DELETE'); reviewing = null; reload();
+        } }, '✕ ' + w('removeGame'))),
+      h('div', { class:'cr-fbcols' },
+        h('div', { class:'cr-play' }, h('iframe', { class:'cr-play-frame', src:'/studio?play#/p/' + g.id, title:g.name }),
+          h('small', { class:'muted' }, '⚑ ' + w('playHint'))),
+        slipForm(g, reload)));
+  }
+  // the feedback slip (the same questions as the paper one); it saves by itself
+  function slipForm(g, done){
+    const F = window.FEEDBACK, box = h('div', { class:'cr-slip' });
+    let data = { checks:{}, ratings:{}, texts:{} }, timer = null;
+    const save = () => put('/feedback/' + g.id, { data });
+    const later = () => { clearTimeout(timer); timer = setTimeout(save, 700); };
+    const LL = o => I18N.lang === 'es' ? o.es : o.en;
+    const draw = () => {
+      const levels = h('div', { class:'cr-levels' }, ...F.levels.map(l => h('button', { class:'cr-level' + (data.level === l.n ? ' on' : ''), type:'button',
+        onclick:() => { data.level = l.n; later(); draw(); } }, h('b', {}, String(l.n)), h('small', {}, LL(l)))));
+      const msg = h('small', { class:'cr-err' });
+      box.replaceChildren(h('b', { class:'cr-slip-h' }, '💬 ' + w('slip')),
+        ...F.checks.map(c => h('label', { class:'cr-slip-q' }, h('span', {}, c.icon + ' ' + LL(c)),
+          h('input', { class:'inp', value:data.checks[c.id] || '', maxlength:F.CHECK_TEXT, oninput:e => { data.checks[c.id] = e.target.value; later(); } }))),
+        h('div', { class:'cr-slip-q' }, h('span', {}, '📶 ' + w('levelQ')), levels),
+        ...F.texts.map(x => h('label', { class:'cr-slip-q' }, h('span', {}, x.icon + ' ' + LL(x) + (x.required ? '' : '')),
+          h('textarea', { class:'inp', rows:2, maxlength:F.MAX_TEXT, oninput:e => { data.texts[x.id] = e.target.value; later(); } }, data.texts[x.id] || ''))),
+        msg,
+        h('button', { class:'btn primary', type:'button', onclick:async () => {
+          const clean = F.clean(data);
+          if(!F.complete(clean)){ msg.textContent = '⚠ ' + w('slipMissing'); return; }
+          clearTimeout(timer); await save(); UI.toast && UI.toast('✅ ' + w('slipSent')); reviewing = null; done();
+        } }, '📤 ' + w('submitSlip')));
+    };
+    box.append(h('small', { class:'muted' }, t('Loading…')));
+    api('/feedback/' + g.id).then(r => { if(r && r.data) data = { checks:{}, ratings:{}, texts:{}, ...r.data }; draw(); }).catch(draw);
+    return box;
+  }
+
+  // the teacher reads one student's slip, with the game beside it
+  async function showSlip(project, reviewer){
+    const F = window.FEEDBACK, LL = o => I18N.lang === 'es' ? o.es : o.en;
+    const f = (await api('/admin/feedback?project=' + encodeURIComponent(project))).find(x => x.reviewer === reviewer);
+    if(!f) return;
+    const d = f.data || {}, lv = F.levels.find(l => l.n === d.level);
+    const row = (q, a) => h('div', { class:'cr-slip-q' }, h('span', {}, q), h('div', { class:'cr-slip-a' }, a || '—'));
+    const back = h('div', { class:'cr-view', onclick:e => { if(e.target === back) back.remove(); } },
+      h('div', { class:'cr-view-card' }, h('div', { class:'cr-view-top' }, h('b', {}, '💬 ' + f.reviewerName + ' → ' + f.game + ' · ' + f.ownerName), h('span', { class:'grow' }),
+        h('button', { class:'btn', type:'button', onclick:() => back.remove() }, '✕ ' + w('close'))),
+        h('div', { class:'cr-fbcols' }, h('div', { class:'cr-play' }, h('iframe', { class:'cr-play-frame', src:'/studio?play#/p/' + project, title:f.game })),
+          h('div', { class:'cr-slip' }, ...F.checks.map(c => row(c.icon + ' ' + LL(c), (d.checks || {})[c.id])),
+            row('📶 ' + w('levelQ'), lv ? lv.n + ' · ' + LL(lv) : ''), ...F.texts.map(x => row(x.icon + ' ' + LL(x), (d.texts || {})[x.id]))))));
+    document.body.append(back);
   }
 
   /* a student's card: their files, Add HTML file, Turn in / Unsubmit */
@@ -485,7 +569,7 @@
         it.turnin && n < rows.length ? h('button', { class:'btn small cr-allin', type:'button', onclick:turn('lock', { locked:true, period }, w('sureAllIn')) }, '🔒 ' + w('allIn')) : null),
       ...rows.map(r => { const st = status(it, r);
         return h('div', { class:'cr-person cr-swrow' }, avatar(r.name, color(period)), h('div', { class:'cr-sw-name' }, h('b', {}, r.name), h('div', { class:'muted' }, r.username)),
-          it.slips ? h('div', { class:'cr-slips' }, ...(r.slips.length ? r.slips.map(x => h('a', { class:'cr-chip', href:'/studio#/p/' + x.project, title:w('seeSlip') }, '💬 ' + x.game + ' · ' + x.owner))
+          it.slips ? h('div', { class:'cr-slips' }, ...(r.slips.length ? r.slips.map(x => h('button', { class:'cr-chip', type:'button', title:w('seeSlip'), onclick:() => showSlip(x.project, r.username) }, '💬 ' + x.game + ' · ' + x.owner))
             : [h('small', { class:'muted' }, w('noSlips'))])) :
           it.games ? h('div', { class:'cr-games row' }, ...(r.games.length ? r.games.map(g => gameTile(g, h('small', { class:'muted' }, g.blocks + ' 🧩'))) : [h('small', { class:'muted' }, w('noGame'))]))
             : h('div', { class:'cr-st' }, bar(st.pct), h('small', {}, st.text)), h('span', { class:'grow' }),

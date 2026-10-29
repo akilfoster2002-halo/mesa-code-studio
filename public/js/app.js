@@ -6,6 +6,8 @@
      #/            My Projects (or the sign-in card)
      #/p/<id>      a project in the editor
      #/teacher     every student, by period (teacher account only)
+   /studio?play#/p/<id> is the game alone: just the stage, ⚑ and ■, read only
+   (the Classroom shows it in a frame, for Game Feedback).
 
    SAVING. Every change marks the project dirty; 1.5 s after the last
    change it is sent to the server. A copy also goes into this browser's
@@ -19,6 +21,7 @@
   const { h, $, $$, esc } = UI;
   const app = $('#app');
   let me = null;
+  const PLAY = new URLSearchParams(location.search).has('play');     // the stage alone, in a frame
 
   /* --------------------------------------------------------------- api */
   async function api(path, opts={}){
@@ -80,8 +83,9 @@
       try { me = await api('/me'); } catch(e){ me = null; }
     }
     if(!me) return loginView();
-    setTimeout(maybeTour, 900);
     const pm = hash.match(/^#\/p\/([^/]+)(\/edit)?$/);
+    if(PLAY) return pm ? editorView(pm[1], false) : null;
+    setTimeout(maybeTour, 900);
     if(pm) return editorView(pm[1], !!pm[2]);
     if(hash === '#/teacher' && me.role === 'teacher') return teacherView();
     const top = title => h('header', { class:'top' }, ...logoNav(), h('h1', {}, title), h('span', { class:'grow' }), langBtn(), ...userBits());
@@ -314,7 +318,7 @@
   }
 
   async function editorView(id, edit){
-    document.body.className = 'v-editor';
+    document.body.className = 'v-editor' + (PLAY ? ' play-only full-stage' : '');
     const E = editorShell();
     E.userBox.replaceChildren(langBtn(), ...userBits(true));
     app.replaceChildren(E.root);
@@ -323,7 +327,7 @@
     try { pr = await api('/projects/' + id); }
     catch(e){ if(e.status !== 401){ app.replaceChildren(h('div', { class:'login-page' }, h('div', { class:'login-card' }, h('p', {}, t('Something went wrong loading this project.')), h('a', { class:'btn primary', href:'#/' }, t('My Projects'))))); } return; }
     projectMeta = { id:pr.id, name:pr.name, updated:pr.updated, owner:pr.owner, ownerName:pr.ownerName };
-    readOnly = !!pr.readOnly && !(edit && pr.canEdit);
+    readOnly = PLAY || (!!pr.readOnly && !(edit && pr.canEdit));
     const someoneElse = pr.owner !== me.username;
     let data = pr.data;
     // a newer copy left in this browser (saved while offline) wins
@@ -360,6 +364,7 @@
     SAVE.open(id, readOnly);
     HELPER.load(P, { id, readOnly });
     VM.rt.dirty = true;
+    if(PLAY) return;                              // the game alone: no feedback panel, nothing else
     // Feedback, in the top bar: a classmate fills in a slip; the owner reads the slips
     const who = pr.ownerName || pr.owner;
     E.fbBtn.classList.add('hidden'); E.fbGive.classList.add('hidden');
