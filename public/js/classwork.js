@@ -16,16 +16,17 @@
      not change it, until the teacher gives it back. The tools (Blocks, Learn,
      Design, HTML) stay in the top bar; the teacher's own assignments go beside it. */
   const FEEDBACK_SLIPS = 4;           // Game Feedback: finished slips on this many classmates' games
+  // `at`: when it was posted, for its place in the Stream (newest first)
   const TOPICS = [
     { id:'design', icon:'🎨', title:{ en:'Game design', es:'Diseño de juegos' }, items:[
-      { id:'game', kind:'assignment', turnin:true, games:true, icon:'🕹', title:{ en:'Game Design', es:'Diseño de juegos' }, href:'/studio#/',
+      { id:'game', kind:'assignment', at:'2026-10-29T13:26:00Z', turnin:true, games:true, icon:'🕹', title:{ en:'Game Design', es:'Diseño de juegos' }, href:'/studio#/',
         line:{ en:'Build your game in blocks, then turn it in', es:'Construye tu juego con bloques y luego entrégalo' },
         status:d => {
           const n = d.blocks || 0, txt = n + ' 🧩';
           if(d.locked) return { state:'done', pct:100, text:txt + ' · 🔒' };
           return { state:n > 0 ? 'started' : 'none', pct:n > 0 ? 50 : 0, text:txt };
         } },
-      { id:'feedback', kind:'assignment', slips:FEEDBACK_SLIPS, icon:'💬', title:{ en:'Game Feedback', es:'Comentarios de juegos' }, href:'/studio#/class',
+      { id:'feedback', kind:'assignment', at:'2026-10-29T13:33:00Z', slips:FEEDBACK_SLIPS, icon:'💬', title:{ en:'Game Feedback', es:'Comentarios de juegos' }, href:'/studio#/class',
         line:{ en:'Play ' + FEEDBACK_SLIPS + ' classmates’ games and fill out a feedback slip for each', es:'Juega ' + FEEDBACK_SLIPS + ' juegos de tus compañeros y llena una tarjeta para cada uno' },
         status:d => { const n = (d.slips || []).length;
           return { state:n >= FEEDBACK_SLIPS ? 'done' : n > 0 ? 'started' : 'none', pct:Math.round(100 * Math.min(n, FEEDBACK_SLIPS) / FEEDBACK_SLIPS), text:n + ' / ' + FEEDBACK_SLIPS + ' 💬' }; } }

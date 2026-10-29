@@ -227,7 +227,7 @@
           room = await put('/room/' + period + '/posts/' + x.id, {}, 'DELETE'); streamView(period);
         } }, '🗑') : null),
       richText(x.text));
-    // assignments are in the stream too, as in Google Classroom: the built-in ones first, then by date with the posts
+    // assignments are in the stream too, as in Google Classroom, by date with the posts
     // the teacher's card lists every student in the class by name, with where their work is
     const work = it => { const st = !teacher && mine ? status(it, mine) : null, due = setting(it).due;
       const kids = teacher ? h('div', { class:'cr-work-kids' }, h('small', { class:'muted' }, t('Loading…'))) : null;
@@ -235,10 +235,10 @@
       return h('div', { class:'cr-card cr-work' }, h('a', { class:'cr-work-head', href:'#/c/' + period + '/a/' + it.id },
         h('span', { class:'cr-item-ico' + (it.custom ? ' own' : '') }, it.icon),
         h('div', { class:'cr-work-t' }, h('b', {}, L(it.title)),
-          h('small', {}, (it.custom ? it.custom.by + ' · ' + fmtDate(it.custom.at.slice(0, 10)) : w('assignment')) + (due ? ' · ' + w('due') + ' ' + fmtDate(due) : ''))),
+          h('small', {}, (it.custom ? it.custom.by + ' · ' + fmtDate(it.custom.at.slice(0, 10)) : w('assignment') + (it.at ? ' · ' + fmtDate(it.at.slice(0, 10)) : '')) + (due ? ' · ' + w('due') + ' ' + fmtDate(due) : ''))),
         h('span', { class:'grow' }), st ? stateChip(st, it) : null), kids); };
-    const feed = [...allItems().filter(it => it.kind === 'assignment' && visible(it)).map(it => ({ it, at:it.custom ? it.custom.at : '' })), ...room.posts]
-      .sort((a, b) => !a.at || !b.at ? (!b.at) - (!a.at) : b.at.localeCompare(a.at));
+    const feed = [...allItems().filter(it => it.kind === 'assignment' && visible(it)).map(it => ({ it, at:it.custom ? it.custom.at : it.at || '' })), ...room.posts]
+      .sort((a, b) => b.at.localeCompare(a.at));        // newest first
     app.replaceChildren(topbar(period, ''), h('main', { class:'cr-main' },
       h('div', { class:'cr-banner', style:{ background:color(period) } }, h('b', {}, w('cls')), h('span', {}, w('period') + ' ' + period)),
       h('div', { class:'cr-stream' },
