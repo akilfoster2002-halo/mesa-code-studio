@@ -84,8 +84,14 @@ test('HTML Class 1: 15 minutes in 8 rounds, from the slides; ids the server keep
 
 test('My Resume: the skeleton parts it has; done once it is turned in', () => {
   const C = require('../public/js/classwork.js');
-  const page = '<!DOCTYPE html>\n<html>\n<head>\n<title>Me - Resume</title>\n<style>\n</style>\n</head>\n<body>\n<h1>Me</h1>\n</body>\n</html>';
+  const page = '<!DOCTYPE html>\n<html>\n<head>\n<title>[Your Name] - Resume</title>\n<style>\n</style>\n</head>\n<body>\n<h1>[Your Name]</h1>\n'
+    + '<p><em>[One-line headline]</em></p>\n<h2>About Me</h2>\n<p>[About Me: 2-3 sentences]</p>\n<h2>Contact</h2>\n<p>Email: [your school email]<br>\nSchool: [School Name]</p>\n</body>\n</html>';
   assert.deepStrictEqual(H.siteInfo(page), { len:page.length, has:H.SITE_PARTS.map(p => p.id), ok:true });
+  assert.ok(H.SITE_PARTS.every(p => H.SITE_GROUPS.some(g => g.n === p.group)));
+  const has = x => H.siteInfo(x).has;
+  assert.ok(!has(page.replace('<br>', '')).includes('br'));                        // Email and School on one line
+  assert.ok(!has(page.replace('[your school email]', 'ana@school.org')).includes('brackets'));   // no real information yet
+  assert.ok(!has(page.replace('<h2>Contact</h2>', '<h1>Contact</h1>')).includes('oneh1'));
   assert.deepStrictEqual(H.siteInfo('<h1>Me</h1>').has, []);                        // an h1 has to be in the body
   assert.strictEqual(H.siteInfo(page.replace('</h1>', '')).ok, false);              // the #1 bug: a missing closing tag
   const st = (text, siteIn) => C.status(C.ITEMS.find(i => i.id === 'site'), C.studentData({ html:{ site:text, siteIn } }, null, []));

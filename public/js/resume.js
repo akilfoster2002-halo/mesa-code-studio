@@ -122,7 +122,8 @@
       document.title = (t && t.trim() ? t.trim() + ' · ' : '') + 'resume.html';
       const has = HL.siteInfo(ed.value).has;
       checks.replaceChildren(h('span', { class:'rs-checks-l' }, w('has')),
-        ...HL.SITE_PARTS.map(p => h('span', { class:'rs-chip' + (has.includes(p.id) ? ' ok' : '') }, (has.includes(p.id) ? '✓ ' : '') + p.en)));
+        ...HL.SITE_GROUPS.flatMap(g => [h('span', { class:'rs-checks-g' }, g.n + ':'),
+          ...HL.SITE_PARTS.filter(p => p.group === g.n).map(p => h('span', { class:'rs-chip' + (has.includes(p.id) ? ' ok' : ''), title:p.say ? L(p.say) : null }, (has.includes(p.id) ? '✓ ' : '') + p.en))]));
     };
     const save = async () => {
       clearTimeout(timer);

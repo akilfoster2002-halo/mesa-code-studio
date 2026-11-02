@@ -408,8 +408,16 @@
      Turn in / Unsubmit as in Classroom (turned in, it cannot change). */
   function resumeWork(period, it, body, side){
     const HL = window.HTMLLESSONS;
-    body.append(h('div', { class:'cr-resume-needs' }, h('b', {}, '✅ ' + w('needs')),
-      h('div', { class:'cr-site-parts' }, ...HL.SITE_PARTS.map(p => h('span', { class:'cr-chip' + (((mine.learn.site || {}).has || []).includes(p.id) ? ' done' : '') }, p.en)))));
+    // the checklist: each part of the page, ticked off as it shows up in resume.html
+    const checklist = h('div', { class:'cr-resume-needs' });
+    const drawChecks = () => { const has = (mine.learn.site || {}).has || [];
+      checklist.replaceChildren(h('b', {}, '✅ ' + w('needs')), ...HL.SITE_GROUPS.map(g => {
+        const parts = HL.SITE_PARTS.filter(p => p.group === g.n), n = parts.filter(p => has.includes(p.id)).length;
+        return h('div', { class:'cr-check-group' }, h('div', { class:'cr-check-h' }, h('span', {}, L(g)), h('small', { class:n === parts.length ? 'all' : '' }, n + ' / ' + parts.length)),
+          ...parts.map(p => h('div', { class:'cr-check-row' + (has.includes(p.id) ? ' done' : '') }, h('span', { class:'cr-box' }, has.includes(p.id) ? '✓' : ''),
+            h('code', {}, p.en), p.say ? h('span', { class:'cr-check-say' }, L(p.say)) : null)));
+      })); };
+    drawChecks(); body.append(checklist);
     const draw = (text, inAt) => {
       const st = status(it, mine);
       const thumb = h('iframe', { class:'cr-thumb-frame', sandbox:'', tabindex:'-1', 'aria-hidden':'true', title:'resume.html' });
@@ -430,7 +438,7 @@
       const r = await api('/learn').catch(() => null), x = ((r && r.data) || {}).html || {};
       mine.learn.site = { ...HL.siteInfo(x.site), in:x.siteIn || null };
       draw(x.site || '', x.siteIn || null);
-      body.querySelectorAll('.cr-resume-needs .cr-chip').forEach((c, i) => c.classList.toggle('done', mine.learn.site.has.includes(HL.SITE_PARTS[i].id)));
+      drawChecks();
     };
     draw('', null); refreshResume();
     // back from the editor tab: show the newest page

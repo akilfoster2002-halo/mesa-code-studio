@@ -246,3 +246,13 @@ button.cr-game{cursor:pointer;font:inherit;text-align:left;width:100%;grid-templ
 .cr-attach-go{display:grid;place-items:center;padding:0 12px;color:#1967d2;font-size:16px}
 .cr-gc-btn{width:100%;justify-content:center}
 .cr-for{color:#1967d2;font-weight:500}
+.cr-check-group{display:grid;gap:4px;margin-top:4px}
+.cr-check-h{display:flex;align-items:center;gap:8px;font-size:13px;font-weight:600;color:#5f6368}
+.cr-check-h small{font-weight:500;color:#80868b}
+.cr-check-h small.all{color:#137333}
+.cr-check-row{display:flex;align-items:center;gap:8px;font-size:14px;color:#3c4043;padding:3px 0}
+.cr-check-row code{font:13px "Ubuntu Mono",Menlo,monospace;background:#f1f3f4;border-radius:4px;padding:1px 6px;color:#3c4043}
+.cr-check-say{color:#5f6368;font-size:13px}
+.cr-box{flex:none;width:18px;height:18px;border:2px solid #9aa0a6;border-radius:4px;display:grid;place-items:center;font-size:13px;font-weight:700;color:#fff}
+.cr-check-row.done .cr-box{background:#137333;border-color:#137333}
+.cr-check-row.done code{background:#e6f4ea;color:#137333}

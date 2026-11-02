@@ -180,16 +180,34 @@
   const C1_H1 = s => /^\s*<h1>\s*[^<\s][^<]*<\/h1>\s*$/i.test(s);
 
   /* MY HTML WEBSITE — the page each student types in the Classroom's editor
-     (it becomes their resume website). What it has so far: */
+     (it becomes their resume website). What it has so far, part by part
+     (part 1 = the skeleton, part 2 = the About Me and Contact sections): */
   const SITE_MAX = 60000;
+  const SITE_GROUPS = [
+    { n:1, en:'Part 1 · The skeleton', es:'Parte 1 · El esqueleto' },
+    { n:2, en:'Part 2 · About Me & Contact', es:'Parte 2 · Sobre mí y Contacto' }
+  ];
+  const ABOUT = '<h2>\\s*(?:about me|sobre m[ií])\\s*<\\/h2>', CONTACT = '<h2>\\s*(?:contact|contacto)\\s*<\\/h2>';
   const SITE_PARTS = [
-    { id:'doctype', en:'<!DOCTYPE html>', test:s => /<!doctype\s+html>/i.test(s) },
-    { id:'html', en:'<html> … </html>', test:s => /<html[^>]*>[\s\S]*<\/html>/i.test(s) },
-    { id:'head', en:'<head> … </head>', test:s => /<head>[\s\S]*<\/head>/i.test(s) },
-    { id:'title', en:'<title> … </title>', test:s => /<title>[^<]*\S[^<]*<\/title>/i.test(s) },
-    { id:'style', en:'<style> … </style>', test:s => /<head>[\s\S]*<style>[\s\S]*<\/style>[\s\S]*<\/head>/i.test(s) },
-    { id:'body', en:'<body> … </body>', test:s => /<body>[\s\S]*<\/body>/i.test(s) },
-    { id:'h1', en:'<h1> … </h1>', test:s => /<body>[\s\S]*<h1>[^<]*\S[^<]*<\/h1>[\s\S]*<\/body>/i.test(s) }
+    { id:'doctype', group:1, en:'<!DOCTYPE html>', test:s => /<!doctype\s+html>/i.test(s) },
+    { id:'html', group:1, en:'<html> … </html>', test:s => /<html[^>]*>[\s\S]*<\/html>/i.test(s) },
+    { id:'head', group:1, en:'<head> … </head>', test:s => /<head>[\s\S]*<\/head>/i.test(s) },
+    { id:'title', group:1, en:'<title> … </title>', test:s => /<title>[^<]*\S[^<]*<\/title>/i.test(s) },
+    { id:'style', group:1, en:'<style> … </style>', test:s => /<head>[\s\S]*<style>[\s\S]*<\/style>[\s\S]*<\/head>/i.test(s) },
+    { id:'body', group:1, en:'<body> … </body>', test:s => /<body>[\s\S]*<\/body>/i.test(s) },
+    { id:'h1', group:1, en:'<h1> … </h1>', test:s => /<body>[\s\S]*<h1>[^<]*\S[^<]*<\/h1>[\s\S]*<\/body>/i.test(s) },
+    { id:'headline', group:2, en:'<p><em>[headline]</em></p>', say:{ en:'A one-line headline under your name', es:'Un titular de una línea bajo tu nombre' },
+      test:s => /<body>[\s\S]*<p>\s*<em>[^<]*\S[^<]*<\/em>\s*<\/p>/i.test(s) },
+    { id:'about', group:2, en:'<h2>About Me</h2>', say:{ en:'An About Me heading', es:'Un subtítulo About Me' }, test:s => new RegExp(ABOUT, 'i').test(s) },
+    { id:'aboutp', group:2, en:'<p>[About Me]</p>', say:{ en:'A paragraph under About Me', es:'Un párrafo bajo About Me' },
+      test:s => new RegExp(ABOUT + '\\s*<p>[\\s\\S]*?\\S[\\s\\S]*?<\\/p>', 'i').test(s) },
+    { id:'contact', group:2, en:'<h2>Contact</h2>', say:{ en:'A Contact heading', es:'Un subtítulo Contact' }, test:s => new RegExp(CONTACT, 'i').test(s) },
+    { id:'br', group:2, en:'Email … <br> School …', say:{ en:'Email and School on two lines with <br>', es:'Email y School en dos líneas con <br>' },
+      test:s => new RegExp(CONTACT + '\\s*<p>[^]*?email[^]*?<br\\s*\\/?>[^]*?school[^]*?<\\/p>', 'i').test(s) },
+    { id:'oneh1', group:2, en:'Only one <h1>', say:{ en:'One <h1>, an <h2> for each section', es:'Un <h1>, un <h2> para cada sección' },
+      test:s => (s.match(/<h1[\s>]/gi) || []).length === 1 && (s.match(/<h2[\s>]/gi) || []).length >= 2 },
+    { id:'brackets', group:2, en:'[placeholders]', say:{ en:'Placeholders stay in [brackets]: no real information yet', es:'Los espacios quedan entre [corchetes]: nada de información real todavía' },
+      test:s => (s.match(/\[[^\]<\n]+\]/g) || []).length >= 3 && !/@/.test(s.replace(/<head>[\s\S]*<\/head>/i, '')) }
   ];
   const siteInfo = s => { s = typeof s === 'string' ? s : ''; const has = SITE_PARTS.filter(p => p.test(s)).map(p => p.id);
     return { len:s.length, has, ok:has.length === SITE_PARTS.length }; };
@@ -198,6 +216,6 @@
   const score = (right, total) => total ? Math.min(100, Math.round(100 * right / total)) : 0;
 
   const HTMLLESSONS = { ACTS, CARDS, TYPE, CLOSE, MATCH_WORDS, MATCH_TAGS, wrap, BUILD, FIX, PAGE_START, GOALS, score,
-    C1_ACTS, C1_WORDS, C1_SORT, C1_ELEMENTS, C1_TAGS, C1_JOBS, C1_PLACE, C1_PAGE, C1_ORDER, C1_EXIT, C1_H1, SITE_MAX, SITE_PARTS, siteInfo };
+    C1_ACTS, C1_WORDS, C1_SORT, C1_ELEMENTS, C1_TAGS, C1_JOBS, C1_PLACE, C1_PAGE, C1_ORDER, C1_EXIT, C1_H1, SITE_MAX, SITE_GROUPS, SITE_PARTS, siteInfo };
   if(typeof module !== 'undefined') module.exports = HTMLLESSONS; else root.HTMLLESSONS = HTMLLESSONS;
 })(this);

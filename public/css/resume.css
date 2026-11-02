@@ -92,3 +92,4 @@ body{background:var(--bg);color:var(--ink);font:14px/1.4 'Google Sans',Roboto,sy
   .rs-top{flex-wrap:wrap}
   .rs-btn kbd{display:none}
 }
+.rs-checks-g{color:var(--muted);font-weight:700;font-size:12px;margin-left:6px}

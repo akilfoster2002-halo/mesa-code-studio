@@ -558,7 +558,8 @@ test('Game Design: the student turns in their game (the editor lock); the teache
 
 test('My Resume: saved with Learn; the teacher reads it; grades say how far it is', async () => {
   const { cookie } = await login('ana', 'tiger42'), t = await login('teach', 'apple-pear');
-  const page = '<!DOCTYPE html><html><head><title>Ana</title><style></style></head><body><h1>Ana</h1></body></html>';
+  const page = '<!DOCTYPE html><html><head><title>Ana</title><style></style></head><body><h1>[Ana]</h1><p><em>[headline]</em></p>'
+    + '<h2>About Me</h2><p>[About me]</p><h2>Contact</h2><p>Email: [email]<br>School: [school]</p></body></html>';
   assert.strictEqual((await call(cookie, '/learn', { method:'PUT', body:JSON.stringify({ data:{ html:{ site:page } } }) })).status, 200);
   await call(cookie, '/learn', { method:'PUT', body:JSON.stringify({ data:{ html:{ acts:{ cwords:{ best:90 } } } } }) });   // other saves keep it
   assert.strictEqual((await (await call(cookie, '/learn')).json()).data.html.site, page);
