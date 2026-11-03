@@ -216,6 +216,8 @@
      (set out like a Wikipedia article: an infobox of facts, sections, fun
      facts, references). Each student turns it into a page about the
      character their teacher gives them (html.wikiChar), then presents it. */
+  // the Mario page's own pictures: 🖼 Add picture in the editor puts the student's picture in the first one left
+  const WIKI_PIC = '/img/wiki/';
   const WIKI_START = `<!DOCTYPE html>
 <html>
 <head>
@@ -230,6 +232,8 @@
     .infobox th, .infobox td { padding: 4px 8px; text-align: left; vertical-align: top; }
     .infobox .top { text-align: center; font-size: 18px; background: #ccccff; }
     .infobox img { width: 100%; }
+    .pic { float: right; width: 200px; margin: 0 0 12px 16px; border: 1px solid #c8ccd1; background: #f8f9fa; padding: 4px; font-size: 13px; }
+    .pic img { width: 100%; }
   </style>
 </head>
 <body>
@@ -239,7 +243,7 @@
   <!-- The infobox: the box of facts on the right -->
   <table class="infobox">
     <tr><th colspan="2" class="top">Mario</th></tr>
-    <tr><td colspan="2"><img src="PASTE-A-PICTURE-LINK-HERE" alt="A picture of Mario"></td></tr>
+    <tr><td colspan="2"><img src="/img/wiki/mario.svg" alt="A drawing of Mario"></td></tr>
     <tr><th>First seen</th><td>Donkey Kong (1981)</td></tr>
     <tr><th>Made by</th><td>Shigeru Miyamoto</td></tr>
     <tr><th>Species</th><td>Human</td></tr>
@@ -256,6 +260,11 @@
   <p>Mario is brave and kind. He always helps his friends.</p>
 
   <h2>Powers</h2>
+  <!-- A picture in the article, with a caption under it -->
+  <figure class="pic">
+    <img src="/img/wiki/mushroom.svg" alt="A Super Mushroom">
+    <figcaption>A Super Mushroom makes Mario big.</figcaption>
+  </figure>
   <p>Mario can jump very high. When he eats a Super Mushroom, he grows big. A Fire Flower lets him throw fireballs.</p>
 
   <h2>Story</h2>
@@ -292,14 +301,17 @@
       test:s => { const n = h1Of(s), t = (s.match(/<title>([^<]*)<\/title>/i) || [])[1]; return !!n && !!t && textOf(t).toLowerCase().includes(n.toLowerCase()); } },
     { id:'bold', group:1, en:'<p><b>[name]</b> is…', say:{ en:'The first paragraph starts with the name in bold', es:'El primer párrafo empieza con el nombre en negrita' },
       test:s => { const m = s.match(/<p>\s*<b>([^<]+)<\/b>/i); return !!m && !!h1Of(s) && same(m[1], h1Of(s)); } },
-    { id:'img', group:1, en:'<img src="…">', say:{ en:'A picture of your character in the box', es:'Una imagen de tu personaje en el cuadro' },
-      test:s => /<img[^>]*\ssrc\s*=\s*["']?(https?:\/\/|data:image\/)[^"'\s>]+/i.test(s) },
+    { id:'img', group:1, en:'<img src="…"> × 2', say:{ en:'Your own pictures: one in the box, one in the article (🖼 Add picture)', es:'Tus propias imágenes: una en el cuadro y una en el artículo (🖼 Añadir imagen)' },
+      test:s => { const srcs = [...s.matchAll(/<img[^>]*\ssrc\s*=\s*["']?([^"'\s>]+)/gi)].map(m => m[1]);
+        return srcs.length >= 2 && srcs.every(x => !x.includes(WIKI_PIC) && /^(https?:\/\/|data:image\/|\/api\/assets\/)/i.test(x)); } },
     { id:'nomario', group:1, en:'No Mario', say:{ en:'Nothing about Mario is left', es:'No queda nada de Mario' },
       test:(s, who) => { const t = s.toLowerCase(), me = (who || '').toLowerCase(); return MARIO_WORDS.every(x => me.includes(x) || !t.includes(x)); } },
     { id:'infobox', group:2, en:'<table class="infobox">', say:{ en:'The box of facts, with at least 5 rows', es:'El cuadro de datos, con 5 filas o más' },
       test:s => { const m = s.match(/<table[^>]*class\s*=\s*["']?infobox[\s\S]*?<\/table>/i); return !!m && (m[0].match(/<tr[\s>]/gi) || []).length >= 5; } },
     { id:'sections', group:2, en:'<h2> + <p> × 4', say:{ en:'At least 4 sections, each a heading and a paragraph', es:'4 secciones o más, cada una con subtítulo y párrafo' },
-      test:s => (s.match(/<h2[^>]*>[^<]*\S[^<]*<\/h2>\s*<p>[\s\S]*?\S[\s\S]*?<\/p>/gi) || []).length >= 4 },
+      test:s => (s.match(/<h2[^>]*>[^<]*\S[^<]*<\/h2>\s*(<!--[\s\S]*?-->\s*)?(<figure[\s\S]*?<\/figure>\s*)?<p>[\s\S]*?\S[\s\S]*?<\/p>/gi) || []).length >= 4 },   // a picture may come first
+    { id:'figure', group:2, en:'<figure> + <figcaption>', say:{ en:'A picture in the article with a caption under it', es:'Una imagen en el artículo con un pie de foto' },
+      test:s => /<figure[^>]*>[\s\S]*?<img[^>]*>[\s\S]*?<figcaption>[^<]*\S[^<]*<\/figcaption>[\s\S]*?<\/figure>/i.test(s) },
     { id:'facts', group:2, en:'<li> × 3', say:{ en:'3 fun facts in a list', es:'3 datos curiosos en una lista' },
       test:s => /<ul>(\s*<li>[\s\S]*?\S[\s\S]*?<\/li>){3,}/i.test(s) },
     { id:'refs', group:2, en:'<a href="…">', say:{ en:'A link to where you found your facts', es:'Un enlace a donde encontraste tus datos' },
@@ -326,6 +338,6 @@
 
   const HTMLLESSONS = { ACTS, CARDS, TYPE, CLOSE, MATCH_WORDS, MATCH_TAGS, wrap, BUILD, FIX, PAGE_START, GOALS, score,
     C1_ACTS, C1_WORDS, C1_SORT, C1_ELEMENTS, C1_TAGS, C1_JOBS, C1_PLACE, C1_PAGE, C1_ORDER, C1_EXIT, C1_H1, SITE_MAX, SITE_GROUPS, SITE_PARTS, siteInfo,
-    WIKI_START, WIKI_GROUPS, WIKI_PARTS, wikiInfo, SITES, sitesOf };
+    WIKI_PIC, WIKI_START, WIKI_GROUPS, WIKI_PARTS, wikiInfo, SITES, sitesOf };
   if(typeof module !== 'undefined') module.exports = HTMLLESSONS; else root.HTMLLESSONS = HTMLLESSONS;
 })(this);

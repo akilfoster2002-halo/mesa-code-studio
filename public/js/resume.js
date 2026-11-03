@@ -10,6 +10,8 @@
    until Unsubmit in the Classroom. A teacher: ?u=<username>, read only.
    At /wiki it is the Website Presentation's character.html instead (html.wiki):
    it starts as the Mario page, and the student changes it to their character.
+   Pictures: 🖼 Add picture (or paste or drop one on the code) makes it smaller,
+   keeps it in the asset store and puts it in the page as <img src="https://…/api/assets/…">.
    ===================================================================== */
 (function(){
   const { h, $ } = UI;
@@ -27,6 +29,9 @@
     login:{ en:'Log in to the Classroom first.', es:'Primero inicia sesión en la Clase.' }, open:{ en:'Open the Classroom', es:'Abrir la Clase' },
     empty:{ en:'Start typing your ' + S.file + ' here…', es:'Empieza a escribir tu ' + S.file + ' aquí…' },
     character:{ en:'Your character', es:'Tu personaje' },
+    addPic:{ en:'Add picture', es:'Añadir imagen' }, picAdding:{ en:'Adding picture…', es:'Añadiendo imagen…' },
+    picFail:{ en:'Picture not added. Try again.', es:'No se añadió la imagen. Inténtalo otra vez.' },
+    picHint:{ en:'Put a picture in the page from your computer. You can also paste one or drop it on the code.', es:'Pon una imagen de tu computadora en la página. También puedes pegarla o soltarla en el código.' },
     line:{ en:'Ln', es:'Lín' }, col:{ en:'Col', es:'Col' }, has:{ en:'Your page has', es:'Tu página tiene' }
   };
   const w = k => L(W[k]);
@@ -77,6 +82,27 @@
     return out + esc(src.slice(i)) + '\n';
   }
 
+  /* ------------------------------------------------------- pictures
+     made at most 800 px wide or tall (a phone photo is megabytes), then
+     kept in the asset store; a moving GIF or an SVG stays as it is */
+  async function shrink(file){
+    if(!/^image\/(png|jpeg|webp|bmp|avif)$/.test(file.type)) return file;
+    const img = await createImageBitmap(file).catch(() => null);
+    if(!img) return file;
+    const k = Math.min(1, 800 / Math.max(img.width, img.height));
+    if(k === 1 && file.size < 400000) return file;
+    const c = document.createElement('canvas');
+    c.width = Math.round(img.width * k); c.height = Math.round(img.height * k);
+    c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+    return new Promise(r => c.toBlob(b => r(b || file), file.type === 'image/png' ? 'image/png' : 'image/jpeg', 0.85));
+  }
+  async function upload(file){
+    const blob = await shrink(file);
+    const r = await fetch('/api/assets', { method:'POST', credentials:'same-origin', headers:{ 'Content-Type':blob.type }, body:blob });
+    if(!r.ok) throw new Error('upload');
+    return location.origin + '/api/assets/' + (await r.json()).id;      // the whole address: a short /api/… does not load in the page's frame
+  }
+
   /* --------------------------------------------------------- the page */
   async function start(){
     let me;
@@ -106,7 +132,7 @@
     const hl = h('pre', { class:'rs-hl', 'aria-hidden':'true' });
     const gutter = h('div', { class:'rs-gutter', 'aria-hidden':'true' });
     const status = h('span', { class:'rs-status' });
-    const frame = h('iframe', { class:'rs-frame', sandbox:'', title:w('page') });
+    const frame = h('iframe', { class:'rs-frame', sandbox:'allow-same-origin', title:w('page') });   // no scripts; same origin so its pictures load
     const tabTitle = h('span', { class:'rs-tabt' });
     const pos = h('span', { class:'rs-pos' });
     const checks = h('div', { class:'rs-checks' });
@@ -142,6 +168,26 @@
       catch(e){ setStatus('offline'); timer = setTimeout(save, 5000); }
     };
     ed.addEventListener('input', () => { draw(); setStatus('edited'); clearTimeout(timer); timer = setTimeout(save, 2000); });
+    // a picture goes where the cursor is in a src="…", else in place of the Mario page's first picture left, else in a new <img> at the cursor
+    const addPicture = async file => {
+      if(o.readOnly || !file || !/^image\//.test(file.type)) return;
+      const at = ed.selectionStart, end = ed.selectionEnd;
+      status.textContent = '⏳ ' + w('picAdding'); status.className = 'rs-status saving';
+      let src;
+      try { src = await upload(file); } catch(e){ status.textContent = '⚠ ' + w('picFail'); status.className = 'rs-status offline'; return; }
+      const v = ed.value, ls = v.lastIndexOf('\n', at - 1) + 1, le = v.indexOf('\n', at) < 0 ? v.length : v.indexOf('\n', at);
+      const inSrc = [...v.slice(ls, le).matchAll(/src\s*=\s*(["'])([^"']*)\1/gi)].map(m => ({ from:ls + m.index + m[0].indexOf(m[1]) + 1, len:m[2].length }))
+        .find(m => at >= m.from && at <= m.from + m.len);
+      const spot = v.match(new RegExp('src="(' + HL.WIKI_PIC.replace(/\//g, '\\/') + '[^"]*)"'));    // the first Mario picture left
+      if(inSrc) ed.setRangeText(src, inSrc.from, inSrc.from + inSrc.len, 'end');
+      else if(spot) ed.setRangeText(src, spot.index + 5, spot.index + 5 + spot[1].length, 'end');
+      else ed.setRangeText('<img src="' + src + '" alt="">', at, end, 'end');
+      ed.focus(); ed.dispatchEvent(new Event('input')); save();
+    };
+    const picker = h('input', { type:'file', accept:'image/*', hidden:true, onchange:e => { addPicture(e.target.files[0]); e.target.value = ''; } });
+    ed.addEventListener('paste', e => { const f = [...(e.clipboardData && e.clipboardData.files || [])].find(f => /^image\//.test(f.type)); if(f){ e.preventDefault(); addPicture(f); } });
+    ed.addEventListener('dragover', e => { if(!o.readOnly && [...e.dataTransfer.types].includes('Files')) e.preventDefault(); });
+    ed.addEventListener('drop', e => { const f = [...e.dataTransfer.files].find(f => /^image\//.test(f.type)); if(f){ e.preventDefault(); addPicture(f); } });
     ed.addEventListener('scroll', sync);
     ['keyup', 'click', 'select'].forEach(k => ed.addEventListener(k, where));
     ed.addEventListener('keydown', e => {
@@ -164,6 +210,7 @@
         h('div', { class:'rs-file' }, h('b', {}, S.file), h('small', {}, o.owner + (o.readOnly ? ' · ' + w('readOnly') : ''))),
         o.character ? h('span', { class:'rs-who' }, '🎭 ' + w('character') + ': ', h('b', {}, o.character)) : null,
         o.readOnly ? null : status, h('span', { class:'grow' }), langBtn, back,
+        o.readOnly ? null : h('button', { class:'rs-btn', type:'button', title:w('picHint'), onclick:() => picker.click() }, '🖼 ' + w('addPic')), o.readOnly ? null : picker,
         o.readOnly ? null : h('button', { class:'rs-btn primary', type:'button', onclick:save, title:'Ctrl+S' }, '💾 ' + w('save'), h('kbd', {}, /Mac/.test(navigator.platform) ? '⌘S' : 'Ctrl S'))),
       o.turnedIn ? h('div', { class:'rs-banner' }, '🔒 ' + w('turnedIn')) : null,
       h('main', { class:'rs-main' },

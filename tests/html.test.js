@@ -107,7 +107,7 @@ test('Website Presentation: starts as the Mario page; ticked off as it becomes t
   assert.deepStrictEqual(H.wikiInfo(start).has, H.WIKI_PARTS.filter(p => p.group === 2).map(p => p.id));
   assert.ok(H.WIKI_PARTS.every(p => H.WIKI_GROUPS.some(g => g.n === p.group)));
   const elsa = start.replace(/Mario/g, 'Elsa').replace(/Luigi|Mushroom Kingdom|Nintendo|Miyamoto|Bowser|Peach|Jumpman|Donkey Kong/g, 'x')
-    .replace('PASTE-A-PICTURE-LINK-HERE', 'https://example.com/elsa.png');
+    .replace('/img/wiki/mario.svg', 'https://example.com/elsa.png').replace('/img/wiki/mushroom.svg', 'https://example.com/castle.png');
   assert.strictEqual(H.wikiInfo(elsa, 'Elsa').ok, true);
   assert.strictEqual(H.wikiInfo(elsa, '').ok, true);                                   // no character given yet: any name
   const has = (x, who) => H.wikiInfo(x, who).has;
@@ -116,10 +116,13 @@ test('Website Presentation: starts as the Mario page; ticked off as it becomes t
   assert.ok(has(start.replace(/Mario/g, 'Luigi'), 'Luigi').includes('nomario') === false); // the rest of Mario is still there
   assert.ok(!has(elsa.replace('<title>Elsa', '<title>Page'), 'Elsa').includes('title'));
   assert.ok(!has(elsa.replace('<b>Elsa</b>', 'Elsa'), 'Elsa').includes('bold'));
-  assert.ok(!has(elsa.replace('https://example.com/elsa.png', 'PASTE-A-PICTURE-LINK-HERE'), 'Elsa').includes('img'));
+  assert.ok(!has(elsa.replace('https://example.com/castle.png', '/img/wiki/mushroom.svg'), 'Elsa').includes('img'));   // a Mario picture is left
+  assert.ok(!has(elsa.replace(/<figure[\s\S]*<\/figure>/, ''), 'Elsa').includes('img'));                             // only one picture
   assert.deepStrictEqual(H.wikiInfo('').has, []);
+  const uploaded = elsa.replace('https://example.com/elsa.png', '/api/assets/' + 'ab'.repeat(32));   // 🖼 Add picture
+  assert.ok(has(uploaded, 'Elsa').includes('img'));
   const st = (text, wikiIn) => C.status(C.ITEMS.find(i => i.id === 'wiki'), C.studentData({ html:{ wiki:text, wikiIn, wikiChar:'Elsa' } }, null, []));
-  assert.deepStrictEqual([st('').state, st(start).state, st(start).text, st(elsa).pct], ['none', 'started', '4 / 9 🏷', 100]);
+  assert.deepStrictEqual([st('').state, st(start).state, st(start).text, st(elsa).pct], ['none', 'started', '5 / 10 🏷', 100]);
   assert.strictEqual(st(elsa, '2026-11-10T15:00:00Z').state, 'done');                  // done = turned in
   assert.strictEqual(H.sitesOf({ wikiChar:'Elsa' }).wiki.who, 'Elsa');
 });

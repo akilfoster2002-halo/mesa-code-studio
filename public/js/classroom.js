@@ -428,7 +428,8 @@
     drawWho(); drawChecks(); if(who) body.append(who); body.append(checklist);
     const draw = (text, inAt) => {
       const st = status(it, mine);
-      const thumb = h('iframe', { class:'cr-thumb-frame', sandbox:'', tabindex:'-1', 'aria-hidden':'true', title:S.file });
+      const thumb = h('iframe', { class:'cr-thumb-frame', sandbox:'allow-same-origin',   // no scripts; same origin so its pictures load
+        tabindex:'-1', 'aria-hidden':'true', title:S.file });
       thumb.srcdoc = text || '';
       side.replaceChildren(h('div', { class:'cr-card cr-yours cr-gc' },
         h('div', { class:'cr-yours-h' }, h('b', {}, w('yourWork')), stateChip(st, it)),
