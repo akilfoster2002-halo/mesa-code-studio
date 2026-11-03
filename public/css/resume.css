@@ -93,3 +93,5 @@ body{background:var(--bg);color:var(--ink);font:14px/1.4 'Google Sans',Roboto,sy
   .rs-btn kbd{display:none}
 }
 .rs-checks-g{color:var(--muted);font-weight:700;font-size:12px;margin-left:6px}
+.rs-who{font-size:14px;color:#3c4043;background:#f3e8fd;border-radius:999px;padding:4px 12px;white-space:nowrap}
+.rs-who b{color:#9334e6}

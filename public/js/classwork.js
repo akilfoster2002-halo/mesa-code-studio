@@ -18,6 +18,11 @@
   const HL = root.HTMLLESSONS || require('./html-lessons.js');
   const prog = (n, of, text) => ({ state:n >= of ? 'done' : n > 0 ? 'started' : 'none', pct:of ? Math.round(100 * Math.min(n, of) / of) : 0, text });
   const FEEDBACK_SLIPS = 4;
+  // a page typed in the editor (My Resume, Website Presentation): done = turned in (as in Google Classroom);
+  // its checklist shows how far the page is
+  const siteStatus = (key, due) => d => { const x = (d.learn && d.learn[key]) || { len:0, has:[], ok:false }, of = HL.SITES[key].parts.length;
+    const late = !!(due && x.in && x.in.slice(0, 10) > due);
+    return { state:x.in ? 'done' : x.len ? 'started' : 'none', late, pct:Math.round(100 * x.has.length / of), text:x.has.length + ' / ' + of + ' 🏷' }; };
   const RESUME_DUE = '2026-11-11';      // My Resume: Wednesday, November 11 (a class can set its own)           // Game Feedback: finished slips on this many classmates' games
   // `at`: when it was posted, for its place in the Stream (newest first)
   const TOPICS = [
@@ -38,12 +43,12 @@
       { id:'html', kind:'assignment', at:'2026-10-29T14:05:00Z', icon:'🌐', title:{ en:'HTML Practice', es:'Práctica de HTML' }, href:'/html#/', frame:'/html?embed#/',
         line:{ en:'7 activities to practice the tags: flash cards, typing, closing tags, fix the bug…', es:'7 actividades para practicar las etiquetas: tarjetas, escribir, cerrar etiquetas, arreglar errores…' },
         status:d => { const acts = (d.learn && d.learn.html) || {}, n = HL.ACTS.filter(a => acts[a.id]).length; return prog(n, HL.ACTS.length, n + ' / ' + HL.ACTS.length); } },
-      { id:'site', kind:'assignment', at:'2026-10-29T14:10:00Z', due:RESUME_DUE, site:true, icon:'📄', title:{ en:'My Resume', es:'Mi currículum' },
+      { id:'wiki', kind:'assignment', at:'2026-11-03T14:00:00Z', site:'wiki', icon:'🎭', title:{ en:'Website Presentation', es:'Presentación del sitio web' },
+        line:{ en:'Change the Mario page into a page about your character. Then present it to the class.', es:'Cambia la página de Mario por una página sobre tu personaje. Luego preséntala a la clase.' },
+        status:siteStatus('wiki') },
+      { id:'site', kind:'assignment', at:'2026-10-29T14:10:00Z', due:RESUME_DUE, site:'site', icon:'📄', title:{ en:'My Resume', es:'Mi currículum' },
         line:{ en:'Type your resume.html in the editor. Every class you add to it.', es:'Escribe tu resume.html en el editor. Cada clase le añades algo.' },
-        // done = turned in (as in Google Classroom); the 7 skeleton parts show how far the page is
-        status:d => { const x = (d.learn && d.learn.site) || { len:0, has:[], ok:false }, of = HL.SITE_PARTS.length;
-          const late = !!(x.in && x.in.slice(0, 10) > RESUME_DUE);
-          return { state:x.in ? 'done' : x.len ? 'started' : 'none', late, pct:Math.round(100 * x.has.length / of), text:x.has.length + ' / ' + of + ' 🏷' }; } }
+        status:siteStatus('site', RESUME_DUE) }
     ] }
   ];
   const ITEMS = TOPICS.flatMap(t => t.items.map(it => ({ ...it, topic:t })));
@@ -80,7 +85,7 @@
     const ps = Array.isArray(projects) ? projects : [];
     return { subs:subs || {}, locked:!!locked, slips:slips || [],
       learn:{ levels:(learn && learn.levels) || {}, words:(learn && learn.words) || null, html:(learn && learn.html && learn.html.acts) || {},
-        site:{ ...HL.siteInfo(learn && learn.html && learn.html.site), in:(learn && learn.html && learn.html.siteIn) || null } },
+        ...HL.sitesOf(learn && learn.html) },
       design:design ? { done:Array.isArray(design.done) ? design.done.length : 0, approved:!!design.approved, turnedIn:!!design.turnedIn } : null,
       projects:ps.length, blocks:ps.reduce((a, p) => Math.max(a, (p.stats && p.stats.blocks) || 0), 0)
     };

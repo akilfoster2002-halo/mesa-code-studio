@@ -135,7 +135,7 @@ function serveStatic(req, res, pathname){
   if(pathname === '/design' || pathname === '/design/') pathname = '/design.html';
   if(pathname === '/learn' || pathname === '/learn/') pathname = '/learn.html';
   if(pathname === '/html' || pathname === '/html/') pathname = '/html.html';
-  if(pathname === '/resume' || pathname === '/resume/') pathname = '/resume.html';
+  if(pathname === '/resume' || pathname === '/resume/' || pathname === '/wiki' || pathname === '/wiki/') pathname = '/resume.html';   // one editor for both pages
   const file = path.normalize(path.join(PUBLIC, decodeURIComponent(pathname)));
   if(!file.startsWith(PUBLIC)) return send(res, 403, 'forbidden');
   fs.stat(file, (err, st) => {
@@ -457,7 +457,7 @@ async function api(req, res, url){
           grade:x.data.grade == null ? null : x.data.grade };
       return send(res, 200, kids.sort((a, b) => a.name.localeCompare(b.name)).map(u => ({ username:u.username, name:u.name,
         learn:{ levels:(learn[u.username] || {}).levels || {}, words:(learn[u.username] || {}).words || null, html:((learn[u.username] || {}).html || {}).acts || {},
-          site:{ ...HTMLLESSONS.siteInfo(((learn[u.username] || {}).html || {}).site), in:((learn[u.username] || {}).html || {}).siteIn || null } },
+          ...HTMLLESSONS.sitesOf((learn[u.username] || {}).html) },
         design:designs[u.username] || null, projects:(over[u.username] || {}).projects || 0, blocks:(over[u.username] || {}).blocks || 0,
         last_login:(over[u.username] || {}).last_login || null, subs:subs[u.username] || {},
         locked:!!u.locked, games:games[u.username] || [], slips:slips[u.username] || [] })));
@@ -541,12 +541,23 @@ async function api(req, res, url){
       const list = (await store.listFeedback()).filter(f => !owners || owners.has(f.owner));
       return send(res, 200, await withNames(list));
     }
-    // one student's My Resume, to read and see
+    // one student's My Resume (or ?f=wiki, their Website Presentation page), to read and see
     if(p[1] === 'site' && p[2] && !p[3] && m === 'GET'){
       const u = await store.getUser(p[2]);
       if(!u) return send(res, 404, { error:'none' });
-      const d = await store.getLearn(u.username);
-      return send(res, 200, { name:u.name, html:((d && d.data && d.data.html) || {}).site || '' });
+      const d = await store.getLearn(u.username), x = (d && d.data && d.data.html) || {};
+      const site = HTMLLESSONS.SITES[url.searchParams.get('f')] || HTMLLESSONS.SITES.site;
+      return send(res, 200, { name:u.name, html:x[site.key] || '', ...(site.who ? { who:x[site.who] || '' } : {}) });
+    }
+    // the character a student's Website Presentation is about
+    if(p[1] === 'students' && p[2] && p[3] === 'character' && m === 'POST'){
+      const u = await store.getUser(p[2]);
+      if(!u || u.role !== 'student') return send(res, 404, { error:'none' });
+      const b = await readJSON(req, 2000);
+      const d = (await store.getLearn(u.username) || {}).data || {};
+      const who = cleanName(b.character).slice(0, 60);
+      await store.saveLearn(u.username, { ...d, html:{ ...(d.html || {}), wikiChar:who } });
+      return send(res, 200, { ok:true, who });
     }
     if(p[1] === 'learn' && !p[2] && m === 'GET'){
       const users = (await store.listUsers()).filter(u => u.role === 'student');
@@ -678,8 +689,11 @@ function mergeLearn(old, add){
   if(add.html && typeof add.html.page === 'string') out.html.page = add.html.page.slice(0, 20000);
   // My Resume: the page the student types (it replaces the old copy), and when it was
   // turned in. Turned in, it cannot change until it is unsubmitted (as in Google Classroom).
-  if(add.html && typeof add.html.siteIn === 'boolean') out.html.siteIn = add.html.siteIn ? new Date().toISOString() : null;
-  if(add.html && typeof add.html.site === 'string' && !out.html.siteIn) out.html.site = add.html.site.slice(0, HTMLLESSONS.SITE_MAX);
+  // The same for the Website Presentation's character.html (html.wiki, html.wikiIn); only a teacher sets html.wikiChar.
+  for(const k of Object.keys(HTMLLESSONS.SITES)){
+    if(add.html && typeof add.html[k + 'In'] === 'boolean') out.html[k + 'In'] = add.html[k + 'In'] ? new Date().toISOString() : null;
+    if(add.html && typeof add.html[k] === 'string' && !out.html[k + 'In']) out.html[k] = add.html[k].slice(0, HTMLLESSONS.SITE_MAX);
+  }
   return out;
 }
 

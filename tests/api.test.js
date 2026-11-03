@@ -581,3 +581,24 @@ test('My Resume: saved with Learn; the teacher reads it; grades say how far it i
   assert.deepStrictEqual([got.site, got.siteIn], ['changed', null]);
   assert.strictEqual((await fetch(base + '/resume')).status, 200);                  // the editor tab
 });
+
+test('Website Presentation: the teacher gives a character; the page saves, turns in and shows in grades', async () => {
+  const H = require('../public/js/html-lessons.js');
+  const { cookie } = await login('ana', 'tiger42'), t = await login('teach', 'apple-pear');
+  assert.strictEqual((await call(cookie, '/admin/students/ana/character', { method:'POST', body:'{"character":"Elsa"}' })).status, 403);
+  assert.deepStrictEqual(await (await call(t.cookie, '/admin/students/ana/character', { method:'POST', body:'{"character":"  Elsa "}' })).json(), { ok:true, who:'Elsa' });
+  const page = H.WIKI_START.replace(/Mario/g, 'Elsa');
+  await call(cookie, '/learn', { method:'PUT', body:JSON.stringify({ data:{ html:{ wiki:page, wikiChar:'Pikachu' } } }) });   // a student cannot pick their own
+  const got = (await (await call(cookie, '/learn')).json()).data.html;
+  assert.deepStrictEqual([got.wiki, got.wikiChar], [page, 'Elsa']);
+  assert.deepStrictEqual(await (await call(t.cookie, '/admin/site/ana?f=wiki')).json(), { name:'Ana', html:page, who:'Elsa' });
+  const me = await (await call(cookie, '/me')).json();
+  let row = (await (await call(t.cookie, '/room/' + me.period + '/grades')).json()).find(r => r.username === 'ana');
+  assert.deepStrictEqual([row.learn.wiki.who, row.learn.wiki.has.includes('name'), row.learn.wiki.in], ['Elsa', true, null]);
+  await call(cookie, '/learn', { method:'PUT', body:JSON.stringify({ data:{ html:{ wikiIn:true } } }) });
+  await call(cookie, '/learn', { method:'PUT', body:JSON.stringify({ data:{ html:{ wiki:'changed' } } }) });
+  assert.strictEqual((await (await call(cookie, '/learn')).json()).data.html.wiki, page);   // turned in: it cannot change
+  row = (await (await call(t.cookie, '/room/' + me.period + '/grades')).json()).find(r => r.username === 'ana');
+  assert.ok(row.learn.wiki.in);
+  assert.strictEqual((await fetch(base + '/wiki')).status, 200);                    // the editor tab
+});

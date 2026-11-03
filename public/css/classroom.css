@@ -256,3 +256,9 @@ button.cr-game{cursor:pointer;font:inherit;text-align:left;width:100%;grid-templ
 .cr-box{flex:none;width:18px;height:18px;border:2px solid #9aa0a6;border-radius:4px;display:grid;place-items:center;font-size:13px;font-weight:700;color:#fff}
 .cr-check-row.done .cr-box{background:#137333;border-color:#137333}
 .cr-check-row.done code{background:#e6f4ea;color:#137333}
+/* Website Presentation: the student's character, and the teacher's box to set it */
+.cr-who{display:grid;gap:2px;background:#f3e8fd;border-radius:8px;padding:10px 12px;font-size:15px;color:#3c4043}
+.cr-who b{color:#9334e6}
+.cr-who-in{width:150px;font-size:14px;padding:5px 8px}
+.cr-who-in.saved{border-color:#1e8e3e;box-shadow:0 0 0 2px #ceead6}
+.cr-who-in.bad{border-color:#d93025}

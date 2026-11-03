@@ -212,10 +212,120 @@
   const siteInfo = s => { s = typeof s === 'string' ? s : ''; const has = SITE_PARTS.filter(p => p.test(s)).map(p => p.id);
     return { len:s.length, has, ok:has.length === SITE_PARTS.length }; };
 
+  /* WEBSITE PRESENTATION — a short, simple encyclopedia page about Mario
+     (set out like a Wikipedia article: an infobox of facts, sections, fun
+     facts, references). Each student turns it into a page about the
+     character their teacher gives them (html.wikiChar), then presents it. */
+  const WIKI_START = `<!DOCTYPE html>
+<html>
+<head>
+  <title>Mario - Classpedia</title>
+  <style>
+    body { font-family: Arial, sans-serif; max-width: 900px; margin: 20px auto; padding: 0 16px; color: #202122; line-height: 1.6; }
+    h1 { font-family: Georgia, serif; font-weight: normal; border-bottom: 1px solid #a2a9b1; margin-bottom: 0; }
+    h2 { font-family: Georgia, serif; font-weight: normal; border-bottom: 1px solid #a2a9b1; }
+    a { color: #3366cc; }
+    .from { color: #54595d; font-size: 14px; margin-top: 4px; }
+    .infobox { float: right; width: 260px; margin: 0 0 16px 16px; border: 1px solid #a2a9b1; background: #f8f9fa; font-size: 14px; border-collapse: collapse; }
+    .infobox th, .infobox td { padding: 4px 8px; text-align: left; vertical-align: top; }
+    .infobox .top { text-align: center; font-size: 18px; background: #ccccff; }
+    .infobox img { width: 100%; }
+  </style>
+</head>
+<body>
+  <h1>Mario</h1>
+  <p class="from">From Classpedia, the free class encyclopedia</p>
+
+  <!-- The infobox: the box of facts on the right -->
+  <table class="infobox">
+    <tr><th colspan="2" class="top">Mario</th></tr>
+    <tr><td colspan="2"><img src="PASTE-A-PICTURE-LINK-HERE" alt="A picture of Mario"></td></tr>
+    <tr><th>First seen</th><td>Donkey Kong (1981)</td></tr>
+    <tr><th>Made by</th><td>Shigeru Miyamoto</td></tr>
+    <tr><th>Species</th><td>Human</td></tr>
+    <tr><th>Home</th><td>Mushroom Kingdom</td></tr>
+    <tr><th>Family</th><td>Luigi (brother)</td></tr>
+  </table>
+
+  <p><b>Mario</b> is a video game character made by Nintendo. He is a plumber who wears a red hat and blue overalls. He is the star of the Super Mario games.</p>
+
+  <h2>Looks</h2>
+  <p>Mario is short and has a big mustache. His red hat has a letter M on it.</p>
+
+  <h2>Personality</h2>
+  <p>Mario is brave and kind. He always helps his friends.</p>
+
+  <h2>Powers</h2>
+  <p>Mario can jump very high. When he eats a Super Mushroom, he grows big. A Fire Flower lets him throw fireballs.</p>
+
+  <h2>Story</h2>
+  <p>Mario lives in the Mushroom Kingdom. Again and again, he saves Princess Peach from Bowser.</p>
+
+  <h2>Fun facts</h2>
+  <ul>
+    <li>Mario was first called Jumpman.</li>
+    <li>His brother Luigi is taller than he is.</li>
+    <li>Mario has been in more than 200 games.</li>
+  </ul>
+
+  <h2>References</h2>
+  <ol>
+    <li><a href="https://en.wikipedia.org/wiki/Mario">Mario - Wikipedia</a></li>
+  </ol>
+</body>
+</html>
+`;
+  const WIKI_GROUPS = [
+    { n:1, en:'Part 1 · Make it your character', es:'Parte 1 · Hazla de tu personaje' },
+    { n:2, en:'Part 2 · Keep the encyclopedia parts', es:'Parte 2 · Deja las partes de la enciclopedia' }
+  ];
+  // the words of the Mario page: none may be left (unless they are in the student's own character's name)
+  const MARIO_WORDS = ['mario', 'luigi', 'mushroom kingdom', 'nintendo', 'miyamoto', 'bowser', 'peach', 'jumpman', 'donkey kong'];
+  const textOf = s => s.replace(/<[^>]*>/g, ' ').replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ').trim();
+  const same = (a, b) => textOf(a).toLowerCase() === textOf(b).toLowerCase();
+  // the name in the big title (still Mario = not changed yet)
+  const h1Of = s => { const m = s.match(/<body[^>]*>[\s\S]*?<h1[^>]*>([\s\S]*?)<\/h1>/i), n = m ? textOf(m[1]) : ''; return /mario/i.test(n) ? '' : n; };
+  const WIKI_PARTS = [
+    { id:'name', group:1, en:'<h1>[your character]</h1>', say:{ en:'The big title is your character’s name', es:'El título grande es el nombre de tu personaje' },
+      test:(s, who) => { const n = h1Of(s); return !!n && (!who || n.toLowerCase().includes(who.toLowerCase())); } },
+    { id:'title', group:1, en:'<title>', say:{ en:'The tab says the name too', es:'La pestaña también dice el nombre' },
+      test:s => { const n = h1Of(s), t = (s.match(/<title>([^<]*)<\/title>/i) || [])[1]; return !!n && !!t && textOf(t).toLowerCase().includes(n.toLowerCase()); } },
+    { id:'bold', group:1, en:'<p><b>[name]</b> is…', say:{ en:'The first paragraph starts with the name in bold', es:'El primer párrafo empieza con el nombre en negrita' },
+      test:s => { const m = s.match(/<p>\s*<b>([^<]+)<\/b>/i); return !!m && !!h1Of(s) && same(m[1], h1Of(s)); } },
+    { id:'img', group:1, en:'<img src="…">', say:{ en:'A picture of your character in the box', es:'Una imagen de tu personaje en el cuadro' },
+      test:s => /<img[^>]*\ssrc\s*=\s*["']?(https?:\/\/|data:image\/)[^"'\s>]+/i.test(s) },
+    { id:'nomario', group:1, en:'No Mario', say:{ en:'Nothing about Mario is left', es:'No queda nada de Mario' },
+      test:(s, who) => { const t = s.toLowerCase(), me = (who || '').toLowerCase(); return MARIO_WORDS.every(x => me.includes(x) || !t.includes(x)); } },
+    { id:'infobox', group:2, en:'<table class="infobox">', say:{ en:'The box of facts, with at least 5 rows', es:'El cuadro de datos, con 5 filas o más' },
+      test:s => { const m = s.match(/<table[^>]*class\s*=\s*["']?infobox[\s\S]*?<\/table>/i); return !!m && (m[0].match(/<tr[\s>]/gi) || []).length >= 5; } },
+    { id:'sections', group:2, en:'<h2> + <p> × 4', say:{ en:'At least 4 sections, each a heading and a paragraph', es:'4 secciones o más, cada una con subtítulo y párrafo' },
+      test:s => (s.match(/<h2[^>]*>[^<]*\S[^<]*<\/h2>\s*<p>[\s\S]*?\S[\s\S]*?<\/p>/gi) || []).length >= 4 },
+    { id:'facts', group:2, en:'<li> × 3', say:{ en:'3 fun facts in a list', es:'3 datos curiosos en una lista' },
+      test:s => /<ul>(\s*<li>[\s\S]*?\S[\s\S]*?<\/li>){3,}/i.test(s) },
+    { id:'refs', group:2, en:'<a href="…">', say:{ en:'A link to where you found your facts', es:'Un enlace a donde encontraste tus datos' },
+      test:s => /<a[^>]*\shref\s*=\s*["']?https?:\/\/[^"'\s>]+/i.test(s) }
+  ];
+  const wikiInfo = (s, who) => { s = typeof s === 'string' ? s : ''; who = typeof who === 'string' ? who.trim() : '';
+    const has = s ? WIKI_PARTS.filter(p => p.test(s, who)).map(p => p.id) : [];
+    return { len:s.length, has, ok:has.length === WIKI_PARTS.length }; };
+
+  /* the pages a student types in the editor: My Resume (resume.html) and the
+     Website Presentation (character.html). Each is kept in the Learn record as
+     html[key], turned in at html[key + 'In']. */
+  const SITES = {
+    site:{ key:'site', item:'site', file:'resume.html', path:'/resume', start:'', groups:SITE_GROUPS, parts:SITE_PARTS, info:s => siteInfo(s) },
+    wiki:{ key:'wiki', item:'wiki', file:'character.html', path:'/wiki', start:WIKI_START, groups:WIKI_GROUPS, parts:WIKI_PARTS, info:wikiInfo, who:'wikiChar' }
+  };
+  // every page's progress from a Learn record's html: { site:{ len, has, ok, in }, wiki:{ …, who } }
+  const sitesOf = html => { html = html || {};
+    return Object.fromEntries(Object.values(SITES).map(x => [x.key, { ...x.info(html[x.key], x.who ? html[x.who] : ''), in:html[x.key + 'In'] || null,
+      ...(x.who ? { who:html[x.who] || '' } : {}) }])); };
+
   /* how a score is made out of 100 */
   const score = (right, total) => total ? Math.min(100, Math.round(100 * right / total)) : 0;
 
   const HTMLLESSONS = { ACTS, CARDS, TYPE, CLOSE, MATCH_WORDS, MATCH_TAGS, wrap, BUILD, FIX, PAGE_START, GOALS, score,
-    C1_ACTS, C1_WORDS, C1_SORT, C1_ELEMENTS, C1_TAGS, C1_JOBS, C1_PLACE, C1_PAGE, C1_ORDER, C1_EXIT, C1_H1, SITE_MAX, SITE_GROUPS, SITE_PARTS, siteInfo };
+    C1_ACTS, C1_WORDS, C1_SORT, C1_ELEMENTS, C1_TAGS, C1_JOBS, C1_PLACE, C1_PAGE, C1_ORDER, C1_EXIT, C1_H1, SITE_MAX, SITE_GROUPS, SITE_PARTS, siteInfo,
+    WIKI_START, WIKI_GROUPS, WIKI_PARTS, wikiInfo, SITES, sitesOf };
   if(typeof module !== 'undefined') module.exports = HTMLLESSONS; else root.HTMLLESSONS = HTMLLESSONS;
 })(this);

@@ -46,7 +46,7 @@ test('Classwork: Game Design (the block game) and Game Feedback are the built-in
   for(const it of C.ITEMS){ assert.ok((it.href || it.site) && it.title.en && it.title.es && it.line.en && it.line.es, it.id); assert.match(it.id, /^[a-z0-9-]{1,30}$/); }
   const empty = C.studentData(null, null, []);
   for(const a of C.ASSIGNMENTS) assert.strictEqual(C.status(a, empty).state, 'none', a.id);
-  assert.deepStrictEqual(C.ASSIGNMENTS.map(a => a.id), ['game', 'feedback', 'html', 'site']);   // block game, feedback, HTML Practice, My Resume
+  assert.deepStrictEqual(C.ASSIGNMENTS.map(a => a.id), ['game', 'feedback', 'html', 'wiki', 'site']);   // block game, feedback, HTML Practice, Website Presentation, My Resume
   const fb = n => C.status(C.ITEMS.find(i => i.id === 'feedback'), C.studentData(null, null, [], {}, false, Array(n).fill({})));
   assert.deepStrictEqual([fb(0).state, fb(3).state, fb(4).state, fb(1).text], ['none', 'started', 'done', '1 / 4 💬']);
   const by = d => C.status(C.ITEMS.find(i => i.id === 'game'), d);
@@ -98,4 +98,28 @@ test('My Resume: the skeleton parts it has; done once it is turned in', () => {
   assert.deepStrictEqual([st('').state, st('<html><body></body></html>').state, st(page).state], ['none', 'started', 'started']);
   assert.deepStrictEqual([st(page, '2026-11-10T15:00:00Z').state, st(page, '2026-11-10T15:00:00Z').late], ['done', false]);   // done = turned in
   assert.strictEqual(st(page, '2026-11-12T15:00:00Z').late, true);                  // after Wednesday, November 11
+});
+
+test('Website Presentation: starts as the Mario page; ticked off as it becomes the student’s character', () => {
+  const C = require('../public/js/classwork.js');
+  const start = H.WIKI_START;
+  // the Mario page already has the encyclopedia parts (part 2), none of part 1
+  assert.deepStrictEqual(H.wikiInfo(start).has, H.WIKI_PARTS.filter(p => p.group === 2).map(p => p.id));
+  assert.ok(H.WIKI_PARTS.every(p => H.WIKI_GROUPS.some(g => g.n === p.group)));
+  const elsa = start.replace(/Mario/g, 'Elsa').replace(/Luigi|Mushroom Kingdom|Nintendo|Miyamoto|Bowser|Peach|Jumpman|Donkey Kong/g, 'x')
+    .replace('PASTE-A-PICTURE-LINK-HERE', 'https://example.com/elsa.png');
+  assert.strictEqual(H.wikiInfo(elsa, 'Elsa').ok, true);
+  assert.strictEqual(H.wikiInfo(elsa, '').ok, true);                                   // no character given yet: any name
+  const has = (x, who) => H.wikiInfo(x, who).has;
+  assert.ok(!has(elsa, 'Pikachu').includes('name'));                                  // the page is about someone else
+  assert.ok(!has(elsa.replace('x (brother)', 'Luigi (brother)'), 'Elsa').includes('nomario'));
+  assert.ok(has(start.replace(/Mario/g, 'Luigi'), 'Luigi').includes('nomario') === false); // the rest of Mario is still there
+  assert.ok(!has(elsa.replace('<title>Elsa', '<title>Page'), 'Elsa').includes('title'));
+  assert.ok(!has(elsa.replace('<b>Elsa</b>', 'Elsa'), 'Elsa').includes('bold'));
+  assert.ok(!has(elsa.replace('https://example.com/elsa.png', 'PASTE-A-PICTURE-LINK-HERE'), 'Elsa').includes('img'));
+  assert.deepStrictEqual(H.wikiInfo('').has, []);
+  const st = (text, wikiIn) => C.status(C.ITEMS.find(i => i.id === 'wiki'), C.studentData({ html:{ wiki:text, wikiIn, wikiChar:'Elsa' } }, null, []));
+  assert.deepStrictEqual([st('').state, st(start).state, st(start).text, st(elsa).pct], ['none', 'started', '4 / 9 🏷', 100]);
+  assert.strictEqual(st(elsa, '2026-11-10T15:00:00Z').state, 'done');                  // done = turned in
+  assert.strictEqual(H.sitesOf({ wikiChar:'Elsa' }).wiki.who, 'Elsa');
 });

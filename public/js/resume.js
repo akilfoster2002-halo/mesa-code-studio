@@ -8,10 +8,13 @@
    textarea does the typing; the pre only draws). Saved with the Learn
    progress (/api/learn, html.site). Turned in (html.siteIn) = read only,
    until Unsubmit in the Classroom. A teacher: ?u=<username>, read only.
+   At /wiki it is the Website Presentation's character.html instead (html.wiki):
+   it starts as the Mario page, and the student changes it to their character.
    ===================================================================== */
 (function(){
   const { h, $ } = UI;
   const HL = window.HTMLLESSONS;
+  const S = /^\/wiki/.test(location.pathname) ? HL.SITES.wiki : HL.SITES.site, k = S.key;
   const app = $('#app');
   const L = o => (I18N.lang === 'es' && o.es) || o.en;
   const W = {
@@ -22,7 +25,8 @@
     turnedIn:{ en:'Turned in. To make changes, Unsubmit in the Classroom.', es:'Entregado. Para hacer cambios, anula la entrega en la Clase.' },
     viewing:{ en:'Viewing', es:'Viendo' }, readOnly:{ en:'read only', es:'solo lectura' },
     login:{ en:'Log in to the Classroom first.', es:'Primero inicia sesión en la Clase.' }, open:{ en:'Open the Classroom', es:'Abrir la Clase' },
-    empty:{ en:'Start typing your resume.html here…', es:'Empieza a escribir tu resume.html aquí…' },
+    empty:{ en:'Start typing your ' + S.file + ' here…', es:'Empieza a escribir tu ' + S.file + ' aquí…' },
+    character:{ en:'Your character', es:'Tu personaje' },
     line:{ en:'Ln', es:'Lín' }, col:{ en:'Col', es:'Col' }, has:{ en:'Your page has', es:'Tu página tiene' }
   };
   const w = k => L(W[k]);
@@ -79,22 +83,25 @@
     try { me = await api('/me'); } catch(e){ me = null; }
     if(!me) return app.replaceChildren(h('div', { class:'rs-msg' }, h('b', {}, '🔑 ' + w('login')), h('a', { class:'rs-btn primary', href:'/' }, w('open'))));
     const who = new URLSearchParams(location.search).get('u');
-    let text = '', turnedIn = false, owner = me.name, readOnly = false;
+    let text = '', turnedIn = false, owner = me.name, readOnly = false, character = '', fresh = false;
     if(who && me.role === 'teacher'){
-      const r = await api('/admin/site/' + encodeURIComponent(who));
-      text = r.html; owner = r.name; readOnly = true;
+      const r = await api('/admin/site/' + encodeURIComponent(who) + '?f=' + k);
+      text = r.html; owner = r.name; readOnly = true; character = r.who || '';
     } else {
       const r = await api('/learn');
       const x = ((r && r.data) || {}).html || {};
-      text = x.site || ''; turnedIn = !!x.siteIn; readOnly = turnedIn || me.role === 'teacher';
+      text = x[k] || ''; turnedIn = !!x[k + 'In']; readOnly = turnedIn || me.role === 'teacher';
+      character = S.who ? x[S.who] || '' : '';
+      // the Website Presentation starts as the Mario page (saved as soon as it opens)
+      if(!text && S.start && !readOnly){ text = S.start; fresh = true; }
     }
-    editor({ me, text, owner, readOnly, turnedIn, teacherView:!!who });
+    editor({ me, text, owner, readOnly, turnedIn, character, fresh, teacherView:!!who });
   }
 
   function editor(o){
-    let saved = o.text, timer = null;
+    let saved = o.fresh ? '' : o.text, timer = null;
     const ed = h('textarea', { class:'rs-input', spellcheck:'false', autocapitalize:'off', autocomplete:'off', autocorrect:'off', wrap:'off',
-      placeholder:w('empty'), 'aria-label':'resume.html', maxlength:HL.SITE_MAX });
+      placeholder:w('empty'), 'aria-label':S.file, maxlength:HL.SITE_MAX });
     ed.value = o.text; ed.readOnly = o.readOnly;
     const hl = h('pre', { class:'rs-hl', 'aria-hidden':'true' });
     const gutter = h('div', { class:'rs-gutter', 'aria-hidden':'true' });
@@ -118,12 +125,12 @@
     const refresh = () => {
       frame.srcdoc = ed.value;
       const t = (ed.value.match(/<title>([^<]*)<\/title>/i) || [])[1];
-      tabTitle.textContent = t && t.trim() ? t.trim() : 'resume.html';
-      document.title = (t && t.trim() ? t.trim() + ' · ' : '') + 'resume.html';
-      const has = HL.siteInfo(ed.value).has;
+      tabTitle.textContent = t && t.trim() ? t.trim() : S.file;
+      document.title = (t && t.trim() ? t.trim() + ' · ' : '') + S.file;
+      const has = S.info(ed.value, o.character).has;
       checks.replaceChildren(h('span', { class:'rs-checks-l' }, w('has')),
-        ...HL.SITE_GROUPS.flatMap(g => [h('span', { class:'rs-checks-g' }, g.n + ':'),
-          ...HL.SITE_PARTS.filter(p => p.group === g.n).map(p => h('span', { class:'rs-chip' + (has.includes(p.id) ? ' ok' : ''), title:p.say ? L(p.say) : null }, (has.includes(p.id) ? '✓ ' : '') + p.en))]));
+        ...S.groups.flatMap(g => [h('span', { class:'rs-checks-g' }, g.n + ':'),
+          ...S.parts.filter(p => p.group === g.n).map(p => h('span', { class:'rs-chip' + (has.includes(p.id) ? ' ok' : ''), title:p.say ? L(p.say) : null }, (has.includes(p.id) ? '✓ ' : '') + p.en))]));
     };
     const save = async () => {
       clearTimeout(timer);
@@ -131,7 +138,7 @@
       if(ed.value === saved){ setStatus('saved'); return refresh(); }
       const text = ed.value;
       setStatus('saving');
-      try { await api('/learn', { method:'PUT', body:JSON.stringify({ data:{ html:{ site:text } } }) }); saved = text; setStatus(ed.value === saved ? 'saved' : 'edited'); refresh(); }
+      try { await api('/learn', { method:'PUT', body:JSON.stringify({ data:{ html:{ [k]:text } } }) }); saved = text; setStatus(ed.value === saved ? 'saved' : 'edited'); refresh(); }
       catch(e){ setStatus('offline'); timer = setTimeout(save, 5000); }
     };
     ed.addEventListener('input', () => { draw(); setStatus('edited'); clearTimeout(timer); timer = setTimeout(save, 2000); });
@@ -149,12 +156,13 @@
     });
     addEventListener('beforeunload', e => { if(!o.readOnly && ed.value !== saved){ save(); e.preventDefault(); } });
 
-    const back = o.teacherView ? null : h('a', { class:'rs-btn ghost', href:'/#/c/' + encodeURIComponent(o.me.period || '') + '/a/site' }, '◀ ' + w('back'));
+    const back = o.teacherView ? null : h('a', { class:'rs-btn ghost', href:'/#/c/' + encodeURIComponent(o.me.period || '') + '/a/' + S.item }, '◀ ' + w('back'));
     const langBtn = h('button', { class:'rs-btn ghost', type:'button', onclick:() => { I18N.set(I18N.lang === 'es' ? 'en' : 'es'); location.reload(); } }, I18N.lang === 'es' ? 'EN' : 'ES');
     app.replaceChildren(h('div', { class:'rs' },
       h('header', { class:'rs-top' },
         h('span', { class:'rs-logo' }, '</>'),
-        h('div', { class:'rs-file' }, h('b', {}, 'resume.html'), h('small', {}, o.owner + (o.readOnly ? ' · ' + w('readOnly') : ''))),
+        h('div', { class:'rs-file' }, h('b', {}, S.file), h('small', {}, o.owner + (o.readOnly ? ' · ' + w('readOnly') : ''))),
+        o.character ? h('span', { class:'rs-who' }, '🎭 ' + w('character') + ': ', h('b', {}, o.character)) : null,
         o.readOnly ? null : status, h('span', { class:'grow' }), langBtn, back,
         o.readOnly ? null : h('button', { class:'rs-btn primary', type:'button', onclick:save, title:'Ctrl+S' }, '💾 ' + w('save'), h('kbd', {}, /Mac/.test(navigator.platform) ? '⌘S' : 'Ctrl S'))),
       o.turnedIn ? h('div', { class:'rs-banner' }, '🔒 ' + w('turnedIn')) : null,
@@ -164,11 +172,12 @@
         h('section', { class:'rs-pane rs-view' },
           h('div', { class:'rs-chrome' }, h('i'), h('i'), h('i'), h('span', { class:'rs-tab' }, h('span', { class:'rs-fav' }), tabTitle),
             h('span', { class:'grow' }), h('button', { class:'rs-reload', type:'button', title:'Refresh', onclick:save }, '↻')),
-          h('div', { class:'rs-url' }, h('span', {}, '🔒'), 'resume.html'),
+          h('div', { class:'rs-url' }, h('span', {}, '🔒'), S.file),
           frame)),
       h('footer', { class:'rs-foot' }, checks)));
-    setStatus('saved'); draw(); refresh();
-    if(!o.readOnly) ed.focus();
+    setStatus(o.fresh ? 'edited' : 'saved'); draw(); refresh();
+    if(o.fresh) save();
+    if(!o.readOnly){ ed.focus(); ed.setSelectionRange(0, 0); ed.scrollTop = 0; where(); }
   }
 
   start();

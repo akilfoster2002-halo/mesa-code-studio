@@ -50,7 +50,9 @@
     noGame:{ en:'No game yet', es:'Aún no hay juego' },
     seeSite:{ en:'See it', es:'Verlo' }, openEditor:{ en:'Open in the editor', es:'Abrir en el editor' },
     needs:{ en:'Your page needs:', es:'Tu página necesita:' }, notStarted:{ en:'not started', es:'sin empezar' },
-    editorHint:{ en:'Click resume.html to open the editor.', es:'Haz clic en resume.html para abrir el editor.' },
+    editorHint:{ en:'Click the file to open the editor.', es:'Haz clic en el archivo para abrir el editor.' },
+    character:{ en:'Your character', es:'Tu personaje' }, noCharacter:{ en:'Your teacher will give you a character.', es:'Tu maestro te dará un personaje.' },
+    characterL:{ en:'Character', es:'Personaje' }, startHint:{ en:'It starts as a page about Mario. Change everything to your character.', es:'Empieza como una página sobre Mario. Cámbialo todo a tu personaje.' },
     addGame:{ en:'Add a game', es:'Añadir un juego' }, addFirst:{ en:'Add a classmate’s game to give feedback on.', es:'Añade el juego de un compañero para comentarlo.' },
     removeGame:{ en:'Remove', es:'Quitar' }, noGames:{ en:'No more classmates’ games.', es:'No hay más juegos de compañeros.' },
     playHint:{ en:'Press the flag to play.', es:'Presiona la bandera para jugar.' },
@@ -402,43 +404,49 @@
     studentWork(period, it, $('.cr-sw'));
   }
 
-  /* My Resume, set out like a Google Classroom assignment: the instructions,
-     and a Your work card with the student's resume.html. The file opens the
-     editor (/resume) in its own tab; coming back here shows the newest page.
+  /* My Resume (and the Website Presentation), set out like a Google Classroom
+     assignment: the instructions, and a Your work card with the student's
+     file (resume.html, character.html). The file opens the editor (/resume,
+     /wiki) in its own tab; coming back here shows the newest page.
      Turn in / Unsubmit as in Classroom (turned in, it cannot change). */
   function resumeWork(period, it, body, side){
-    const HL = window.HTMLLESSONS;
-    // the checklist: each part of the page, ticked off as it shows up in resume.html
+    const HL = window.HTMLLESSONS, S = HL.SITES[it.site], k = S.key;
+    // the Website Presentation: the character the teacher gave this student
+    const who = S.who ? h('div', { class:'cr-who' }) : null;
+    const drawWho = () => { if(!who) return; const n = (mine.learn[k] || {}).who;
+      who.replaceChildren(n ? h('span', {}, '🎭 ' + w('character') + ': ', h('b', {}, n)) : h('span', { class:'muted' }, '🎭 ' + w('noCharacter')),
+        h('small', { class:'muted' }, w('startHint'))); };
+    // the checklist: each part of the page, ticked off as it shows up in the file
     const checklist = h('div', { class:'cr-resume-needs' });
-    const drawChecks = () => { const has = (mine.learn.site || {}).has || [];
-      checklist.replaceChildren(h('b', {}, '✅ ' + w('needs')), ...HL.SITE_GROUPS.map(g => {
-        const parts = HL.SITE_PARTS.filter(p => p.group === g.n), n = parts.filter(p => has.includes(p.id)).length;
+    const drawChecks = () => { const has = (mine.learn[k] || {}).has || [];
+      checklist.replaceChildren(h('b', {}, '✅ ' + w('needs')), ...S.groups.map(g => {
+        const parts = S.parts.filter(p => p.group === g.n), n = parts.filter(p => has.includes(p.id)).length;
         return h('div', { class:'cr-check-group' }, h('div', { class:'cr-check-h' }, h('span', {}, L(g)), h('small', { class:n === parts.length ? 'all' : '' }, n + ' / ' + parts.length)),
           ...parts.map(p => h('div', { class:'cr-check-row' + (has.includes(p.id) ? ' done' : '') }, h('span', { class:'cr-box' }, has.includes(p.id) ? '✓' : ''),
             h('code', {}, p.en), p.say ? h('span', { class:'cr-check-say' }, L(p.say)) : null)));
       })); };
-    drawChecks(); body.append(checklist);
+    drawWho(); drawChecks(); if(who) body.append(who); body.append(checklist);
     const draw = (text, inAt) => {
       const st = status(it, mine);
-      const thumb = h('iframe', { class:'cr-thumb-frame', sandbox:'', tabindex:'-1', 'aria-hidden':'true', title:'resume.html' });
+      const thumb = h('iframe', { class:'cr-thumb-frame', sandbox:'', tabindex:'-1', 'aria-hidden':'true', title:S.file });
       thumb.srcdoc = text || '';
       side.replaceChildren(h('div', { class:'cr-card cr-yours cr-gc' },
         h('div', { class:'cr-yours-h' }, h('b', {}, w('yourWork')), stateChip(st, it)),
-        h('a', { class:'cr-attach', href:'/resume', target:'_blank', rel:'noopener', title:w('openEditor') },
+        h('a', { class:'cr-attach', href:S.path, target:'_blank', rel:'noopener', title:w('openEditor') },
           h('span', { class:'cr-thumb' }, text ? thumb : h('span', { class:'cr-thumb-blank' }, '</>')),
-          h('span', { class:'cr-attach-t' }, h('b', {}, 'resume.html'), h('small', {}, 'HTML · ' + (text ? (((mine.learn.site || {}).has || []).length + ' / ' + HL.SITE_PARTS.length + ' 🏷') : w('notStarted')))),
+          h('span', { class:'cr-attach-t' }, h('b', {}, S.file), h('small', {}, 'HTML · ' + (text ? (((mine.learn[k] || {}).has || []).length + ' / ' + S.parts.length + ' 🏷') : w('notStarted')))),
           h('span', { class:'cr-attach-go' }, '↗')),
         inAt ? h('small', { class:'muted' }, '🔒 ' + w('turnedIn') + ' ' + fmtWhen(inAt)) : h('small', { class:'muted' }, w('editorHint')),
         h('button', { class:'btn ' + (inAt ? '' : 'primary') + ' cr-gc-btn', type:'button', disabled:!inAt && !text, onclick:async e => {
           e.target.disabled = true;
-          try { await put('/learn', { data:{ html:{ siteIn:!inAt } } }); refreshResume(); } catch(x){ e.target.disabled = false; }
+          try { await put('/learn', { data:{ html:{ [k + 'In']:!inAt } } }); refreshResume(); } catch(x){ e.target.disabled = false; }
         } }, inAt ? w('unsubmit') : w('turnIn'))));
     };
     const refreshResume = async () => {
       const r = await api('/learn').catch(() => null), x = ((r && r.data) || {}).html || {};
-      mine.learn.site = { ...HL.siteInfo(x.site), in:x.siteIn || null };
-      draw(x.site || '', x.siteIn || null);
-      drawChecks();
+      mine.learn[k] = HL.sitesOf(x)[k];
+      draw(x[k] || '', x[k + 'In'] || null);
+      drawWho(); drawChecks();
     };
     draw('', null); refreshResume();
     // back from the editor tab: show the newest page
@@ -639,13 +647,25 @@
         return h('div', { class:'cr-person cr-swrow' }, avatar(r.name, color(period)), h('div', { class:'cr-sw-name' }, h('b', {}, r.name), h('div', { class:'muted' }, r.username)),
           it.slips ? h('div', { class:'cr-slips' }, ...(r.slips.length ? r.slips.map(x => h('button', { class:'cr-chip', type:'button', title:w('seeSlip'), onclick:() => showSlip(x.project, r.username) }, '💬 ' + x.game + ' · ' + x.owner))
             : [h('small', { class:'muted' }, w('noSlips'))])) :
-          it.site ? h('div', { class:'cr-st' }, bar(st.pct), h('small', {}, st.text), r.learn.site.len ? h('a', { class:'btn small', href:'/resume?u=' + encodeURIComponent(r.username), target:'_blank', rel:'noopener' }, '👁 ' + w('seeSite') + ' ↗') : null) :
+          it.site ? h('div', { class:'cr-st' }, bar(st.pct), h('small', {}, st.text), r.learn[it.site].len ? h('a', { class:'btn small', href:HTMLLESSONS.SITES[it.site].path + '?u=' + encodeURIComponent(r.username), target:'_blank', rel:'noopener' }, '👁 ' + w('seeSite') + ' ↗') : null,
+            HTMLLESSONS.SITES[it.site].who ? characterInput(r) : null) :
           it.games ? h('div', { class:'cr-games row' }, ...(r.games.length ? r.games.map(g => gameTile(g, h('small', { class:'muted' }, g.blocks + ' 🧩'))) : [h('small', { class:'muted' }, w('noGame'))]))
             : h('div', { class:'cr-st' }, bar(st.pct), h('small', {}, st.text)), h('span', { class:'grow' }),
           stateChip(st, it),
           it.turnin ? (st.state === 'done'
             ? h('button', { class:'btn small', type:'button', title:w('giveBackT'), onclick:turn('students/' + r.username + '/lock', { locked:false }) }, '↩ ' + w('giveBack'))
             : h('button', { class:'btn small', type:'button', onclick:turn('students/' + r.username + '/lock', { locked:true }) }, '🔒 ' + w('turnIn'))) : null); })));
+  }
+
+  // the Website Presentation: the teacher types the character each student's page is about
+  function characterInput(r){
+    return h('input', { class:'inp cr-who-in', type:'text', maxlength:60, value:r.learn.wiki.who || '', placeholder:'🎭 ' + w('characterL'),
+      'aria-label':w('characterL') + ' ' + r.name, onchange:async e => {
+        e.target.classList.remove('saved', 'bad');
+        try { const x = await put('/admin/students/' + encodeURIComponent(r.username) + '/character', { character:e.target.value }, 'POST');
+          e.target.value = r.learn.wiki.who = x.who; e.target.classList.add('saved'); }
+        catch(x){ e.target.classList.add('bad'); }
+      } });
   }
 
   /* -------------------------------------------------------------- people */
