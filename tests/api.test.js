@@ -602,3 +602,39 @@ test('Website Presentation: the teacher gives a character; the page saves, turns
   assert.ok(row.learn.wiki.in);
   assert.strictEqual((await fetch(base + '/wiki')).status, 200);                    // the editor tab
 });
+
+test('Website Presentation: a page shared with a classmate; both type in it at the same time', async () => {
+  const M = require('../public/js/merge.js');
+  const a = await login('ana', 'tiger42'), d = await login('dev', 'bear55'), c = await login('cara', 'fox77'), t = await login('teach', 'apple-pear');
+  await call(a.cookie, '/learn', { method:'PUT', body:JSON.stringify({ data:{ html:{ wikiIn:false } } }) });
+  const start = '<h1>Elsa</h1>\n<p>She has ice powers.</p>\n';
+  await call(a.cookie, '/page/ana/wiki', { method:'PUT', body:JSON.stringify({ base:'', text:start }) });
+  const now = (await (await call(a.cookie, '/page/ana/wiki')).json()).text;
+  // not shared yet: a classmate cannot open it; a teacher can read it
+  assert.strictEqual((await call(d.cookie, '/page/ana/wiki')).status, 404);
+  assert.strictEqual((await (await call(t.cookie, '/page/ana/wiki')).json()).canEdit, false);
+  assert.strictEqual((await call(t.cookie, '/page/ana/wiki', { method:'PUT', body:JSON.stringify({ base:now, text:'x' }) })).status, 405);
+  // share: only classmates in the same period stay on the list
+  assert.deepStrictEqual((await (await call(a.cookie, '/page/wiki/share', { method:'POST', body:JSON.stringify({ with:['dev', 'cara', 'teach'] }) })).json()).with, ['dev']);
+  assert.strictEqual((await call(c.cookie, '/page/ana/wiki')).status, 404);
+  const sh = await (await call(d.cookie, '/page/wiki/shared')).json();
+  assert.deepStrictEqual(sh.withMe.map(x => x.owner), ['ana']);
+  assert.ok(sh.classmates.some(x => x.username === 'ana') && !sh.classmates.some(x => x.username === 'cara'));
+  // both change the page from the same copy: both changes are kept
+  const anaText = now.replace('<h1>Elsa</h1>', '<h1>Queen Elsa</h1>'), devText = now.replace('ice powers.', 'ice powers. She lives in Arendelle.');
+  const [ra, rd] = await Promise.all([
+    call(a.cookie, '/page/ana/wiki', { method:'PUT', body:JSON.stringify({ base:now, text:anaText }) }),
+    call(d.cookie, '/page/ana/wiki', { method:'PUT', body:JSON.stringify({ base:now, text:devText }) })]);
+  assert.deepStrictEqual([ra.status, rd.status], [200, 200]);
+  const both = (await (await call(d.cookie, '/page/ana/wiki')).json());
+  assert.ok(both.text.includes('Queen Elsa') && both.text.includes('Arendelle'), both.text);
+  assert.ok(both.here.some(x => x.username === 'dev'));
+  assert.deepStrictEqual(await (await call(d.cookie, '/page/ana/wiki?h=' + M.hash(both.text))).json().then(x => x.same), true);
+  assert.strictEqual((await (await call(a.cookie, '/learn')).json()).data.html.wiki, both.text);
+  // turned in: nobody can change it
+  await call(a.cookie, '/learn', { method:'PUT', body:JSON.stringify({ data:{ html:{ wikiIn:true } } }) });
+  assert.strictEqual((await call(d.cookie, '/page/ana/wiki', { method:'PUT', body:JSON.stringify({ base:both.text, text:'gone' }) })).status, 423);
+  await call(a.cookie, '/learn', { method:'PUT', body:JSON.stringify({ data:{ html:{ wikiIn:false } } }) });
+  await call(a.cookie, '/page/wiki/share', { method:'POST', body:JSON.stringify({ with:[] }) });
+  assert.strictEqual((await call(d.cookie, '/page/ana/wiki')).status, 404);
+});

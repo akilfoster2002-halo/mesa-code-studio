@@ -323,15 +323,16 @@
 
   /* the pages a student types in the editor: My Resume (resume.html) and the
      Website Presentation (character.html). Each is kept in the Learn record as
-     html[key], turned in at html[key + 'In']. */
+     html[key], turned in at html[key + 'In']; a page that can be shared lists the
+     classmates who can type in it too in html[key + 'Share']. */
   const SITES = {
     site:{ key:'site', item:'site', file:'resume.html', path:'/resume', start:'', groups:SITE_GROUPS, parts:SITE_PARTS, info:s => siteInfo(s) },
-    wiki:{ key:'wiki', item:'wiki', file:'character.html', path:'/wiki', start:WIKI_START, groups:WIKI_GROUPS, parts:WIKI_PARTS, info:wikiInfo, who:'wikiChar' }
+    wiki:{ key:'wiki', item:'wiki', file:'character.html', path:'/wiki', start:WIKI_START, groups:WIKI_GROUPS, parts:WIKI_PARTS, info:wikiInfo, who:'wikiChar', share:true }
   };
   // every page's progress from a Learn record's html: { site:{ len, has, ok, in }, wiki:{ …, who } }
   const sitesOf = html => { html = html || {};
     return Object.fromEntries(Object.values(SITES).map(x => [x.key, { ...x.info(html[x.key], x.who ? html[x.who] : ''), in:html[x.key + 'In'] || null,
-      ...(x.who ? { who:html[x.who] || '' } : {}) }])); };
+      ...(x.who ? { who:html[x.who] || '' } : {}), ...(x.share ? { with:html[x.key + 'Share'] || [] } : {}) }])); };
 
   /* how a score is made out of 100 */
   const score = (right, total) => total ? Math.min(100, Math.round(100 * right / total)) : 0;

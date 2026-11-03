@@ -42,6 +42,7 @@ const names = require('./names');
 const ai = require('./ai');
 const FEEDBACK = require('../public/js/feedback-def.js');
 const HTMLLESSONS = require('../public/js/html-lessons.js');
+const MERGE = require('../public/js/merge.js');
 
 const PORT = Number(process.env.PORT) || 8790;
 const PUBLIC = path.join(__dirname, '..', 'public');
@@ -58,6 +59,26 @@ const store = open();
 
 /* ------------------------------------------------------------- helpers */
 /* two students in the same period (a teacher is in every class) */
+/* one save at a time to a student's Learn record (their pages live in it, and
+   classmates sharing a page save to it at the same time) */
+const learnLocks = new Map();
+function withLearn(owner, fn){
+  const run = (learnLocks.get(owner) || Promise.resolve()).then(fn, fn);
+  const done = run.catch(() => {});
+  learnLocks.set(owner, done);
+  done.then(() => { if(learnLocks.get(owner) === done) learnLocks.delete(owner); });
+  return run;
+}
+/* who has a shared page open right now: 'owner/key' → { username:{ name, at } } */
+const pageHere = new Map();
+function here(doc, user){
+  const now = Date.now(), m = pageHere.get(doc) || {};
+  if(user) m[user.username] = { name:user.name, at:now };
+  for(const [u, x] of Object.entries(m)) if(now - x.at > 8000) delete m[u];
+  pageHere.set(doc, m);
+  return Object.entries(m).map(([username, x]) => ({ username, name:x.name }));
+}
+
 async function sameClass(user, username){
   if(user.role === 'teacher') return true;
   const o = await store.getUser(username);
@@ -500,11 +521,81 @@ async function api(req, res, url){
     if(m === 'GET'){ const d = await store.getLearn(user.username); return send(res, 200, { data:d ? d.data : null }); }
     if(m === 'PUT'){
       const b = await readJSON(req, 200000);
-      const old = (await store.getLearn(user.username) || {}).data || {};
-      const merged = mergeLearn(old, b.data || {});
-      await store.saveLearn(user.username, merged);
+      const merged = await withLearn(user.username, async () => {
+        const old = (await store.getLearn(user.username) || {}).data || {};
+        const out = mergeLearn(old, b.data || {});
+        await store.saveLearn(user.username, out);
+        return out;
+      });
       return send(res, 200, { data:merged });
     }
+  }
+
+  /* A page typed in the editor (My Resume, Website Presentation), by its owner and
+     the classmates they share it with, at the same time (as in Google Docs):
+       GET  /api/page/:owner/:key?h=<fingerprint>   the page ({ same:true } if it has not changed),
+                                                    and who has it open
+       PUT  /api/page/:owner/:key { base, text }    my changes since base, put together with
+                                                    everyone else's (MERGE.merge3); the page back
+       POST /api/page/:key/share { with:[usernames] }  the owner shares it (classmates only)
+       GET  /api/page/:key/shared                   who I share mine with; pages shared with me
+     A teacher reads any page. Turned in, it does not change. */
+  if(p[0] === 'page'){
+    const H = HTMLLESSONS, S = H.SITES[p[1] && p[2] ? p[2] : p[1]];
+    if(p[2] === 'shared' || p[2] === 'share'){
+      const site = H.SITES[p[1]];
+      if(!site || !site.share || teacher) return send(res, 404, { error:'none' });
+      const kids = (await store.listUsers()).filter(u => u.role === 'student' && !u.disabled && u.username !== user.username && !!user.period && u.period === user.period);
+      if(p[2] === 'share' && !p[3] && m === 'POST'){
+        const b = await readJSON(req, 8000), ok = new Set(kids.map(u => u.username));
+        const to = [...new Set((Array.isArray(b.with) ? b.with : []).map(String))].filter(u => ok.has(u)).slice(0, 10);
+        await withLearn(user.username, async () => {
+          const d = (await store.getLearn(user.username) || {}).data || {};
+          await store.saveLearn(user.username, { ...d, html:{ ...(d.html || {}), [site.key + 'Share']:to } });
+        });
+        return send(res, 200, { with:to });
+      }
+      if(p[2] === 'shared' && !p[3] && m === 'GET'){
+        const ls = Object.fromEntries((await store.listLearn()).map(d => [d.owner, (d.data || {}).html || {}]));
+        const mine = (ls[user.username] || {})[site.key + 'Share'] || [];
+        return send(res, 200, { classmates:kids.map(u => ({ username:u.username, name:u.name })).sort((a, b) => a.name.localeCompare(b.name)), with:mine,
+          withMe:kids.filter(u => ((ls[u.username] || {})[site.key + 'Share'] || []).includes(user.username))
+            .map(u => ({ owner:u.username, name:u.name, title:((ls[u.username] || {})[site.key] || '').match(/<h1[^>]*>([^<]*)<\/h1>/i)?.[1]?.trim() || '' })) });
+      }
+      return send(res, 404, { error:'none' });
+    }
+    if(!S || !p[1] || p[3]) return send(res, 404, { error:'none' });
+    const owner = await store.getUser(p[1]);
+    if(!owner || owner.role !== 'student') return send(res, 404, { error:'none' });
+    const htmlOf = async () => ((await store.getLearn(owner.username) || {}).data || {}).html || {};
+    const x = await htmlOf(), mine = owner.username === user.username;
+    const shared = !mine && !teacher && S.share && ((x[S.key + 'Share'] || []).includes(user.username)) && await sameClass(user, owner.username);
+    if(!mine && !teacher && !shared) return send(res, 404, { error:'none' });
+    const doc = owner.username + '/' + S.key;
+    const out = (h, text) => ({ text, h:MERGE.hash(text), in:h[S.key + 'In'] || null, who:S.who ? h[S.who] || '' : undefined,
+      owner:{ username:owner.username, name:owner.name }, with:h[S.key + 'Share'] || [], here:here(doc, teacher ? null : user), canEdit:!teacher });
+    if(m === 'GET'){
+      const text = x[S.key] || '';
+      if(url.searchParams.get('h') && url.searchParams.get('h') === MERGE.hash(text)){
+        return send(res, 200, { same:true, in:x[S.key + 'In'] || null, with:x[S.key + 'Share'] || [], here:here(doc, teacher ? null : user) });
+      }
+      return send(res, 200, out(x, text));
+    }
+    if(m === 'PUT' && !teacher){
+      const b = await readJSON(req, 3 * H.SITE_MAX);
+      if(typeof b.base !== 'string' || typeof b.text !== 'string') return send(res, 400, { error:'text' });
+      const r = await withLearn(owner.username, async () => {
+        const d = (await store.getLearn(owner.username) || {}).data || {}, h = d.html || {};
+        if(h[S.key + 'In']) return { locked:true, h };                    // turned in
+        const now = h[S.key] || '';
+        const text = MERGE.merge3(b.base, b.text, now).slice(0, H.SITE_MAX);
+        if(text !== now) await store.saveLearn(owner.username, { ...d, html:{ ...h, [S.key]:text } });
+        return { h:{ ...h, [S.key]:text } };
+      });
+      if(r.locked) return send(res, 423, { error:'turnedIn', ...out(r.h, r.h[S.key] || '') });
+      return send(res, 200, out(r.h, r.h[S.key]));
+    }
+    return send(res, 405, { error:'method' });
   }
 
   if(p[0] === 'game' && p[1] === 'turnin' && !p[2] && m === 'POST' && !teacher){
@@ -554,9 +645,11 @@ async function api(req, res, url){
       const u = await store.getUser(p[2]);
       if(!u || u.role !== 'student') return send(res, 404, { error:'none' });
       const b = await readJSON(req, 2000);
-      const d = (await store.getLearn(u.username) || {}).data || {};
       const who = cleanName(b.character).slice(0, 60);
-      await store.saveLearn(u.username, { ...d, html:{ ...(d.html || {}), wikiChar:who } });
+      await withLearn(u.username, async () => {
+        const d = (await store.getLearn(u.username) || {}).data || {};
+        await store.saveLearn(u.username, { ...d, html:{ ...(d.html || {}), wikiChar:who } });
+      });
       return send(res, 200, { ok:true, who });
     }
     if(p[1] === 'learn' && !p[2] && m === 'GET'){

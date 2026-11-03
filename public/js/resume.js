@@ -12,6 +12,10 @@
    it starts as the Mario page, and the student changes it to their character.
    Pictures: 🖼 Add picture (or paste or drop one on the code) makes it smaller,
    keeps it in the asset store and puts it in the page as <img src="https://…/api/assets/…">.
+   Typing together (as in Google Docs): the page is kept at /api/page/<owner>/<key>.
+   Every moment or so the editor sends what changed and gets everyone else's
+   changes back (MERGE.merge3 puts them together). The Website Presentation's
+   owner can 👥 Share it with classmates, who open it at /wiki?o=<owner>.
    ===================================================================== */
 (function(){
   const { h, $ } = UI;
@@ -32,13 +36,18 @@
     addPic:{ en:'Add picture', es:'Añadir imagen' }, picAdding:{ en:'Adding picture…', es:'Añadiendo imagen…' },
     picFail:{ en:'Picture not added. Try again.', es:'No se añadió la imagen. Inténtalo otra vez.' },
     picHint:{ en:'Put a picture in the page from your computer. You can also paste one or drop it on the code.', es:'Pon una imagen de tu computadora en la página. También puedes pegarla o soltarla en el código.' },
-    line:{ en:'Ln', es:'Lín' }, col:{ en:'Col', es:'Col' }, has:{ en:'Your page has', es:'Tu página tiene' }
+    line:{ en:'Ln', es:'Lín' }, col:{ en:'Col', es:'Col' }, has:{ en:'Your page has', es:'Tu página tiene' },
+    share:{ en:'Share', es:'Compartir' }, shareH:{ en:'Share with classmates', es:'Compartir con compañeros' },
+    shareHint:{ en:'They can type in your page too, at the same time as you.', es:'Ellos también pueden escribir en tu página, al mismo tiempo que tú.' },
+    done:{ en:'Done', es:'Listo' }, cancel:{ en:'Cancel', es:'Cancelar' }, here:{ en:'Here now', es:'Aquí ahora' },
+    notShared:{ en:'This page is not shared with you.', es:'Esta página no está compartida contigo.' },
+    noClassmates:{ en:'No classmates yet.', es:'Todavía no hay compañeros.' }
   };
   const w = k => L(W[k]);
   async function api(path, opts={}){
     const r = await fetch('/api' + path, { credentials:'same-origin', ...opts, headers:{ ...(opts.body ? { 'Content-Type':'application/json' } : {}) } });
     const j = (r.headers.get('content-type') || '').includes('json') ? await r.json() : null;
-    if(!r.ok) throw Object.assign(new Error((j && j.error) || r.statusText), { status:r.status });
+    if(!r.ok) throw Object.assign(new Error((j && j.error) || r.statusText), { status:r.status, body:j });
     return j;
   }
 
@@ -103,29 +112,31 @@
     return location.origin + '/api/assets/' + (await r.json()).id;      // the whole address: a short /api/… does not load in the page's frame
   }
 
+  const COLORS = ['#1e8e3e', '#1967d2', '#d93025', '#e37400', '#9334e6', '#129eaf', '#c26401', '#5f6368'];
+  const colorOf = u => COLORS[[...String(u)].reduce((n, c) => n + c.charCodeAt(0), 0) % COLORS.length];
+
   /* --------------------------------------------------------- the page */
   async function start(){
     let me;
     try { me = await api('/me'); } catch(e){ me = null; }
     if(!me) return app.replaceChildren(h('div', { class:'rs-msg' }, h('b', {}, '🔑 ' + w('login')), h('a', { class:'rs-btn primary', href:'/' }, w('open'))));
-    const who = new URLSearchParams(location.search).get('u');
-    let text = '', turnedIn = false, owner = me.name, readOnly = false, character = '', fresh = false;
-    if(who && me.role === 'teacher'){
-      const r = await api('/admin/site/' + encodeURIComponent(who) + '?f=' + k);
-      text = r.html; owner = r.name; readOnly = true; character = r.who || '';
-    } else {
-      const r = await api('/learn');
-      const x = ((r && r.data) || {}).html || {};
-      text = x[k] || ''; turnedIn = !!x[k + 'In']; readOnly = turnedIn || me.role === 'teacher';
-      character = S.who ? x[S.who] || '' : '';
-      // the Website Presentation starts as the Mario page (saved as soon as it opens)
-      if(!text && S.start && !readOnly){ text = S.start; fresh = true; }
-    }
-    editor({ me, text, owner, readOnly, turnedIn, character, fresh, teacherView:!!who });
+    // whose page: mine, a classmate's shared with me (?o=), or a student's for the teacher (?u=)
+    const q = new URLSearchParams(location.search), teacherView = me.role === 'teacher';
+    const owner = (teacherView ? q.get('u') : q.get('o')) || me.username;
+    const doc = '/page/' + encodeURIComponent(owner) + '/' + k;
+    let r;
+    try { r = await api(doc); }
+    catch(e){ return app.replaceChildren(h('div', { class:'rs-msg' }, h('b', {}, '🔒 ' + w('notShared')), h('a', { class:'rs-btn primary', href:'/' }, w('open')))); }
+    const mine = owner === me.username, turnedIn = !!r.in, readOnly = turnedIn || !r.canEdit;
+    // the Website Presentation starts as the Mario page (saved as soon as it opens)
+    const fresh = !r.text && !!S.start && mine && !readOnly;
+    editor({ me, doc, mine, text:fresh ? S.start : r.text, base:r.text, owner:r.owner, with:r.with || [], here:r.here || [],
+      readOnly, turnedIn, character:r.who || '', teacherView });
   }
 
   function editor(o){
-    let saved = o.fresh ? '' : o.text, timer = null;
+    // base: the page as the server last had it; what is typed on top of it is sent every moment or so
+    let base = o.base, timer = null, busy = false, rendered = null, lastKey = 0;
     const ed = h('textarea', { class:'rs-input', spellcheck:'false', autocapitalize:'off', autocomplete:'off', autocorrect:'off', wrap:'off',
       placeholder:w('empty'), 'aria-label':S.file, maxlength:HL.SITE_MAX });
     ed.value = o.text; ed.readOnly = o.readOnly;
@@ -141,14 +152,15 @@
       hl.innerHTML = paint(ed.value);
       const n = ed.value.split('\n').length;
       if(gutter.childElementCount !== n) gutter.replaceChildren(...Array.from({ length:n }, (x, i) => h('div', {}, String(i + 1))));
-      sync(); where();
+      scrolled(); where();
     };
-    const sync = () => { hl.scrollTop = ed.scrollTop; hl.scrollLeft = ed.scrollLeft; gutter.scrollTop = ed.scrollTop; };
+    const scrolled = () => { hl.scrollTop = ed.scrollTop; hl.scrollLeft = ed.scrollLeft; gutter.scrollTop = ed.scrollTop; };
     const where = () => { const before = ed.value.slice(0, ed.selectionStart).split('\n');
       pos.textContent = w('line') + ' ' + before.length + ', ' + w('col') + ' ' + (before[before.length - 1].length + 1);
       [...gutter.children].forEach((d, k) => d.classList.toggle('on', k === before.length - 1)); };
     // the page beside it: what the browser shows, and its <title> on the tab
     const refresh = () => {
+      rendered = ed.value;
       frame.srcdoc = ed.value;
       const t = (ed.value.match(/<title>([^<]*)<\/title>/i) || [])[1];
       tabTitle.textContent = t && t.trim() ? t.trim() : S.file;
@@ -158,16 +170,64 @@
         ...S.groups.flatMap(g => [h('span', { class:'rs-checks-g' }, g.n + ':'),
           ...S.parts.filter(p => p.group === g.n).map(p => h('span', { class:'rs-chip' + (has.includes(p.id) ? ' ok' : ''), title:p.say ? L(p.say) : null }, (has.includes(p.id) ? '✓ ' : '') + p.en))]));
     };
-    const save = async () => {
-      clearTimeout(timer);
-      if(o.readOnly) return refresh();
-      if(ed.value === saved){ setStatus('saved'); return refresh(); }
-      const text = ed.value;
-      setStatus('saving');
-      try { await api('/learn', { method:'PUT', body:JSON.stringify({ data:{ html:{ [k]:text } } }) }); saved = text; setStatus(ed.value === saved ? 'saved' : 'edited'); refresh(); }
-      catch(e){ setStatus('offline'); timer = setTimeout(save, 5000); }
+    // someone else's changes: put in the code, the cursor and scroll kept where they were
+    const setText = text => {
+      if(text === ed.value) return;
+      const hs = MERGE.hunks(ed.value, text), a = MERGE.mapPoint(ed.selectionStart, hs), b = MERGE.mapPoint(ed.selectionEnd, hs), top = ed.scrollTop;
+      ed.value = text;
+      if(document.activeElement === ed) ed.setSelectionRange(a, b);
+      ed.scrollTop = top; draw();
     };
-    ed.addEventListener('input', () => { draw(); setStatus('edited'); clearTimeout(timer); timer = setTimeout(save, 2000); });
+    // send my changes, get everyone else's (a page nobody changed only asks "the same?")
+    const push = async force => {
+      if(busy) return;
+      busy = true; clearTimeout(timer);
+      const sent = ed.value, mineChanged = !o.readOnly && sent !== base;
+      try {
+        if(mineChanged) setStatus('saving');
+        const r = mineChanged ? await api(o.doc, { method:'PUT', body:JSON.stringify({ base, text:sent }) }) : await api(o.doc + '?h=' + MERGE.hash(base));
+        if(!r.same){ const from = mineChanged ? sent : base; base = r.text; setText(MERGE.merge3(from, ed.value, r.text)); }
+        people(r.here || [], r.with || o.with);
+        if(!o.readOnly) setStatus(ed.value === base ? 'saved' : 'edited');
+        if(r.in && !o.readOnly) return location.reload();
+      } catch(e){
+        if(e.status === 423) return location.reload();          // turned in: read only now
+        if(!o.readOnly) setStatus('offline');
+      } finally { busy = false; }
+      // the page beside the code: when typing stops (or Save), not at every letter
+      if(rendered !== ed.value && (force || Date.now() - lastKey > 1500)) refresh();
+      timer = setTimeout(push, ed.value !== base ? 700 : document.hidden ? 5000 : 1500);
+    };
+    const save = () => { refresh(); if(busy) return; push(true); };
+    ed.addEventListener('input', () => { draw(); lastKey = Date.now(); setStatus('edited'); if(!busy){ clearTimeout(timer); timer = setTimeout(push, 700); } });
+
+    // who else has the page open, and (the owner) who it is shared with
+    const hereBox = h('span', { class:'rs-here' });
+    const people = (list, shared) => {
+      o.with = shared;
+      const others = list.filter(x => x.username !== o.me.username);
+      hereBox.replaceChildren(...others.map(x => h('span', { class:'rs-av', title:w('here') + ': ' + x.name, style:'background:' + colorOf(x.username) }, x.name.slice(0, 1).toUpperCase())));
+      if(shareBtn) shareBtn.lastChild.textContent = w('share') + (shared.length ? ' · ' + shared.length : '');
+    };
+    const shareBtn = o.mine && S.share && !o.readOnly ? h('button', { class:'rs-btn', type:'button', title:w('shareHint'), onclick:() => shareDialog() }, '👥 ', h('span', {}, w('share'))) : null;
+    const shareDialog = async () => {
+      const r = await api('/page/' + k + '/shared').catch(() => null);
+      if(!r) return;
+      const picked = new Set(o.with);
+      const back = h('div', { class:'rs-dlg-back', onclick:e => { if(e.target === back) back.remove(); } },
+        h('div', { class:'rs-dlg', role:'dialog', 'aria-label':w('shareH') },
+          h('b', {}, '👥 ' + w('shareH')), h('small', {}, w('shareHint')),
+          h('div', { class:'rs-dlg-list' }, ...(r.classmates.length ? r.classmates.map(c => h('label', { class:'rs-dlg-row' },
+            h('input', { type:'checkbox', checked:picked.has(c.username), onchange:e => { e.target.checked ? picked.add(c.username) : picked.delete(c.username); } }),
+            h('span', { class:'rs-av', style:'background:' + colorOf(c.username) }, c.name.slice(0, 1).toUpperCase()), c.name)) : [h('small', {}, w('noClassmates'))])),
+          h('div', { class:'rs-dlg-btns' }, h('button', { class:'rs-btn ghost', type:'button', onclick:() => back.remove() }, w('cancel')),
+            h('button', { class:'rs-btn primary', type:'button', onclick:async () => {
+              const x = await api('/page/' + k + '/share', { method:'POST', body:JSON.stringify({ with:[...picked] }) }).catch(() => null);
+              if(x) people([], x.with);
+              back.remove();
+            } }, w('done')))));
+      document.body.append(back);
+    };
     // a picture goes where the cursor is in a src="…", else in place of the Mario page's first picture left, else in a new <img> at the cursor
     const addPicture = async file => {
       if(o.readOnly || !file || !/^image\//.test(file.type)) return;
@@ -182,13 +242,13 @@
       if(inSrc) ed.setRangeText(src, inSrc.from, inSrc.from + inSrc.len, 'end');
       else if(spot) ed.setRangeText(src, spot.index + 5, spot.index + 5 + spot[1].length, 'end');
       else ed.setRangeText('<img src="' + src + '" alt="">', at, end, 'end');
-      ed.focus(); ed.dispatchEvent(new Event('input')); save();
+      ed.focus(); ed.dispatchEvent(new Event('input')); save();      // the picture shows at once
     };
     const picker = h('input', { type:'file', accept:'image/*', hidden:true, onchange:e => { addPicture(e.target.files[0]); e.target.value = ''; } });
     ed.addEventListener('paste', e => { const f = [...(e.clipboardData && e.clipboardData.files || [])].find(f => /^image\//.test(f.type)); if(f){ e.preventDefault(); addPicture(f); } });
     ed.addEventListener('dragover', e => { if(!o.readOnly && [...e.dataTransfer.types].includes('Files')) e.preventDefault(); });
     ed.addEventListener('drop', e => { const f = [...e.dataTransfer.files].find(f => /^image\//.test(f.type)); if(f){ e.preventDefault(); addPicture(f); } });
-    ed.addEventListener('scroll', sync);
+    ed.addEventListener('scroll', scrolled);
     ['keyup', 'click', 'select'].forEach(k => ed.addEventListener(k, where));
     ed.addEventListener('keydown', e => {
       if((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's'){ e.preventDefault(); save(); return; }
@@ -200,16 +260,17 @@
         if(indent){ e.preventDefault(); ed.setRangeText('\n' + indent, ed.selectionStart, ed.selectionEnd, 'end'); ed.dispatchEvent(new Event('input')); }
       }
     });
-    addEventListener('beforeunload', e => { if(!o.readOnly && ed.value !== saved){ save(); e.preventDefault(); } });
+    addEventListener('beforeunload', e => { if(!o.readOnly && ed.value !== base){ push(); e.preventDefault(); } });
+    document.addEventListener('visibilitychange', () => { if(!document.hidden && !busy) push(); });
 
     const back = o.teacherView ? null : h('a', { class:'rs-btn ghost', href:'/#/c/' + encodeURIComponent(o.me.period || '') + '/a/' + S.item }, '◀ ' + w('back'));
     const langBtn = h('button', { class:'rs-btn ghost', type:'button', onclick:() => { I18N.set(I18N.lang === 'es' ? 'en' : 'es'); location.reload(); } }, I18N.lang === 'es' ? 'EN' : 'ES');
     app.replaceChildren(h('div', { class:'rs' },
       h('header', { class:'rs-top' },
         h('span', { class:'rs-logo' }, '</>'),
-        h('div', { class:'rs-file' }, h('b', {}, S.file), h('small', {}, o.owner + (o.readOnly ? ' · ' + w('readOnly') : ''))),
+        h('div', { class:'rs-file' }, h('b', {}, S.file), h('small', {}, (o.mine ? o.owner.name : '✏️ ' + L({ en:o.owner.name + '’s page', es:'Página de ' + o.owner.name })) + (o.readOnly ? ' · ' + w('readOnly') : ''))),
         o.character ? h('span', { class:'rs-who' }, '🎭 ' + w('character') + ': ', h('b', {}, o.character)) : null,
-        o.readOnly ? null : status, h('span', { class:'grow' }), langBtn, back,
+        o.readOnly ? null : status, h('span', { class:'grow' }), hereBox, shareBtn, langBtn, back,
         o.readOnly ? null : h('button', { class:'rs-btn', type:'button', title:w('picHint'), onclick:() => picker.click() }, '🖼 ' + w('addPic')), o.readOnly ? null : picker,
         o.readOnly ? null : h('button', { class:'rs-btn primary', type:'button', onclick:save, title:'Ctrl+S' }, '💾 ' + w('save'), h('kbd', {}, /Mac/.test(navigator.platform) ? '⌘S' : 'Ctrl S'))),
       o.turnedIn ? h('div', { class:'rs-banner' }, '🔒 ' + w('turnedIn')) : null,
@@ -222,8 +283,8 @@
           h('div', { class:'rs-url' }, h('span', {}, '🔒'), S.file),
           frame)),
       h('footer', { class:'rs-foot' }, checks)));
-    setStatus(o.fresh ? 'edited' : 'saved'); draw(); refresh();
-    if(o.fresh) save();
+    setStatus(ed.value === base ? 'saved' : 'edited'); draw(); refresh(); people(o.here, o.with);
+    push();
     if(!o.readOnly){ ed.focus(); ed.setSelectionRange(0, 0); ed.scrollTop = 0; where(); }
   }
 

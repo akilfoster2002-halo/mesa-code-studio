@@ -52,7 +52,9 @@
     needs:{ en:'Your page needs:', es:'Tu página necesita:' }, notStarted:{ en:'not started', es:'sin empezar' },
     editorHint:{ en:'Click the file to open the editor.', es:'Haz clic en el archivo para abrir el editor.' },
     character:{ en:'Your character', es:'Tu personaje' }, noCharacter:{ en:'Your teacher will give you a character.', es:'Tu maestro te dará un personaje.' },
-    characterL:{ en:'Character', es:'Personaje' }, startHint:{ en:'It starts as a page about Mario. Change everything to your character.', es:'Empieza como una página sobre Mario. Cámbialo todo a tu personaje.' },
+    characterL:{ en:'Character', es:'Personaje' }, sharedMe:{ en:'Shared with you', es:'Compartido contigo' },
+    sharedWith:{ en:'Shared with', es:'Compartido con' }, shareHint:{ en:'Open your page and click 👥 Share to type in it with classmates.', es:'Abre tu página y haz clic en 👥 Compartir para escribir en ella con compañeros.' },
+    helping:{ en:'Typing in', es:'Escribe en' }, startHint:{ en:'It starts as a page about Mario. Change everything to your character.', es:'Empieza como una página sobre Mario. Cámbialo todo a tu personaje.' },
     addGame:{ en:'Add a game', es:'Añadir un juego' }, addFirst:{ en:'Add a classmate’s game to give feedback on.', es:'Añade el juego de un compañero para comentarlo.' },
     removeGame:{ en:'Remove', es:'Quitar' }, noGames:{ en:'No more classmates’ games.', es:'No hay más juegos de compañeros.' },
     playHint:{ en:'Press the flag to play.', es:'Presiona la bandera para jugar.' },
@@ -411,6 +413,7 @@
      Turn in / Unsubmit as in Classroom (turned in, it cannot change). */
   function resumeWork(period, it, body, side){
     const HL = window.HTMLLESSONS, S = HL.SITES[it.site], k = S.key;
+    const box = S.share ? h('div', { class:'cr-card cr-shared' }) : null;     // pages shared with me (under Your work)
     // the Website Presentation: the character the teacher gave this student
     const who = S.who ? h('div', { class:'cr-who' }) : null;
     const drawWho = () => { if(!who) return; const n = (mine.learn[k] || {}).who;
@@ -441,7 +444,7 @@
         h('button', { class:'btn ' + (inAt ? '' : 'primary') + ' cr-gc-btn', type:'button', disabled:!inAt && !text, onclick:async e => {
           e.target.disabled = true;
           try { await put('/learn', { data:{ html:{ [k + 'In']:!inAt } } }); refreshResume(); } catch(x){ e.target.disabled = false; }
-        } }, inAt ? w('unsubmit') : w('turnIn'))));
+        } }, inAt ? w('unsubmit') : w('turnIn'))), box || '');
     };
     const refreshResume = async () => {
       const r = await api('/learn').catch(() => null), x = ((r && r.data) || {}).html || {};
@@ -450,6 +453,17 @@
       drawWho(); drawChecks();
     };
     draw('', null); refreshResume();
+    // pages shared with me (and who I share mine with): each opens in the editor to type in together
+    if(box){
+      api('/page/' + k + '/shared').then(r => {
+        const names = Object.fromEntries(r.classmates.map(c => [c.username, c.name]));
+        box.replaceChildren(h('b', {}, '👥 ' + w('sharedMe')),
+          ...(r.withMe.length ? r.withMe.map(x => h('a', { class:'cr-attach', href:S.path + '?o=' + encodeURIComponent(x.owner), target:'_blank', rel:'noopener' },
+            h('span', { class:'cr-attach-t' }, h('b', {}, L({ en:x.name + '’s page', es:'Página de ' + x.name })), h('small', {}, x.title || S.file)), h('span', { class:'cr-attach-go' }, '↗')))
+            : [h('small', { class:'muted' }, '—')]),
+          r.with.length ? h('small', { class:'muted' }, w('sharedWith') + ': ' + r.with.map(u => names[u] || u).join(', ')) : h('small', { class:'muted' }, w('shareHint')));
+      }).catch(() => box.remove());
+    }
     // back from the editor tab: show the newest page
     onVisible = () => { if(location.hash === '#/c/' + period + '/a/' + it.id) refreshResume(); };
   }
@@ -649,13 +663,23 @@
           it.slips ? h('div', { class:'cr-slips' }, ...(r.slips.length ? r.slips.map(x => h('button', { class:'cr-chip', type:'button', title:w('seeSlip'), onclick:() => showSlip(x.project, r.username) }, '💬 ' + x.game + ' · ' + x.owner))
             : [h('small', { class:'muted' }, w('noSlips'))])) :
           it.site ? h('div', { class:'cr-st' }, bar(st.pct), h('small', {}, st.text), r.learn[it.site].len ? h('a', { class:'btn small', href:HTMLLESSONS.SITES[it.site].path + '?u=' + encodeURIComponent(r.username), target:'_blank', rel:'noopener' }, '👁 ' + w('seeSite') + ' ↗') : null,
-            HTMLLESSONS.SITES[it.site].who ? characterInput(r) : null) :
+            HTMLLESSONS.SITES[it.site].who ? characterInput(r) : null, HTMLLESSONS.SITES[it.site].share ? partners(r, rows, it.site) : null) :
           it.games ? h('div', { class:'cr-games row' }, ...(r.games.length ? r.games.map(g => gameTile(g, h('small', { class:'muted' }, g.blocks + ' 🧩'))) : [h('small', { class:'muted' }, w('noGame'))]))
             : h('div', { class:'cr-st' }, bar(st.pct), h('small', {}, st.text)), h('span', { class:'grow' }),
           stateChip(st, it),
           it.turnin ? (st.state === 'done'
             ? h('button', { class:'btn small', type:'button', title:w('giveBackT'), onclick:turn('students/' + r.username + '/lock', { locked:false }) }, '↩ ' + w('giveBack'))
             : h('button', { class:'btn small', type:'button', onclick:turn('students/' + r.username + '/lock', { locked:true }) }, '🔒 ' + w('turnIn'))) : null); })));
+  }
+
+  // who a student types a shared page with: the classmates on their page, and whose pages they are on
+  function partners(r, rows, key){
+    const name = u => (rows.find(x => x.username === u) || {}).name || u;
+    const on = rows.filter(x => ((x.learn[key] || {}).with || []).includes(r.username)).map(x => x.username);
+    const mine = (r.learn[key] || {}).with || [];
+    if(!mine.length && !on.length) return null;
+    return h('small', { class:'cr-partners muted' }, mine.length ? '👥 ' + mine.map(name).join(', ') : null, mine.length && on.length ? ' · ' : null,
+      on.length ? '✏️ ' + w('helping') + ': ' + on.map(u => name(u) + '’s').join(', ') : null);
   }
 
   // the Website Presentation: the teacher types the character each student's page is about

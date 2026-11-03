@@ -126,3 +126,20 @@ test('Website Presentation: starts as the Mario page; ticked off as it becomes t
   assert.strictEqual(st(elsa, '2026-11-10T15:00:00Z').state, 'done');                  // done = turned in
   assert.strictEqual(H.sitesOf({ wikiChar:'Elsa' }).wiki.who, 'Elsa');
 });
+
+test('Merge: two people’s changes to one page are both kept', () => {
+  const M = require('../public/js/merge.js');
+  const base = H.WIKI_START;
+  const a = base.replace('<h1>Mario</h1>', '<h1>Elsa</h1>'), b = base.replace('helps his friends.', 'helps his friends. He likes pizza.');
+  const m = M.merge3(base, a, b);
+  assert.ok(m.includes('<h1>Elsa</h1>') && m.includes('He likes pizza.'));
+  assert.strictEqual(M.merge3(base, a, a), a);
+  assert.strictEqual(M.merge3('the red cat sat', 'the blue cat sat', 'the red dog sat'), 'the blue dog sat');
+  assert.strictEqual(M.merge3('ab', 'aXb', 'aYb'), 'aYXb');                         // both typed in the same place
+  for(let t = 0; t < 500; t++){                                                    // changes apart from each other
+    const s = Array.from({ length:40 }, () => 'abc\n'[Math.random() * 4 | 0]).join(''), i = Math.random() * 15 | 0, j = 20 + (Math.random() * 15 | 0);
+    assert.strictEqual(M.merge3(s, s.slice(0, i) + 'MM' + s.slice(i + 2), s.slice(0, j) + 'T' + s.slice(j + 1)), s.slice(0, i) + 'MM' + s.slice(i + 2, j) + 'T' + s.slice(j + 1));
+  }
+  const h = M.hunks('hello world', 'hello brave world');
+  assert.deepStrictEqual([h, M.mapPoint(8, h), M.apply('hello world', h)], [[{ at:6, del:0, ins:'brave ' }], 14, 'hello brave world']);
+});
