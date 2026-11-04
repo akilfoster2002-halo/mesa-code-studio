@@ -86,9 +86,9 @@ function moveCursors(doc, from, to){
   const hs = MERGE.hunks(from, to);
   for(const x of Object.values(m)) if(x.sel) x.sel = x.sel.map(i => MERGE.mapPoint(i, hs));
 }
-// a cursor sent by an editor: [from, to] inside a page this long
+// a cursor sent by an editor: [where the selection started, where the cursor is] inside a page this long
 const selOf = (v, len) => { const a = Array.isArray(v) ? v : String(v || '').split(','); const n = a.slice(0, 2).map(Number);
-  return n.length === 2 && n.every(i => Number.isInteger(i) && i >= 0 && i <= len) ? [Math.min(n[0], n[1]), Math.max(n[0], n[1])] : undefined; };
+  return n.length === 2 && n.every(i => Number.isInteger(i) && i >= 0 && i <= len) ? n : undefined; };
 
 async function sameClass(user, username){
   if(user.role === 'teacher') return true;

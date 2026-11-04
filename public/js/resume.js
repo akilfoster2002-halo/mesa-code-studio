@@ -163,12 +163,14 @@
         let col = 0; for(const ch of line) col = ch === '\t' ? col + 2 - col % 2 : col + 1;      // tab-size 2
         return { x:left + col * cw, y:top + ln * lh, ln }; };
       marksIn.replaceChildren(...list.flatMap(x => {
-        const [a, b] = x.sel.map(i => Math.min(text.length, hs ? MERGE.mapPoint(i, hs) : i)), color = colorOf(x.username), p = at(b), out = [];
+        // [where they started, where their cursor is]: a selection can go up as well as down
+        const [s, f] = x.sel.map(i => Math.min(text.length, hs ? MERGE.mapPoint(i, hs) : i)), a = Math.min(s, f), b = Math.max(s, f);
+        const color = colorOf(x.username), p = at(f), out = [];
         if(a < b){                                      // the selection, one box per line
           const s0 = at(a);
-          for(let ln = s0.ln; ln <= p.ln && ln - s0.ln < 200; ln++){
-            const x0 = ln === s0.ln ? s0.x : left, x1 = ln === p.ln ? p.x : x0 + Math.max(cw, 9999);
-            out.push(h('div', { class:'rs-selbox', style:'left:' + x0 + 'px;top:' + (top + ln * lh) + 'px;width:' + Math.max(2, (ln === p.ln ? x1 : left + 2000) - x0) + 'px;height:' + lh + 'px;background:' + color }));
+          for(let ln = s0.ln, last = at(b).ln; ln <= last && ln - s0.ln < 200; ln++){
+            const e0 = at(b), x0 = ln === s0.ln ? s0.x : left, x1 = ln === e0.ln ? e0.x : left + 2000;
+            out.push(h('div', { class:'rs-selbox', style:'left:' + x0 + 'px;top:' + (top + ln * lh) + 'px;width:' + Math.max(2, x1 - x0) + 'px;height:' + lh + 'px;background:' + color }));
           }
         }
         out.push(h('div', { class:'rs-caret', style:'left:' + p.x + 'px;top:' + p.y + 'px;height:' + lh + 'px;background:' + color },
@@ -176,7 +178,10 @@
         return out;
       }));
     };
-    const where = () => { const before = ed.value.slice(0, ed.selectionStart).split('\n');
+    // my cursor: the end of a selection I am moving (selecting up, that is its start)
+    const focusAt = () => ed.selectionDirection === 'backward' ? ed.selectionStart : ed.selectionEnd;
+    const mySel = () => ed.selectionDirection === 'backward' ? [ed.selectionEnd, ed.selectionStart] : [ed.selectionStart, ed.selectionEnd];
+    const where = () => { const before = ed.value.slice(0, focusAt()).split('\n');
       pos.textContent = w('line') + ' ' + before.length + ', ' + w('col') + ' ' + (before[before.length - 1].length + 1);
       [...gutter.children].forEach((d, k) => d.classList.toggle('on', k === before.length - 1)); };
     // the page beside it: what the browser shows, and its <title> on the tab
@@ -194,9 +199,9 @@
     // someone else's changes: put in the code, the cursor and scroll kept where they were
     const setText = text => {
       if(text === ed.value) return;
-      const hs = MERGE.hunks(ed.value, text), a = MERGE.mapPoint(ed.selectionStart, hs), b = MERGE.mapPoint(ed.selectionEnd, hs), top = ed.scrollTop;
+      const hs = MERGE.hunks(ed.value, text), a = MERGE.mapPoint(ed.selectionStart, hs), b = Math.max(a, MERGE.mapPoint(ed.selectionEnd, hs)), top = ed.scrollTop;
       ed.value = text;
-      if(document.activeElement === ed) ed.setSelectionRange(a, b);
+      if(document.activeElement === ed) ed.setSelectionRange(a, b, ed.selectionDirection);
       ed.scrollTop = top; draw();
     };
     // send my changes, get everyone else's (a page nobody changed only asks "the same?")
@@ -205,7 +210,7 @@
       busy = true; clearTimeout(timer);
       const sent = ed.value, mineChanged = !o.readOnly && sent !== base;
       // my cursor, for my classmates (only while I am in the code)
-      const sel = !o.readOnly && document.activeElement === ed ? [ed.selectionStart, ed.selectionEnd] : null;
+      const sel = !o.readOnly && document.activeElement === ed ? mySel() : null;
       try {
         if(mineChanged) setStatus('saving');
         const r = mineChanged ? await api(o.doc, { method:'PUT', body:JSON.stringify({ base, text:sent, sel }) })
