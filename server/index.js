@@ -539,6 +539,9 @@ async function api(req, res, url){
                                                     everyone else's (MERGE.merge3); the page back
        POST /api/page/:key/share { with:[usernames] }  the owner shares it (classmates only)
        GET  /api/page/:key/shared                   who I share mine with; pages shared with me
+       POST /api/page/:owner/:key/files { name, id }   a picture (already in /api/assets) put in the
+                                                    page's files folder, used in the code by its name
+       DELETE /api/page/:owner/:key/files/:name     taken out of the folder
      A teacher reads any page. Turned in, it does not change. */
   if(p[0] === 'page'){
     const H = HTMLLESSONS, S = H.SITES[p[1] && p[2] ? p[2] : p[1]];
@@ -564,7 +567,7 @@ async function api(req, res, url){
       }
       return send(res, 404, { error:'none' });
     }
-    if(!S || !p[1] || p[3]) return send(res, 404, { error:'none' });
+    if(!S || !p[1] || (p[3] && p[3] !== 'files')) return send(res, 404, { error:'none' });
     const owner = await store.getUser(p[1]);
     if(!owner || owner.role !== 'student') return send(res, 404, { error:'none' });
     const htmlOf = async () => ((await store.getLearn(owner.username) || {}).data || {}).html || {};
@@ -573,11 +576,30 @@ async function api(req, res, url){
     if(!mine && !teacher && !shared) return send(res, 404, { error:'none' });
     const doc = owner.username + '/' + S.key;
     const out = (h, text) => ({ text, h:MERGE.hash(text), in:h[S.key + 'In'] || null, who:S.who ? h[S.who] || '' : undefined,
-      owner:{ username:owner.username, name:owner.name }, with:h[S.key + 'Share'] || [], here:here(doc, teacher ? null : user), canEdit:!teacher });
+      owner:{ username:owner.username, name:owner.name }, with:h[S.key + 'Share'] || [], files:h[S.key + 'Files'] || {}, here:here(doc, teacher ? null : user), canEdit:!teacher });
+    if(p[3] === 'files'){
+      if(teacher) return send(res, 403, { error:'teacher' });
+      const name = String(m === 'DELETE' ? decodeURIComponent(p[4] || '') : '').toLowerCase();
+      const b = m === 'POST' && !p[4] ? await readJSON(req, 2000) : null;
+      if(b && (!H.FILE_NAME.test(String(b.name || '')) || !/^[a-f0-9]{64}$/.test(String(b.id || '')) || !(await store.hasAsset(b.id)))) return send(res, 400, { error:'file' });
+      if(!b && !(m === 'DELETE' && name)) return send(res, 405, { error:'method' });
+      const r = await withLearn(owner.username, async () => {
+        const d = (await store.getLearn(owner.username) || {}).data || {}, h = d.html || {};
+        if(h[S.key + 'In']) return { locked:true };
+        const files = { ...(h[S.key + 'Files'] || {}) };
+        if(b){ if(!files[b.name.toLowerCase()] && Object.keys(files).length >= 40) return { full:true }; files[b.name.toLowerCase()] = b.id; }
+        else delete files[name];
+        await store.saveLearn(owner.username, { ...d, html:{ ...h, [S.key + 'Files']:files } });
+        return { files };
+      });
+      if(r.locked) return send(res, 423, { error:'turnedIn' });
+      if(r.full) return send(res, 413, { error:'full' });
+      return send(res, 200, { files:r.files });
+    }
     if(m === 'GET'){
       const text = x[S.key] || '';
       if(url.searchParams.get('h') && url.searchParams.get('h') === MERGE.hash(text)){
-        return send(res, 200, { same:true, in:x[S.key + 'In'] || null, with:x[S.key + 'Share'] || [], here:here(doc, teacher ? null : user) });
+        return send(res, 200, { same:true, in:x[S.key + 'In'] || null, with:x[S.key + 'Share'] || [], files:x[S.key + 'Files'] || {}, here:here(doc, teacher ? null : user) });
       }
       return send(res, 200, out(x, text));
     }

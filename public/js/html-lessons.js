@@ -216,8 +216,9 @@
      (set out like a Wikipedia article: an infobox of facts, sections, fun
      facts, references). Each student turns it into a page about the
      character their teacher gives them (html.wikiChar), then presents it. */
-  // the Mario page's own pictures: 🖼 Add picture in the editor puts the student's picture in the first one left
+  // the Mario page's own pictures, in its files folder from the start (as if they sat beside it on a desktop)
   const WIKI_PIC = '/img/wiki/';
+  const WIKI_FILES = { 'mario.svg':WIKI_PIC + 'mario.svg', 'mushroom.svg':WIKI_PIC + 'mushroom.svg' };
   const WIKI_START = `<!DOCTYPE html>
 <html>
 <head>
@@ -243,7 +244,7 @@
   <!-- The infobox: the box of facts on the right -->
   <table class="infobox">
     <tr><th colspan="2" class="top">Mario</th></tr>
-    <tr><td colspan="2"><img src="/img/wiki/mario.svg" alt="A drawing of Mario"></td></tr>
+    <tr><td colspan="2"><img src="mario.svg" alt="A drawing of Mario"></td></tr>
     <tr><th>First seen</th><td>Donkey Kong (1981)</td></tr>
     <tr><th>Made by</th><td>Shigeru Miyamoto</td></tr>
     <tr><th>Species</th><td>Human</td></tr>
@@ -262,7 +263,7 @@
   <h2>Powers</h2>
   <!-- A picture in the article, with a caption under it -->
   <figure class="pic">
-    <img src="/img/wiki/mushroom.svg" alt="A Super Mushroom">
+    <img src="mushroom.svg" alt="A Super Mushroom">
     <figcaption>A Super Mushroom makes Mario big.</figcaption>
   </figure>
   <p>Mario can jump very high. When he eats a Super Mushroom, he grows big. A Fire Flower lets him throw fireballs.</p>
@@ -303,7 +304,7 @@
       test:s => { const m = s.match(/<p>\s*<b>([^<]+)<\/b>/i); return !!m && !!h1Of(s) && same(m[1], h1Of(s)); } },
     { id:'img', group:1, en:'<img src="…"> × 2', say:{ en:'Your own pictures: one in the box, one in the article (🖼 Add picture)', es:'Tus propias imágenes: una en el cuadro y una en el artículo (🖼 Añadir imagen)' },
       test:s => { const srcs = [...s.matchAll(/<img[^>]*\ssrc\s*=\s*["']?([^"'\s>]+)/gi)].map(m => m[1]);
-        return srcs.length >= 2 && srcs.every(x => !x.includes(WIKI_PIC) && /^(https?:\/\/|data:image\/|\/api\/assets\/)/i.test(x)); } },
+        return srcs.length >= 2 && srcs.every(x => !WIKI_FILES[x] && !x.includes(WIKI_PIC) && (/^(https?:\/\/|data:image\/|\/api\/assets\/)/i.test(x) || FILE_NAME.test(x))); } },
     { id:'nomario', group:1, en:'No Mario', say:{ en:'Nothing about Mario is left', es:'No queda nada de Mario' },
       test:(s, who) => { const t = s.toLowerCase(), me = (who || '').toLowerCase(); return MARIO_WORDS.every(x => me.includes(x) || !t.includes(x)); } },
     { id:'infobox', group:2, en:'<table class="infobox">', say:{ en:'The box of facts, with at least 5 rows', es:'El cuadro de datos, con 5 filas o más' },
@@ -325,9 +326,26 @@
      Website Presentation (character.html). Each is kept in the Learn record as
      html[key], turned in at html[key + 'In']; a page that can be shared lists the
      classmates who can type in it too in html[key + 'Share']. */
+  /* A page's files folder: pictures saved beside it, used in the code by their
+     name (<img src="elsa.png">) as on a desktop. html[key + 'Files'] = { name:assetId };
+     a page that starts with pictures (the Mario page) has those too. */
+  const FILE_NAME = /^[a-z0-9][a-z0-9._-]{0,40}\.(png|jpe?g|gif|webp|svg|bmp|avif)$/i;
+  // a picture's file name from what the student's computer called it: "My Elsa (1).PNG" → my-elsa-1.png
+  const fileName = (s, taken) => {
+    const m = String(s || '').toLowerCase().match(/^(.*?)(?:\.([a-z0-9]+))?$/), ext = /^(png|jpe?g|gif|webp|svg|bmp|avif)$/.test(m[2] || '') ? m[2] : 'png';
+    const stem = (m[1] || '').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 30) || 'picture';
+    let name = stem + '.' + ext;
+    for(let n = 2; taken && taken[name]; n++) name = stem + '-' + n + '.' + ext;
+    return name;
+  };
+  const filesOf = (site, html) => ({ ...(site.files || {}), ...Object.fromEntries(Object.entries((html || {})[site.key + 'Files'] || {}).map(([n, id]) => [n, '/api/assets/' + id])) });
+  // the page as a browser shows it: a file's name in src="…" or href="…" becomes where the file is kept
+  const withFiles = (text, files, origin) => String(text || '').replace(/(\b(?:src|href)\s*=\s*)(["'])([^"']+)\2/gi,
+    (all, at, q, v) => files[v.trim()] ? at + q + (origin || '') + files[v.trim()] + q : all);
+
   const SITES = {
     site:{ key:'site', item:'site', file:'resume.html', path:'/resume', start:'', groups:SITE_GROUPS, parts:SITE_PARTS, info:s => siteInfo(s) },
-    wiki:{ key:'wiki', item:'wiki', file:'character.html', path:'/wiki', start:WIKI_START, groups:WIKI_GROUPS, parts:WIKI_PARTS, info:wikiInfo, who:'wikiChar', share:true }
+    wiki:{ key:'wiki', item:'wiki', file:'character.html', path:'/wiki', start:WIKI_START, groups:WIKI_GROUPS, parts:WIKI_PARTS, info:wikiInfo, who:'wikiChar', share:true, files:WIKI_FILES }
   };
   // every page's progress from a Learn record's html: { site:{ len, has, ok, in }, wiki:{ …, who } }
   const sitesOf = html => { html = html || {};
@@ -339,6 +357,6 @@
 
   const HTMLLESSONS = { ACTS, CARDS, TYPE, CLOSE, MATCH_WORDS, MATCH_TAGS, wrap, BUILD, FIX, PAGE_START, GOALS, score,
     C1_ACTS, C1_WORDS, C1_SORT, C1_ELEMENTS, C1_TAGS, C1_JOBS, C1_PLACE, C1_PAGE, C1_ORDER, C1_EXIT, C1_H1, SITE_MAX, SITE_GROUPS, SITE_PARTS, siteInfo,
-    WIKI_PIC, WIKI_START, WIKI_GROUPS, WIKI_PARTS, wikiInfo, SITES, sitesOf };
+    WIKI_PIC, WIKI_FILES, FILE_NAME, fileName, filesOf, withFiles, WIKI_START, WIKI_GROUPS, WIKI_PARTS, wikiInfo, SITES, sitesOf };
   if(typeof module !== 'undefined') module.exports = HTMLLESSONS; else root.HTMLLESSONS = HTMLLESSONS;
 })(this);

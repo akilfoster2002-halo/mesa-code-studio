@@ -449,7 +449,7 @@
     const refreshResume = async () => {
       const r = await api('/learn').catch(() => null), x = ((r && r.data) || {}).html || {};
       mine.learn[k] = HL.sitesOf(x)[k];
-      draw(x[k] || '', x[k + 'In'] || null);
+      draw(HL.withFiles(x[k] || '', HL.filesOf(S, x), location.origin), x[k + 'In'] || null);      // its pictures by file name
       drawWho(); drawChecks();
     };
     draw('', null); refreshResume();

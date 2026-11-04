@@ -107,3 +107,15 @@ body{background:var(--bg);color:var(--ink);font:14px/1.4 'Google Sans',Roboto,sy
 .rs-dlg-row{display:flex;align-items:center;gap:10px;padding:6px 4px;border-radius:6px;cursor:pointer;font-size:15px}
 .rs-dlg-row:hover{background:#f1f3f4}
 .rs-dlg-btns{display:flex;justify-content:flex-end;gap:8px}
+/* the page's files folder, as beside a page on a desktop */
+.rs-files{display:flex;align-items:center;gap:6px;flex-wrap:wrap;padding:6px 16px;background:#fff;border-bottom:1px solid var(--line);font-size:13px}
+.rs-files-l{font-weight:600;color:var(--muted);margin-right:4px}
+.rs-file-chip{display:inline-flex;align-items:center;border:1px solid var(--line);border-radius:6px;background:#f8f9fa;font:13px "Ubuntu Mono",Menlo,monospace;color:var(--ink)}
+.rs-file-chip.page{padding:4px 8px}
+.rs-file-use{display:inline-flex;align-items:center;gap:6px;border:0;background:none;padding:3px 8px 3px 4px;font:inherit;color:inherit;cursor:pointer;border-radius:6px}
+.rs-file-use:hover:not(:disabled){background:#e8f0fe}
+.rs-file-use:disabled{cursor:default}
+.rs-file-use img{width:22px;height:22px;object-fit:cover;border-radius:3px;background:#fff}
+.rs-file-x{border:0;background:none;color:var(--muted);cursor:pointer;padding:3px 6px;font-size:12px}
+.rs-file-x:hover{color:#d93025}
+.rs-btn.small{padding:4px 10px;font-size:13px}

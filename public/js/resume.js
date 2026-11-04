@@ -10,8 +10,10 @@
    until Unsubmit in the Classroom. A teacher: ?u=<username>, read only.
    At /wiki it is the Website Presentation's character.html instead (html.wiki):
    it starts as the Mario page, and the student changes it to their character.
-   Pictures: 🖼 Add picture (or paste or drop one on the code) makes it smaller,
-   keeps it in the asset store and puts it in the page as <img src="https://…/api/assets/…">.
+   Pictures, as on a desktop: each page has a 📁 files folder beside it. ＋ Add picture
+   (or paste or drop one on the code) makes it smaller, keeps it in the asset store,
+   puts it in the folder by its file name and in the code as <img src="elsa.png">;
+   the page beside the code shows the files where they are kept (HL.withFiles).
    Typing together (as in Google Docs): the page is kept at /api/page/<owner>/<key>.
    Every moment or so the editor sends what changed and gets everyone else's
    changes back (MERGE.merge3 puts them together). The Website Presentation's
@@ -35,7 +37,10 @@
     character:{ en:'Your character', es:'Tu personaje' },
     addPic:{ en:'Add picture', es:'Añadir imagen' }, picAdding:{ en:'Adding picture…', es:'Añadiendo imagen…' },
     picFail:{ en:'Picture not added. Try again.', es:'No se añadió la imagen. Inténtalo otra vez.' },
-    picHint:{ en:'Put a picture in the page from your computer. You can also paste one or drop it on the code.', es:'Pon una imagen de tu computadora en la página. También puedes pegarla o soltarla en el código.' },
+    picHint:{ en:'Put a picture from your computer in your files folder and in the page. You can also paste one or drop it on the code.', es:'Pon una imagen de tu computadora en tu carpeta de archivos y en la página. También puedes pegarla o soltarla en el código.' },
+    files:{ en:'Files', es:'Archivos' }, nameIt:{ en:'Name your picture file (like elsa.png):', es:'Nombra tu archivo de imagen (como elsa.png):' },
+    useIt:{ en:'Click to put it in the page at the cursor', es:'Haz clic para ponerla en la página donde está el cursor' },
+    delFile:{ en:'Take this file out of the folder?', es:'¿Quitar este archivo de la carpeta?' }, full:{ en:'The folder is full (40 files).', es:'La carpeta está llena (40 archivos).' },
     line:{ en:'Ln', es:'Lín' }, col:{ en:'Col', es:'Col' }, has:{ en:'Your page has', es:'Tu página tiene' },
     share:{ en:'Share', es:'Compartir' }, shareH:{ en:'Share with classmates', es:'Compartir con compañeros' },
     shareHint:{ en:'They can type in your page too, at the same time as you.', es:'Ellos también pueden escribir en tu página, al mismo tiempo que tú.' },
@@ -109,7 +114,7 @@
     const blob = await shrink(file);
     const r = await fetch('/api/assets', { method:'POST', credentials:'same-origin', headers:{ 'Content-Type':blob.type }, body:blob });
     if(!r.ok) throw new Error('upload');
-    return location.origin + '/api/assets/' + (await r.json()).id;      // the whole address: a short /api/… does not load in the page's frame
+    return (await r.json()).id;
   }
 
   const COLORS = ['#1e8e3e', '#1967d2', '#d93025', '#e37400', '#9334e6', '#129eaf', '#c26401', '#5f6368'];
@@ -130,7 +135,7 @@
     const mine = owner === me.username, turnedIn = !!r.in, readOnly = turnedIn || !r.canEdit;
     // the Website Presentation starts as the Mario page (saved as soon as it opens)
     const fresh = !r.text && !!S.start && mine && !readOnly;
-    editor({ me, doc, mine, text:fresh ? S.start : r.text, base:r.text, owner:r.owner, with:r.with || [], here:r.here || [],
+    editor({ me, doc, mine, text:fresh ? S.start : r.text, base:r.text, owner:r.owner, with:r.with || [], here:r.here || [], files:r.files || {},
       readOnly, turnedIn, character:r.who || '', teacherView });
   }
 
@@ -161,7 +166,7 @@
     // the page beside it: what the browser shows, and its <title> on the tab
     const refresh = () => {
       rendered = ed.value;
-      frame.srcdoc = ed.value;
+      frame.srcdoc = HL.withFiles(ed.value, files(), location.origin);    // the files' names, where they are kept
       const t = (ed.value.match(/<title>([^<]*)<\/title>/i) || [])[1];
       tabTitle.textContent = t && t.trim() ? t.trim() : S.file;
       document.title = (t && t.trim() ? t.trim() + ' · ' : '') + S.file;
@@ -188,6 +193,7 @@
         const r = mineChanged ? await api(o.doc, { method:'PUT', body:JSON.stringify({ base, text:sent }) }) : await api(o.doc + '?h=' + MERGE.hash(base));
         if(!r.same){ const from = mineChanged ? sent : base; base = r.text; setText(MERGE.merge3(from, ed.value, r.text)); }
         people(r.here || [], r.with || o.with);
+        if(r.files && JSON.stringify(r.files) !== JSON.stringify(o.files)){ o.files = r.files; drawFiles(); refresh(); }   // a classmate added a picture
         if(!o.readOnly) setStatus(ed.value === base ? 'saved' : 'edited');
         if(r.in && !o.readOnly) return location.reload();
       } catch(e){
@@ -228,21 +234,44 @@
             } }, w('done')))));
       document.body.append(back);
     };
-    // a picture goes where the cursor is in a src="…", else in place of the Mario page's first picture left, else in a new <img> at the cursor
-    const addPicture = async file => {
-      if(o.readOnly || !file || !/^image\//.test(file.type)) return;
-      const at = ed.selectionStart, end = ed.selectionEnd;
-      status.textContent = '⏳ ' + w('picAdding'); status.className = 'rs-status saving';
-      let src;
-      try { src = await upload(file); } catch(e){ status.textContent = '⚠ ' + w('picFail'); status.className = 'rs-status offline'; return; }
+    // the files folder: the page's own pictures (the Mario page's two, and the student's)
+    const files = () => HL.filesOf(S, { [k + 'Files']:o.files });
+    const filesBar = h('div', { class:'rs-files' });
+    const fileApi = (path, opts) => api(o.doc + '/files' + path, opts);
+    // a file's name goes where the cursor is in a src="…", else in place of the Mario page's first picture left, else in a new <img> at the cursor
+    const usePicture = (name, at = ed.selectionStart, end = ed.selectionEnd) => {
       const v = ed.value, ls = v.lastIndexOf('\n', at - 1) + 1, le = v.indexOf('\n', at) < 0 ? v.length : v.indexOf('\n', at);
       const inSrc = [...v.slice(ls, le).matchAll(/src\s*=\s*(["'])([^"']*)\1/gi)].map(m => ({ from:ls + m.index + m[0].indexOf(m[1]) + 1, len:m[2].length }))
         .find(m => at >= m.from && at <= m.from + m.len);
-      const spot = v.match(new RegExp('src="(' + HL.WIKI_PIC.replace(/\//g, '\\/') + '[^"]*)"'));    // the first Mario picture left
-      if(inSrc) ed.setRangeText(src, inSrc.from, inSrc.from + inSrc.len, 'end');
-      else if(spot) ed.setRangeText(src, spot.index + 5, spot.index + 5 + spot[1].length, 'end');
-      else ed.setRangeText('<img src="' + src + '" alt="">', at, end, 'end');
+      const spot = [...v.matchAll(/src="([^"]*)"/g)].find(m => (S.files || {})[m[1]] || m[1].includes(HL.WIKI_PIC));
+      if(inSrc) ed.setRangeText(name, inSrc.from, inSrc.from + inSrc.len, 'end');
+      else if(spot) ed.setRangeText(name, spot.index + 5, spot.index + 5 + spot[1].length, 'end');
+      else ed.setRangeText('<img src="' + name + '" alt="">', at, end, 'end');
       ed.focus(); ed.dispatchEvent(new Event('input')); save();      // the picture shows at once
+    };
+    const addPicture = async file => {
+      if(o.readOnly || !file || !/^image\//.test(file.type)) return;
+      const at = ed.selectionStart, end = ed.selectionEnd;
+      // name it, as when saving a file into the website's folder
+      const asked = prompt(w('nameIt'), HL.fileName(file.name, files()));
+      if(asked == null) return;
+      const name = HL.FILE_NAME.test(asked.trim()) ? asked.trim().toLowerCase() : HL.fileName(asked, {});
+      status.textContent = '⏳ ' + w('picAdding'); status.className = 'rs-status saving';
+      try { const id = await upload(file); o.files = (await fileApi('', { method:'POST', body:JSON.stringify({ name, id }) })).files; }
+      catch(e){ status.textContent = '⚠ ' + w(e.status === 413 ? 'full' : 'picFail'); status.className = 'rs-status offline'; return; }
+      drawFiles(); usePicture(name, at, end);
+    };
+    const drawFiles = () => {
+      const all = files(), own = o.files || {};
+      filesBar.replaceChildren(h('span', { class:'rs-files-l' }, '📁 ' + w('files')), h('span', { class:'rs-file-chip page' }, '📄 ' + S.file),
+        ...Object.keys(all).sort().map(n => h('span', { class:'rs-file-chip' },
+          h('button', { type:'button', class:'rs-file-use', title:w('useIt'), disabled:o.readOnly, onclick:() => usePicture(n) },
+            h('img', { src:all[n], alt:'' }), n),
+          own[n] && !o.readOnly ? h('button', { type:'button', class:'rs-file-x', title:w('delFile'), 'aria-label':w('delFile') + ' ' + n, onclick:async () => {
+            if(!confirm(w('delFile') + '\n' + n)) return;
+            try { o.files = (await fileApi('/' + encodeURIComponent(n), { method:'DELETE' })).files; drawFiles(); refresh(); } catch(e){}
+          } }, '✕') : null)),
+        o.readOnly ? null : h('button', { class:'rs-btn small', type:'button', title:w('picHint'), onclick:() => picker.click() }, '＋ ' + w('addPic')));
     };
     const picker = h('input', { type:'file', accept:'image/*', hidden:true, onchange:e => { addPicture(e.target.files[0]); e.target.value = ''; } });
     ed.addEventListener('paste', e => { const f = [...(e.clipboardData && e.clipboardData.files || [])].find(f => /^image\//.test(f.type)); if(f){ e.preventDefault(); addPicture(f); } });
@@ -271,9 +300,10 @@
         h('div', { class:'rs-file' }, h('b', {}, S.file), h('small', {}, (o.mine ? o.owner.name : '✏️ ' + L({ en:o.owner.name + '’s page', es:'Página de ' + o.owner.name })) + (o.readOnly ? ' · ' + w('readOnly') : ''))),
         o.character ? h('span', { class:'rs-who' }, '🎭 ' + w('character') + ': ', h('b', {}, o.character)) : null,
         o.readOnly ? null : status, h('span', { class:'grow' }), hereBox, shareBtn, langBtn, back,
-        o.readOnly ? null : h('button', { class:'rs-btn', type:'button', title:w('picHint'), onclick:() => picker.click() }, '🖼 ' + w('addPic')), o.readOnly ? null : picker,
+        o.readOnly ? null : picker,
         o.readOnly ? null : h('button', { class:'rs-btn primary', type:'button', onclick:save, title:'Ctrl+S' }, '💾 ' + w('save'), h('kbd', {}, /Mac/.test(navigator.platform) ? '⌘S' : 'Ctrl S'))),
       o.turnedIn ? h('div', { class:'rs-banner' }, '🔒 ' + w('turnedIn')) : null,
+      filesBar,
       h('main', { class:'rs-main' },
         h('section', { class:'rs-pane rs-code' }, h('div', { class:'rs-pane-h' }, h('span', { class:'rs-dot' }), w('code'), h('span', { class:'grow' }), pos),
           h('div', { class:'rs-ed' }, gutter, h('div', { class:'rs-layers' }, hl, ed))),
@@ -283,7 +313,7 @@
           h('div', { class:'rs-url' }, h('span', {}, '🔒'), S.file),
           frame)),
       h('footer', { class:'rs-foot' }, checks)));
-    setStatus(ed.value === base ? 'saved' : 'edited'); draw(); refresh(); people(o.here, o.with);
+    setStatus(ed.value === base ? 'saved' : 'edited'); drawFiles(); draw(); refresh(); people(o.here, o.with);
     push();
     if(!o.readOnly){ ed.focus(); ed.setSelectionRange(0, 0); ed.scrollTop = 0; where(); }
   }

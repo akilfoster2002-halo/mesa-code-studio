@@ -631,6 +631,14 @@ test('Website Presentation: a page shared with a classmate; both type in it at t
   assert.ok(both.here.some(x => x.username === 'dev'));
   assert.deepStrictEqual(await (await call(d.cookie, '/page/ana/wiki?h=' + M.hash(both.text))).json().then(x => x.same), true);
   assert.strictEqual((await (await call(a.cookie, '/learn')).json()).data.html.wiki, both.text);
+  // the files folder: a classmate it is shared with puts a picture in it, by name
+  const pic = await (await call(d.cookie, '/assets', { method:'POST', headers:{ 'Content-Type':'image/png' }, body:Buffer.from('not really a png') })).json();
+  assert.strictEqual((await call(d.cookie, '/page/ana/wiki/files', { method:'POST', body:JSON.stringify({ name:'../x.png', id:pic.id }) })).status, 400);
+  assert.strictEqual((await call(d.cookie, '/page/ana/wiki/files', { method:'POST', body:JSON.stringify({ name:'elsa.png', id:'0'.repeat(64) }) })).status, 400);
+  assert.deepStrictEqual((await (await call(d.cookie, '/page/ana/wiki/files', { method:'POST', body:JSON.stringify({ name:'elsa.png', id:pic.id }) })).json()).files, { 'elsa.png':pic.id });
+  assert.deepStrictEqual((await (await call(a.cookie, '/page/ana/wiki')).json()).files, { 'elsa.png':pic.id });
+  assert.strictEqual((await call(c.cookie, '/page/ana/wiki/files', { method:'POST', body:JSON.stringify({ name:'b.png', id:pic.id }) })).status, 404);
+  assert.deepStrictEqual((await (await call(a.cookie, '/page/ana/wiki/files/elsa.png', { method:'DELETE' })).json()).files, {});
   // turned in: nobody can change it
   await call(a.cookie, '/learn', { method:'PUT', body:JSON.stringify({ data:{ html:{ wikiIn:true } } }) });
   assert.strictEqual((await call(d.cookie, '/page/ana/wiki', { method:'PUT', body:JSON.stringify({ base:both.text, text:'gone' }) })).status, 423);

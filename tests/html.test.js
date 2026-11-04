@@ -107,7 +107,7 @@ test('Website Presentation: starts as the Mario page; ticked off as it becomes t
   assert.deepStrictEqual(H.wikiInfo(start).has, H.WIKI_PARTS.filter(p => p.group === 2).map(p => p.id));
   assert.ok(H.WIKI_PARTS.every(p => H.WIKI_GROUPS.some(g => g.n === p.group)));
   const elsa = start.replace(/Mario/g, 'Elsa').replace(/Luigi|Mushroom Kingdom|Nintendo|Miyamoto|Bowser|Peach|Jumpman|Donkey Kong/g, 'x')
-    .replace('/img/wiki/mario.svg', 'https://example.com/elsa.png').replace('/img/wiki/mushroom.svg', 'https://example.com/castle.png');
+    .replace('src="mario.svg"', 'src="elsa.png"').replace('src="mushroom.svg"', 'src="https://example.com/castle.png"');   // a file in the folder, a link
   assert.strictEqual(H.wikiInfo(elsa, 'Elsa').ok, true);
   assert.strictEqual(H.wikiInfo(elsa, '').ok, true);                                   // no character given yet: any name
   const has = (x, who) => H.wikiInfo(x, who).has;
@@ -116,7 +116,11 @@ test('Website Presentation: starts as the Mario page; ticked off as it becomes t
   assert.ok(has(start.replace(/Mario/g, 'Luigi'), 'Luigi').includes('nomario') === false); // the rest of Mario is still there
   assert.ok(!has(elsa.replace('<title>Elsa', '<title>Page'), 'Elsa').includes('title'));
   assert.ok(!has(elsa.replace('<b>Elsa</b>', 'Elsa'), 'Elsa').includes('bold'));
-  assert.ok(!has(elsa.replace('https://example.com/castle.png', '/img/wiki/mushroom.svg'), 'Elsa').includes('img'));   // a Mario picture is left
+  assert.ok(!has(elsa.replace('https://example.com/castle.png', 'mushroom.svg'), 'Elsa').includes('img'));   // a Mario picture is left
+  assert.deepStrictEqual([H.fileName('My Elsa (1).PNG', {}), H.fileName('image.png', { 'image.png':1 }), H.fileName('x.exe', {})], ['my-elsa-1.png', 'image-2.png', 'x.png']);
+  const files = H.filesOf(H.SITES.wiki, { wikiFiles:{ 'elsa.png':'ab'.repeat(32) } });
+  assert.strictEqual(H.withFiles('<img src="elsa.png"><img src="mario.svg"><img src="gone.png">', files, 'https://x'),
+    '<img src="https://x/api/assets/' + 'ab'.repeat(32) + '"><img src="https://x/img/wiki/mario.svg"><img src="gone.png">');
   assert.ok(!has(elsa.replace(/<figure[\s\S]*<\/figure>/, ''), 'Elsa').includes('img'));                             // only one picture
   assert.deepStrictEqual(H.wikiInfo('').has, []);
   const uploaded = elsa.replace('https://example.com/elsa.png', '/api/assets/' + 'ab'.repeat(32));   // 🖼 Add picture
