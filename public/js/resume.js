@@ -133,8 +133,10 @@
     const ed = h('textarea', { class:'rs-input', spellcheck:'false', autocapitalize:'off', autocomplete:'off', autocorrect:'off', wrap:'off',
       placeholder:w('empty'), 'aria-label':S.file, maxlength:HL.SITE_MAX });
     ed.value = o.text; ed.readOnly = o.readOnly;
-    const hl = h('pre', { class:'rs-hl', 'aria-hidden':'true' });
-    const gutter = h('div', { class:'rs-gutter', 'aria-hidden':'true' });
+    // the colored code and the line numbers are moved with the typing box, not scrolled: with scrollbars
+    // showing, the box scrolls further than they can, and the cursor would sit above its line
+    const hlIn = h('div', { class:'rs-hl-in' }), hl = h('pre', { class:'rs-hl', 'aria-hidden':'true' }, hlIn);
+    const gutIn = h('div', { class:'rs-gutter-in' }), gutter = h('div', { class:'rs-gutter', 'aria-hidden':'true' }, gutIn);
     const status = h('span', { class:'rs-status' });
     const frame = h('iframe', { class:'rs-frame', sandbox:'allow-same-origin', title:w('page') });   // no scripts; same origin so its pictures load
     const tabTitle = h('span', { class:'rs-tabt' });
@@ -142,12 +144,13 @@
     const checks = h('div', { class:'rs-checks' });
     const setStatus = (k, cls) => { status.textContent = (k === 'saved' ? '✓ ' : k === 'offline' ? '⚠ ' : '') + w(k); status.className = 'rs-status ' + (cls || k); };
     const draw = () => {
-      hl.innerHTML = paint(ed.value);
+      hlIn.innerHTML = paint(ed.value);
       const n = ed.value.split('\n').length;
-      if(gutter.childElementCount !== n) gutter.replaceChildren(...Array.from({ length:n }, (x, i) => h('div', {}, String(i + 1))));
+      if(gutIn.childElementCount !== n) gutIn.replaceChildren(...Array.from({ length:n }, (x, i) => h('div', {}, String(i + 1))));
       scrolled(); where();
     };
-    const scrolled = () => { hl.scrollTop = ed.scrollTop; hl.scrollLeft = ed.scrollLeft; gutter.scrollTop = ed.scrollTop;
+    const scrolled = () => { hlIn.style.transform = 'translate(' + -ed.scrollLeft + 'px,' + -ed.scrollTop + 'px)';
+      gutIn.style.transform = 'translateY(' + -ed.scrollTop + 'px)';
       marksIn.style.transform = 'translate(' + -ed.scrollLeft + 'px,' + -ed.scrollTop + 'px)'; };
     // classmates' cursors, drawn over the code: a line where each one is, their name, what they selected
     const marksIn = h('div', { class:'rs-marks-in' }), marks = h('div', { class:'rs-marks', 'aria-hidden':'true' }, marksIn);
@@ -183,7 +186,7 @@
     const mySel = () => ed.selectionDirection === 'backward' ? [ed.selectionEnd, ed.selectionStart] : [ed.selectionStart, ed.selectionEnd];
     const where = () => { const before = ed.value.slice(0, focusAt()).split('\n');
       pos.textContent = w('line') + ' ' + before.length + ', ' + w('col') + ' ' + (before[before.length - 1].length + 1);
-      [...gutter.children].forEach((d, k) => d.classList.toggle('on', k === before.length - 1)); };
+      [...gutIn.children].forEach((d, k) => d.classList.toggle('on', k === before.length - 1)); };
     // the page beside it: what the browser shows, and its <title> on the tab
     const refresh = () => {
       rendered = ed.value;
