@@ -127,3 +127,10 @@ body{background:var(--bg);color:var(--ink);font:14px/1.4 'Google Sans',Roboto,sy
 .rs-drive-pic img{width:100%;aspect-ratio:1;object-fit:contain;background:#f8f9fa;border-radius:4px}
 .rs-drive-pic span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .rs-drive-empty{color:var(--muted);padding:18px 0}
+/* classmates' cursors over the code */
+.rs-marks{position:absolute;inset:0;pointer-events:none;overflow:hidden;z-index:2}
+.rs-marks-in{position:absolute;left:0;top:0}
+.rs-caret{position:absolute;width:2px;border-radius:1px}
+.rs-caret-n{position:absolute;left:0;bottom:100%;font:600 11px/1.2 system-ui,sans-serif;color:#fff;padding:2px 6px;border-radius:4px 4px 4px 0;white-space:nowrap}
+.rs-caret-n.below{bottom:auto;top:100%;border-radius:0 4px 4px 4px}
+.rs-selbox{position:absolute;opacity:.28}

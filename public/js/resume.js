@@ -19,7 +19,9 @@
    Typing together (as in Google Docs): the page is kept at /api/page/<owner>/<key>.
    Every moment or so the editor sends what changed and gets everyone else's
    changes back (MERGE.merge3 puts them together). The Website Presentation's
-   owner can 👥 Share it with classmates, who open it at /wiki?o=<owner>.
+   owner can 👥 Share it with classmates, who open it at /wiki?o=<owner>. Each editor
+   sends its cursor too, and shows everyone else's in the code: a coloured line with
+   their name, and what they have selected (as in Google Docs).
    ===================================================================== */
 (function(){
   const { h, $ } = UI;
@@ -145,7 +147,35 @@
       if(gutter.childElementCount !== n) gutter.replaceChildren(...Array.from({ length:n }, (x, i) => h('div', {}, String(i + 1))));
       scrolled(); where();
     };
-    const scrolled = () => { hl.scrollTop = ed.scrollTop; hl.scrollLeft = ed.scrollLeft; gutter.scrollTop = ed.scrollTop; };
+    const scrolled = () => { hl.scrollTop = ed.scrollTop; hl.scrollLeft = ed.scrollLeft; gutter.scrollTop = ed.scrollTop;
+      marksIn.style.transform = 'translate(' + -ed.scrollLeft + 'px,' + -ed.scrollTop + 'px)'; };
+    // classmates' cursors, drawn over the code: a line where each one is, their name, what they selected
+    const marksIn = h('div', { class:'rs-marks-in' }), marks = h('div', { class:'rs-marks', 'aria-hidden':'true' }, marksIn);
+    let cursors = [];                                   // [{ username, name, sel }] in the page as the server had it (base)
+    const drawCursors = () => {
+      const list = cursors.filter(x => x.sel && x.username !== o.me.username);
+      if(!list.length) return marksIn.replaceChildren();
+      const cs = getComputedStyle(ed), lh = parseFloat(cs.lineHeight), top = parseFloat(cs.paddingTop), left = parseFloat(cs.paddingLeft);
+      const c = document.createElement('canvas').getContext('2d'); c.font = cs.fontSize + ' ' + cs.fontFamily;
+      const cw = c.measureText('M'.repeat(50)).width / 50, text = ed.value;
+      const hs = text === base ? null : MERGE.hunks(base, text);      // what I typed since: the cursors move with it
+      const at = i => { const before = text.slice(0, i), ln = before.split('\n').length - 1, line = before.slice(before.lastIndexOf('\n') + 1);
+        let col = 0; for(const ch of line) col = ch === '\t' ? col + 2 - col % 2 : col + 1;      // tab-size 2
+        return { x:left + col * cw, y:top + ln * lh, ln }; };
+      marksIn.replaceChildren(...list.flatMap(x => {
+        const [a, b] = x.sel.map(i => Math.min(text.length, hs ? MERGE.mapPoint(i, hs) : i)), color = colorOf(x.username), p = at(b), out = [];
+        if(a < b){                                      // the selection, one box per line
+          const s0 = at(a);
+          for(let ln = s0.ln; ln <= p.ln && ln - s0.ln < 200; ln++){
+            const x0 = ln === s0.ln ? s0.x : left, x1 = ln === p.ln ? p.x : x0 + Math.max(cw, 9999);
+            out.push(h('div', { class:'rs-selbox', style:'left:' + x0 + 'px;top:' + (top + ln * lh) + 'px;width:' + Math.max(2, (ln === p.ln ? x1 : left + 2000) - x0) + 'px;height:' + lh + 'px;background:' + color }));
+          }
+        }
+        out.push(h('div', { class:'rs-caret', style:'left:' + p.x + 'px;top:' + p.y + 'px;height:' + lh + 'px;background:' + color },
+          h('span', { class:'rs-caret-n' + (p.y < 18 ? ' below' : ''), style:'background:' + color }, x.name.split(' ')[0])));
+        return out;
+      }));
+    };
     const where = () => { const before = ed.value.slice(0, ed.selectionStart).split('\n');
       pos.textContent = w('line') + ' ' + before.length + ', ' + w('col') + ' ' + (before[before.length - 1].length + 1);
       [...gutter.children].forEach((d, k) => d.classList.toggle('on', k === before.length - 1)); };
@@ -174,9 +204,12 @@
       if(busy) return;
       busy = true; clearTimeout(timer);
       const sent = ed.value, mineChanged = !o.readOnly && sent !== base;
+      // my cursor, for my classmates (only while I am in the code)
+      const sel = !o.readOnly && document.activeElement === ed ? [ed.selectionStart, ed.selectionEnd] : null;
       try {
         if(mineChanged) setStatus('saving');
-        const r = mineChanged ? await api(o.doc, { method:'PUT', body:JSON.stringify({ base, text:sent }) }) : await api(o.doc + '?h=' + MERGE.hash(base));
+        const r = mineChanged ? await api(o.doc, { method:'PUT', body:JSON.stringify({ base, text:sent, sel }) })
+          : await api(o.doc + '?h=' + MERGE.hash(base) + (sel && sent === base ? '&c=' + sel.join(',') : ''));
         if(!r.same){ const from = mineChanged ? sent : base; base = r.text; setText(MERGE.merge3(from, ed.value, r.text)); }
         people(r.here || [], r.with || o.with);
         if(r.files && JSON.stringify(r.files) !== JSON.stringify(o.files)){ o.files = r.files; drawFiles(); refresh(); }   // a classmate added a picture
@@ -188,16 +221,19 @@
       } finally { busy = false; }
       // the page beside the code: when typing stops (or Save), not at every letter
       if(rendered !== ed.value && (force || Date.now() - lastKey > 1500)) refresh();
-      timer = setTimeout(push, ed.value !== base ? 700 : document.hidden ? 5000 : 1500);
+      timer = setTimeout(push, ed.value !== base ? 700 : document.hidden ? 5000 : cursors.length > 1 ? 1000 : 1500);
     };
     const save = () => { refresh(); if(busy) return; push(true); };
-    ed.addEventListener('input', () => { draw(); lastKey = Date.now(); setStatus('edited'); if(!busy){ clearTimeout(timer); timer = setTimeout(push, 700); } });
+    ed.addEventListener('input', () => { draw(); drawCursors(); lastKey = Date.now(); setStatus('edited'); if(!busy){ clearTimeout(timer); timer = setTimeout(push, 700); } });
+    // my cursor moved with someone else here: tell them soon
+    const moved = () => { if(cursors.length > 1 && !busy){ clearTimeout(timer); timer = setTimeout(push, 250); } };
 
     // who else has the page open, and (the owner) who it is shared with
     const hereBox = h('span', { class:'rs-here' });
     const people = (list, shared) => {
       o.with = shared;
       const others = list.filter(x => x.username !== o.me.username);
+      cursors = list; drawCursors();
       hereBox.replaceChildren(...others.map(x => h('span', { class:'rs-av', title:w('here') + ': ' + x.name, style:'background:' + colorOf(x.username) }, x.name.slice(0, 1).toUpperCase())));
       if(shareBtn) shareBtn.lastChild.textContent = w('share') + (shared.length ? ' · ' + shared.length : '');
     };
@@ -288,7 +324,7 @@
     ed.addEventListener('dragover', e => { if(!o.readOnly && [...e.dataTransfer.types].includes('Files')) e.preventDefault(); });
     ed.addEventListener('drop', e => { const f = [...e.dataTransfer.files].find(f => /^image\//.test(f.type)); if(f){ e.preventDefault(); addPicture(f); } });
     ed.addEventListener('scroll', scrolled);
-    ['keyup', 'click', 'select'].forEach(k => ed.addEventListener(k, where));
+    ['keyup', 'click', 'select'].forEach(k => ed.addEventListener(k, () => { where(); moved(); }));
     ed.addEventListener('keydown', e => {
       if((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's'){ e.preventDefault(); save(); return; }
       if(o.readOnly) return;
@@ -316,7 +352,7 @@
       filesBar,
       h('main', { class:'rs-main' },
         h('section', { class:'rs-pane rs-code' }, h('div', { class:'rs-pane-h' }, h('span', { class:'rs-dot' }), w('code'), h('span', { class:'grow' }), pos),
-          h('div', { class:'rs-ed' }, gutter, h('div', { class:'rs-layers' }, hl, ed))),
+          h('div', { class:'rs-ed' }, gutter, h('div', { class:'rs-layers' }, hl, ed, marks))),
         h('section', { class:'rs-pane rs-view' },
           h('div', { class:'rs-chrome' }, h('i'), h('i'), h('i'), h('span', { class:'rs-tab' }, h('span', { class:'rs-fav' }), tabTitle),
             h('span', { class:'grow' }), h('button', { class:'rs-reload', type:'button', title:'Refresh', onclick:save }, '↻')),

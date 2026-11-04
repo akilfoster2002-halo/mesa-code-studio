@@ -664,3 +664,28 @@ test('My Drive: a student keeps pictures by name; sees their pages and what is s
   await call(a.cookie, '/page/wiki/share', { method:'POST', body:JSON.stringify({ with:[] }) });
   assert.strictEqual((await fetch(base + '/drive')).status, 200);
 });
+
+test('Website Presentation: classmates see where each other’s cursor is, and it moves with the text', async () => {
+  const M = require('../public/js/merge.js');
+  const a = await login('ana', 'tiger42'), d = await login('dev', 'bear55');
+  await call(a.cookie, '/learn', { method:'PUT', body:JSON.stringify({ data:{ html:{ wikiIn:false } } }) });
+  await call(a.cookie, '/page/wiki/share', { method:'POST', body:JSON.stringify({ with:['dev'] }) });
+  const page = (await (await call(a.cookie, '/page/ana/wiki')).json()).text, text = '<h1>Elsa</h1>\n<p>Ice.</p>\n';
+  // Ana types, her cursor after "Ice"
+  const at = text.indexOf('Ice') + 3;
+  await call(a.cookie, '/page/ana/wiki', { method:'PUT', body:JSON.stringify({ base:page, text, sel:[at, at] }) });
+  const cur = r => r.here.find(x => x.username === 'ana').sel;
+  let r = await (await call(d.cookie, '/page/ana/wiki')).json();
+  assert.deepStrictEqual(cur(r), [at, at]);
+  // Dev adds a line above it: Ana's cursor moves down with her text
+  const more = r.text.replace('<h1>Elsa</h1>\n', '<h1>Elsa</h1>\n<h2>Looks</h2>\n');
+  r = await (await call(d.cookie, '/page/ana/wiki', { method:'PUT', body:JSON.stringify({ base:r.text, text:more, sel:[0, 4] }) })).json();
+  assert.strictEqual(r.text.slice(cur(r)[0] - 3, cur(r)[0]), 'Ice');
+  // a cursor sent with a copy that is not the page now is not used; one that is, is
+  const a2 = await (await call(a.cookie, '/page/ana/wiki?h=old&c=1,1')).json();
+  assert.strictEqual(a2.here.find(x => x.username === 'ana').sel[0], r.text.indexOf('Ice') + 3);
+  const a3 = await (await call(a.cookie, '/page/ana/wiki?h=' + M.hash(r.text) + '&c=2,9')).json();
+  assert.deepStrictEqual(a3.here.find(x => x.username === 'ana').sel, [2, 9]);
+  assert.deepStrictEqual(a3.here.find(x => x.username === 'dev').sel, [0, 4]);
+  await call(a.cookie, '/page/wiki/share', { method:'POST', body:JSON.stringify({ with:[] }) });
+});

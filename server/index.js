@@ -69,15 +69,26 @@ function withLearn(owner, fn){
   done.then(() => { if(learnLocks.get(owner) === done) learnLocks.delete(owner); });
   return run;
 }
-/* who has a shared page open right now: 'owner/key' → { username:{ name, at } } */
+/* who has a shared page open right now, and where their cursor is in the page
+   as the server has it: 'owner/key' → { username:{ name, at, sel:[from, to] } }
+   (sel undefined = keep where it was; a page that changes moves every cursor with it) */
 const pageHere = new Map();
-function here(doc, user){
+function here(doc, user, sel){
   const now = Date.now(), m = pageHere.get(doc) || {};
-  if(user) m[user.username] = { name:user.name, at:now };
+  if(user) m[user.username] = { name:user.name, at:now, sel:sel === undefined ? (m[user.username] || {}).sel || null : sel };
   for(const [u, x] of Object.entries(m)) if(now - x.at > 8000) delete m[u];
   pageHere.set(doc, m);
-  return Object.entries(m).map(([username, x]) => ({ username, name:x.name }));
+  return Object.entries(m).map(([username, x]) => ({ username, name:x.name, sel:x.sel }));
 }
+function moveCursors(doc, from, to){
+  const m = pageHere.get(doc);
+  if(!m || from === to) return;
+  const hs = MERGE.hunks(from, to);
+  for(const x of Object.values(m)) if(x.sel) x.sel = x.sel.map(i => MERGE.mapPoint(i, hs));
+}
+// a cursor sent by an editor: [from, to] inside a page this long
+const selOf = (v, len) => { const a = Array.isArray(v) ? v : String(v || '').split(','); const n = a.slice(0, 2).map(Number);
+  return n.length === 2 && n.every(i => Number.isInteger(i) && i >= 0 && i <= len) ? [Math.min(n[0], n[1]), Math.max(n[0], n[1])] : undefined; };
 
 async function sameClass(user, username){
   if(user.role === 'teacher') return true;
@@ -610,8 +621,8 @@ async function api(req, res, url){
     const shared = !mine && !teacher && S.share && ((x[S.key + 'Share'] || []).includes(user.username)) && await sameClass(user, owner.username);
     if(!mine && !teacher && !shared) return send(res, 404, { error:'none' });
     const doc = owner.username + '/' + S.key;
-    const out = (h, text) => ({ text, h:MERGE.hash(text), in:h[S.key + 'In'] || null, who:S.who ? h[S.who] || '' : undefined,
-      owner:{ username:owner.username, name:owner.name }, with:h[S.key + 'Share'] || [], files:h[S.key + 'Files'] || {}, here:here(doc, teacher ? null : user), canEdit:!teacher });
+    const out = (h, text, sel) => ({ text, h:MERGE.hash(text), in:h[S.key + 'In'] || null, who:S.who ? h[S.who] || '' : undefined,
+      owner:{ username:owner.username, name:owner.name }, with:h[S.key + 'Share'] || [], files:h[S.key + 'Files'] || {}, here:here(doc, teacher ? null : user, sel), canEdit:!teacher });
     if(p[3] === 'files'){
       if(teacher) return send(res, 403, { error:'teacher' });
       const name = String(m === 'DELETE' ? decodeURIComponent(p[4] || '') : '').toLowerCase();
@@ -633,9 +644,10 @@ async function api(req, res, url){
     }
     if(m === 'GET'){
       const text = x[S.key] || '';
-      if(url.searchParams.get('h') && url.searchParams.get('h') === MERGE.hash(text)){
-        return send(res, 200, { same:true, in:x[S.key + 'In'] || null, with:x[S.key + 'Share'] || [], files:x[S.key + 'Files'] || {}, here:here(doc, teacher ? null : user) });
-      }
+      // ?c=from,to: my cursor, in my copy (only kept when my copy is the page as it is now)
+      const same = !!url.searchParams.get('h') && url.searchParams.get('h') === MERGE.hash(text);
+      const sel = same ? selOf(url.searchParams.get('c'), text.length) : undefined;
+      if(same) return send(res, 200, { same:true, in:x[S.key + 'In'] || null, with:x[S.key + 'Share'] || [], files:x[S.key + 'Files'] || {}, here:here(doc, teacher ? null : user, sel) });
       return send(res, 200, out(x, text));
     }
     if(m === 'PUT' && !teacher){
@@ -646,11 +658,13 @@ async function api(req, res, url){
         if(h[S.key + 'In']) return { locked:true, h };                    // turned in
         const now = h[S.key] || '';
         const text = MERGE.merge3(b.base, b.text, now).slice(0, H.SITE_MAX);
-        if(text !== now) await store.saveLearn(owner.username, { ...d, html:{ ...h, [S.key]:text } });
-        return { h:{ ...h, [S.key]:text } };
+        if(text !== now){ await store.saveLearn(owner.username, { ...d, html:{ ...h, [S.key]:text } }); moveCursors(doc, now, text); }
+        // my cursor (in what I sent), moved to where it is in the page now
+        const mySel = selOf(b.sel, b.text.length), hs = mySel ? MERGE.hunks(b.text, text) : null;
+        return { h:{ ...h, [S.key]:text }, sel:mySel ? mySel.map(i => Math.min(text.length, MERGE.mapPoint(i, hs))) : undefined };
       });
       if(r.locked) return send(res, 423, { error:'turnedIn', ...out(r.h, r.h[S.key] || '') });
-      return send(res, 200, out(r.h, r.h[S.key]));
+      return send(res, 200, out(r.h, r.h[S.key], r.sel));
     }
     return send(res, 405, { error:'method' });
   }
