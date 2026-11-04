@@ -220,9 +220,13 @@
   const WIKI_PIC = '/img/wiki/';
   const WIKI_FILES = { 'mario.svg':WIKI_PIC + 'mario.svg', 'mushroom.svg':WIKI_PIC + 'mushroom.svg' };
   const WIKI_START = `<!DOCTYPE html>
+<!-- A comment like this is a note for people. The browser does not show it. -->
+<!-- Un comentario como este es una nota para personas. El navegador no lo muestra. -->
 <html>
 <head>
+  <!-- The words on the browser tab / Las palabras en la pestaña -->
   <title>Mario - Classpedia</title>
+  <!-- CSS: how the page looks (fonts, colors, boxes) / CSS: cómo se ve la página -->
   <style>
     body { font-family: Arial, sans-serif; max-width: 900px; margin: 20px auto; padding: 0 16px; color: #202122; line-height: 1.6; }
     h1 { font-family: Georgia, serif; font-weight: normal; border-bottom: 1px solid #a2a9b1; margin-bottom: 0; }
@@ -235,15 +239,19 @@
     .infobox img { width: 100%; }
     .pic { float: right; width: 200px; margin: 0 0 12px 16px; border: 1px solid #c8ccd1; background: #f8f9fa; padding: 4px; font-size: 13px; }
     .pic img { width: 100%; }
+    blockquote { margin: 12px 0; padding: 8px 16px; border-left: 4px solid #a2a9b1; background: #f8f9fa; font-style: italic; }
   </style>
 </head>
 <body>
+  <!-- <h1>: the big title. Only one on the page. / El título grande. Solo uno. -->
   <h1>Mario</h1>
   <p class="from">From Classpedia, the free class encyclopedia</p>
 
-  <!-- The infobox: the box of facts on the right -->
+  <!-- <table>: the box of facts on the right. <tr> is a row, <th> a label, <td> a fact. -->
+  <!-- El cuadro de datos. <tr> es una fila, <th> una etiqueta, <td> un dato. -->
   <table class="infobox">
     <tr><th colspan="2" class="top">Mario</th></tr>
+    <!-- <img>: a picture from your 📁 Files, by its name / una imagen de tus archivos -->
     <tr><td colspan="2"><img src="mario.svg" alt="A drawing of Mario"></td></tr>
     <tr><th>First seen</th><td>Donkey Kong (1981)</td></tr>
     <tr><th>Made by</th><td>Shigeru Miyamoto</td></tr>
@@ -252,25 +260,46 @@
     <tr><th>Family</th><td>Luigi (brother)</td></tr>
   </table>
 
-  <p><b>Mario</b> is a video game character made by Nintendo. He is a plumber who wears a red hat and blue overalls. He is the star of the Super Mario games.</p>
+  <!-- <p>: a paragraph. <b> makes words bold, <i> makes them slanted (italic). -->
+  <!-- Un párrafo. <b> pone las palabras en negrita, <i> en cursiva. -->
+  <p><b>Mario</b> is a video game character made by Nintendo. He is a plumber who wears a red hat and blue overalls. He is the star of the <i>Super Mario</i> games.</p>
 
+  <!-- <h2>: a section title. Each section has an <h2> and a <p>. -->
+  <!-- El título de una sección. Cada sección tiene un <h2> y un <p>. -->
   <h2>Looks</h2>
   <p>Mario is short and has a big mustache. His red hat has a letter M on it.</p>
 
   <h2>Personality</h2>
   <p>Mario is brave and kind. He always helps his friends.</p>
 
+  <!-- <blockquote>: words someone said / palabras que alguien dijo -->
+  <blockquote>"It's-a me, Mario!"</blockquote>
+
   <h2>Powers</h2>
-  <!-- A picture in the article, with a caption under it -->
+  <!-- <figure>: a picture in the article, with a <figcaption> under it -->
+  <!-- Una imagen en el artículo, con un pie de foto <figcaption> -->
   <figure class="pic">
     <img src="mushroom.svg" alt="A Super Mushroom">
     <figcaption>A Super Mushroom makes Mario big.</figcaption>
   </figure>
-  <p>Mario can jump very high. When he eats a Super Mushroom, he grows big. A Fire Flower lets him throw fireballs.</p>
+  <p>Mario can jump very high. When he eats a <b>Super Mushroom</b>, he grows big. A <b>Fire Flower</b> lets him throw fireballs.</p>
 
   <h2>Story</h2>
   <p>Mario lives in the Mushroom Kingdom. Again and again, he saves Princess Peach from Bowser.</p>
 
+  <!-- <ol>: an ordered list, with numbers (1, 2, 3…). Each thing in it is an <li>. -->
+  <!-- Una lista ordenada, con números. Cada cosa en ella es un <li>. -->
+  <h2>Games, in order</h2>
+  <ol>
+    <li><i>Donkey Kong</i> (1981)</li>
+    <li><i>Mario Bros.</i> (1983)</li>
+    <li><i>Super Mario Bros.</i> (1985)</li>
+    <li><i>Super Mario 64</i> (1996)</li>
+    <li><i>Super Mario Odyssey</i> (2017)</li>
+  </ol>
+
+  <!-- <ul>: an unordered list, with dots (•). Each thing in it is an <li> too. -->
+  <!-- Una lista sin orden, con puntos. Cada cosa en ella también es un <li>. -->
   <h2>Fun facts</h2>
   <ul>
     <li>Mario was first called Jumpman.</li>
@@ -278,6 +307,8 @@
     <li>Mario has been in more than 200 games.</li>
   </ul>
 
+  <!-- <a href="…">: a link. Put where you found your facts here. -->
+  <!-- Un enlace. Pon aquí dónde encontraste tus datos. -->
   <h2>References</h2>
   <ol>
     <li><a href="https://en.wikipedia.org/wiki/Mario">Mario - Wikipedia</a></li>
@@ -313,13 +344,16 @@
       test:s => (s.match(/<h2[^>]*>[^<]*\S[^<]*<\/h2>\s*(<!--[\s\S]*?-->\s*)?(<figure[\s\S]*?<\/figure>\s*)?<p>[\s\S]*?\S[\s\S]*?<\/p>/gi) || []).length >= 4 },   // a picture may come first
     { id:'figure', group:2, en:'<figure> + <figcaption>', say:{ en:'A picture in the article with a caption under it', es:'Una imagen en el artículo con un pie de foto' },
       test:s => /<figure[^>]*>[\s\S]*?<img[^>]*>[\s\S]*?<figcaption>[^<]*\S[^<]*<\/figcaption>[\s\S]*?<\/figure>/i.test(s) },
-    { id:'facts', group:2, en:'<li> × 3', say:{ en:'3 fun facts in a list', es:'3 datos curiosos en una lista' },
+    { id:'ol', group:2, en:'<ol> + <li> × 3', say:{ en:'A numbered list (like the games, in order)', es:'Una lista con números (como los juegos, en orden)' },
+      test:s => /<ol[^>]*>(\s*<li>[\s\S]*?\S[\s\S]*?<\/li>){3,}/i.test(s) },
+    { id:'facts', group:2, en:'<ul> + <li> × 3', say:{ en:'3 fun facts in a list with dots', es:'3 datos curiosos en una lista con puntos' },
       test:s => /<ul>(\s*<li>[\s\S]*?\S[\s\S]*?<\/li>){3,}/i.test(s) },
     { id:'refs', group:2, en:'<a href="…">', say:{ en:'A link to where you found your facts', es:'Un enlace a donde encontraste tus datos' },
       test:s => /<a[^>]*\shref\s*=\s*["']?https?:\/\/[^"'\s>]+/i.test(s) }
   ];
+  const noComments = s => s.replace(/<!--[\s\S]*?(-->|$)/g, '');        // a tag named in a <!-- note --> is not on the page
   const wikiInfo = (s, who) => { s = typeof s === 'string' ? s : ''; who = typeof who === 'string' ? who.trim() : '';
-    const has = s ? WIKI_PARTS.filter(p => p.test(s, who)).map(p => p.id) : [];
+    const code = noComments(s), has = s ? WIKI_PARTS.filter(p => p.test(code, who)).map(p => p.id) : [];
     return { len:s.length, has, ok:has.length === WIKI_PARTS.length }; };
 
   /* the pages a student types in the editor: My Resume (resume.html) and the

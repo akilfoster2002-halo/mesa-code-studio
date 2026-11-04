@@ -123,10 +123,12 @@ test('Website Presentation: starts as the Mario page; ticked off as it becomes t
     '<img src="https://x/api/assets/' + 'ab'.repeat(32) + '"><img src="https://x/img/wiki/mario.svg"><img src="gone.png">');
   assert.ok(!has(elsa.replace(/<figure[\s\S]*<\/figure>/, ''), 'Elsa').includes('img'));                             // only one picture
   assert.deepStrictEqual(H.wikiInfo('').has, []);
+  assert.ok(!has('<body><!-- <h1>Elsa</h1> --></body>', 'Elsa').includes('name'));   // a tag in a comment is not on the page
+  assert.ok(!has(elsa.replace(/<h2>Games, in order<\/h2>\s*<ol>[\s\S]*?<\/ol>/, ''), 'Elsa').includes('ol'));   // the numbered list
   const uploaded = elsa.replace('https://example.com/elsa.png', '/api/assets/' + 'ab'.repeat(32));   // 🖼 Add picture
   assert.ok(has(uploaded, 'Elsa').includes('img'));
   const st = (text, wikiIn) => C.status(C.ITEMS.find(i => i.id === 'wiki'), C.studentData({ html:{ wiki:text, wikiIn, wikiChar:'Elsa' } }, null, []));
-  assert.deepStrictEqual([st('').state, st(start).state, st(start).text, st(elsa).pct], ['none', 'started', '5 / 10 🏷', 100]);
+  assert.deepStrictEqual([st('').state, st(start).state, st(start).text, st(elsa).pct], ['none', 'started', '6 / 11 🏷', 100]);
   assert.strictEqual(st(elsa, '2026-11-10T15:00:00Z').state, 'done');                  // done = turned in
   assert.strictEqual(H.sitesOf({ wikiChar:'Elsa' }).wiki.who, 'Elsa');
 });
