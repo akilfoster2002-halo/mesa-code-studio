@@ -14,6 +14,8 @@
    (or paste or drop one on the code) makes it smaller, keeps it in the asset store,
    puts it in the folder by its file name and in the code as <img src="elsa.png">;
    the page beside the code shows the files where they are kept (HL.withFiles).
+   A picture from the computer is kept in the student's ☁️ My Drive (/drive) too, and
+   ☁️ My Drive puts one from there in the folder.
    Typing together (as in Google Docs): the page is kept at /api/page/<owner>/<key>.
    Every moment or so the editor sends what changed and gets everyone else's
    changes back (MERGE.merge3 puts them together). The Website Presentation's
@@ -40,6 +42,9 @@
     picHint:{ en:'Put a picture from your computer in your files folder and in the page. You can also paste one or drop it on the code.', es:'Pon una imagen de tu computadora en tu carpeta de archivos y en la página. También puedes pegarla o soltarla en el código.' },
     files:{ en:'Files', es:'Archivos' }, nameIt:{ en:'Name your picture file (like elsa.png):', es:'Nombra tu archivo de imagen (como elsa.png):' },
     useIt:{ en:'Click to put it in the page at the cursor', es:'Haz clic para ponerla en la página donde está el cursor' },
+    drive:{ en:'My Drive', es:'Mi unidad' }, fromDrive:{ en:'Put a picture from your Drive in this page', es:'Pon una imagen de tu unidad en esta página' },
+    driveEmpty:{ en:'Your Drive has no pictures yet. Add one from your computer, or open My Drive.', es:'Tu unidad aún no tiene imágenes. Añade una de tu computadora o abre Mi unidad.' },
+    openDrive:{ en:'Open My Drive', es:'Abrir Mi unidad' }, close:{ en:'Close', es:'Cerrar' },
     delFile:{ en:'Take this file out of the folder?', es:'¿Quitar este archivo de la carpeta?' }, full:{ en:'The folder is full (40 files).', es:'La carpeta está llena (40 archivos).' },
     line:{ en:'Ln', es:'Lín' }, col:{ en:'Col', es:'Col' }, has:{ en:'Your page has', es:'Tu página tiene' },
     share:{ en:'Share', es:'Compartir' }, shareH:{ en:'Share with classmates', es:'Compartir con compañeros' },
@@ -96,26 +101,7 @@
     return out + esc(src.slice(i)) + '\n';
   }
 
-  /* ------------------------------------------------------- pictures
-     made at most 800 px wide or tall (a phone photo is megabytes), then
-     kept in the asset store; a moving GIF or an SVG stays as it is */
-  async function shrink(file){
-    if(!/^image\/(png|jpeg|webp|bmp|avif)$/.test(file.type)) return file;
-    const img = await createImageBitmap(file).catch(() => null);
-    if(!img) return file;
-    const k = Math.min(1, 800 / Math.max(img.width, img.height));
-    if(k === 1 && file.size < 400000) return file;
-    const c = document.createElement('canvas');
-    c.width = Math.round(img.width * k); c.height = Math.round(img.height * k);
-    c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
-    return new Promise(r => c.toBlob(b => r(b || file), file.type === 'image/png' ? 'image/png' : 'image/jpeg', 0.85));
-  }
-  async function upload(file){
-    const blob = await shrink(file);
-    const r = await fetch('/api/assets', { method:'POST', credentials:'same-origin', headers:{ 'Content-Type':blob.type }, body:blob });
-    if(!r.ok) throw new Error('upload');
-    return (await r.json()).id;
-  }
+  const { upload } = PICTURES;
 
   const COLORS = ['#1e8e3e', '#1967d2', '#d93025', '#e37400', '#9334e6', '#129eaf', '#c26401', '#5f6368'];
   const colorOf = u => COLORS[[...String(u)].reduce((n, c) => n + c.charCodeAt(0), 0) % COLORS.length];
@@ -257,9 +243,32 @@
       if(asked == null) return;
       const name = HL.FILE_NAME.test(asked.trim()) ? asked.trim().toLowerCase() : HL.fileName(asked, {});
       status.textContent = '⏳ ' + w('picAdding'); status.className = 'rs-status saving';
-      try { const id = await upload(file); o.files = (await fileApi('', { method:'POST', body:JSON.stringify({ name, id }) })).files; }
-      catch(e){ status.textContent = '⚠ ' + w(e.status === 413 ? 'full' : 'picFail'); status.className = 'rs-status offline'; return; }
+      try {
+        const id = await upload(file);
+        o.files = (await fileApi('', { method:'POST', body:JSON.stringify({ name, id }) })).files;
+        api('/drive', { method:'POST', body:JSON.stringify({ name, id }) }).catch(() => {});     // kept in My Drive too
+      } catch(e){ status.textContent = '⚠ ' + w(e.status === 413 ? 'full' : 'picFail'); status.className = 'rs-status offline'; return; }
       drawFiles(); usePicture(name, at, end);
+    };
+    // ☁️ My Drive: pick one of my pictures; it goes in this page's folder (a new name if that one is taken)
+    const fromDrive = async () => {
+      const at = ed.selectionStart, end = ed.selectionEnd;
+      const r = await api('/drive').catch(() => null);
+      if(!r) return;
+      const names = Object.keys(r.files).sort();
+      const back = h('div', { class:'rs-dlg-back', onclick:e => { if(e.target === back) back.remove(); } },
+        h('div', { class:'rs-dlg wide', role:'dialog', 'aria-label':w('drive') },
+          h('b', {}, '☁️ ' + w('drive')), h('small', {}, w('fromDrive')),
+          names.length ? h('div', { class:'rs-drive-grid' }, ...names.map(n => h('button', { type:'button', class:'rs-drive-pic', onclick:async () => {
+            back.remove();
+            const own = o.files || {}, name = own[n] && own[n] !== r.files[n] ? HL.fileName(n, files()) : n;
+            try { o.files = (await fileApi('', { method:'POST', body:JSON.stringify({ name, id:r.files[n] }) })).files; } catch(e){ return; }
+            drawFiles(); usePicture(name, at, end);
+          } }, h('img', { src:'/api/assets/' + r.files[n], alt:'' }), h('span', {}, n))))
+            : h('small', { class:'rs-drive-empty' }, w('driveEmpty')),
+          h('div', { class:'rs-dlg-btns' }, h('a', { class:'rs-btn ghost', href:'/drive', target:'_blank', rel:'noopener' }, w('openDrive') + ' ↗'),
+            h('button', { class:'rs-btn primary', type:'button', onclick:() => back.remove() }, w('close')))));
+      document.body.append(back);
     };
     const drawFiles = () => {
       const all = files(), own = o.files || {};
@@ -271,7 +280,8 @@
             if(!confirm(w('delFile') + '\n' + n)) return;
             try { o.files = (await fileApi('/' + encodeURIComponent(n), { method:'DELETE' })).files; drawFiles(); refresh(); } catch(e){}
           } }, '✕') : null)),
-        o.readOnly ? null : h('button', { class:'rs-btn small', type:'button', title:w('picHint'), onclick:() => picker.click() }, '＋ ' + w('addPic')));
+        o.readOnly ? null : h('button', { class:'rs-btn small', type:'button', title:w('picHint'), onclick:() => picker.click() }, '＋ ' + w('addPic')),
+        o.readOnly ? null : h('button', { class:'rs-btn small', type:'button', title:w('fromDrive'), onclick:fromDrive }, '☁️ ' + w('drive')));
     };
     const picker = h('input', { type:'file', accept:'image/*', hidden:true, onchange:e => { addPicture(e.target.files[0]); e.target.value = ''; } });
     ed.addEventListener('paste', e => { const f = [...(e.clipboardData && e.clipboardData.files || [])].find(f => /^image\//.test(f.type)); if(f){ e.preventDefault(); addPicture(f); } });

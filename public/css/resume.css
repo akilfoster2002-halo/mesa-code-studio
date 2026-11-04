@@ -119,3 +119,11 @@ body{background:var(--bg);color:var(--ink);font:14px/1.4 'Google Sans',Roboto,sy
 .rs-file-x{border:0;background:none;color:var(--muted);cursor:pointer;padding:3px 6px;font-size:12px}
 .rs-file-x:hover{color:#d93025}
 .rs-btn.small{padding:4px 10px;font-size:13px}
+/* ☁️ My Drive: pick a picture */
+.rs-dlg.wide{width:min(560px,100%)}
+.rs-drive-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:8px;max-height:55vh;overflow:auto;padding:2px}
+.rs-drive-pic{display:grid;gap:4px;border:1px solid var(--line);border-radius:8px;background:#fff;padding:6px;cursor:pointer;font:12px "Ubuntu Mono",Menlo,monospace;color:var(--ink);text-align:center}
+.rs-drive-pic:hover{border-color:var(--blue);background:#e8f0fe}
+.rs-drive-pic img{width:100%;aspect-ratio:1;object-fit:contain;background:#f8f9fa;border-radius:4px}
+.rs-drive-pic span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rs-drive-empty{color:var(--muted);padding:18px 0}

@@ -1,0 +1,24 @@
+/* MY DRIVE — pictures, my pages, pages shared with me */
+body{background:var(--bg)}
+.dv{min-height:100vh}
+.dv-main{max-width:960px;margin:0 auto;padding:20px 16px 48px;display:grid;gap:22px}
+.dv-sec{background:#fff;border:1px solid var(--line);border-radius:12px;padding:16px 18px;display:grid;gap:12px}
+.dv-sec-h{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.dv-sec-h h2{margin:0;font-size:18px;font-weight:600;color:var(--ink)}
+.dv-sec-h small{color:var(--muted)}
+.dv-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px}
+.dv-pic{position:relative;border:1px solid var(--line);border-radius:10px;background:#fff;padding:6px;display:grid;gap:6px}
+.dv-pic img{width:100%;aspect-ratio:1;object-fit:contain;background:#f8f9fa;border-radius:6px}
+.dv-pic span{font:13px "Ubuntu Mono",Menlo,monospace;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding:0 2px}
+.dv-x{position:absolute;top:8px;right:8px;width:28px;height:28px;border-radius:50%;border:0;background:rgba(255,255,255,.92);box-shadow:0 1px 3px rgba(0,0,0,.25);cursor:pointer;color:var(--muted);font-size:13px}
+.dv-x:hover{color:#d93025}
+.dv-drop{border:2px dashed var(--line);border-radius:10px;padding:22px;text-align:center;color:var(--muted);font-size:14px}
+.dv-drop.on{border-color:var(--blue);background:#e8f0fe;color:var(--blue)}
+.dv-docs{display:grid;gap:8px}
+.dv-doc{display:flex;align-items:center;gap:12px;border:1px solid var(--line);border-radius:10px;padding:10px 14px;text-decoration:none;color:var(--ink)}
+.dv-doc:hover{background:#f8f9fa;border-color:var(--blue)}
+.dv-doc-i{font-size:22px}
+.dv-doc b{font:600 14px "Ubuntu Mono",Menlo,monospace}
+.dv-doc small{display:block;color:var(--muted);font-size:13px}
+.dv-doc .grow{flex:1}
+.dv-msg{color:var(--muted);font-size:14px}

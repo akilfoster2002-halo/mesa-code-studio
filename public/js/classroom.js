@@ -68,7 +68,7 @@
     edit:{ en:'Edit', es:'Editar' }, sureDelA:{ en:'Delete this assignment and the work turned in for it?', es:'¿Eliminar esta tarea y el trabajo entregado?' },
     page:{ en:'Page', es:'Página' }, code:{ en:'Code', es:'Código' }, close:{ en:'Close', es:'Cerrar' }, back:{ en:'Classwork', es:'Trabajo de clase' },
     noWork:{ en:'Nothing attached yet', es:'Nada adjunto todavía' }, openWork:{ en:'Open their work', es:'Abrir su trabajo' },
-    forL:{ en:'For', es:'Para' }, everyone:{ en:'All students', es:'Todos los estudiantes' },
+    drive:{ en:'My Drive', es:'Mi unidad' }, forL:{ en:'For', es:'Para' }, everyone:{ en:'All students', es:'Todos los estudiantes' },
     points:{ en:'points', es:'puntos' }, pointsL:{ en:'Points', es:'Puntos' }, ungraded:{ en:'Ungraded', es:'Sin calificar' },
     grade:{ en:'Grade', es:'Calificación' }, graded:{ en:'Graded', es:'Calificado' },
     comments:{ en:'Private comments', es:'Comentarios privados' }, addComment:{ en:'Add a private comment…', es:'Añade un comentario privado…' },
@@ -147,7 +147,7 @@
       h('a', { class:'cr-logo', href:'#/' }, h('span', { class:'cr-logo-mark' }, '◆'), h('span', { class:'cr-logo-t' },
         period ? [h('b', {}, w('cls')), h('small', {}, w('period') + ' ' + period)] : h('b', {}, w('app')))),
       h('nav', { class:'cr-tabs' }, ...tabs.map(([id, label]) => h('a', { class:'cr-tab' + (id === tab ? ' on' : ''), href:'#/c/' + period + (id ? '/' + id : '') }, label))),
-      h('span', { class:'grow' }), langBtn(),
+      h('span', { class:'grow' }), me.role === 'teacher' ? null : h('a', { class:'btn ghost cr-drive', href:'/drive', target:'_blank', rel:'noopener' }, '☁️ ' + w('drive')), langBtn(),
       h('span', { class:'cr-me', title:me.username }, avatar(me.name, '#1967d2'), h('span', { class:'who' }, me.name)),
       h('button', { class:'btn ghost', type:'button', onclick:async () => { await fetch('/api/logout', { method:'POST' }).catch(() => {}); me = null; location.hash = '#/'; route(true); } }, t('Log out')));
   }

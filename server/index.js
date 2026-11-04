@@ -157,6 +157,7 @@ function serveStatic(req, res, pathname){
   if(pathname === '/learn' || pathname === '/learn/') pathname = '/learn.html';
   if(pathname === '/html' || pathname === '/html/') pathname = '/html.html';
   if(pathname === '/resume' || pathname === '/resume/' || pathname === '/wiki' || pathname === '/wiki/') pathname = '/resume.html';   // one editor for both pages
+  if(pathname === '/drive' || pathname === '/drive/') pathname = '/drive.html';
   const file = path.normalize(path.join(PUBLIC, decodeURIComponent(pathname)));
   if(!file.startsWith(PUBLIC)) return send(res, 403, 'forbidden');
   fs.stat(file, (err, st) => {
@@ -543,6 +544,40 @@ async function api(req, res, url){
                                                     page's files folder, used in the code by its name
        DELETE /api/page/:owner/:key/files/:name     taken out of the folder
      A teacher reads any page. Turned in, it does not change. */
+  /* My Drive: each student's own pictures, kept to use in any page (html.drive = { name:assetId }),
+     with their pages and the pages shared with them
+       GET /api/drive          { files, pages:[{ key, file, path, len, in }], shared:[{ owner, name, key, title, path }] }
+       POST /api/drive { name, id }   a picture (already in /api/assets) put in the Drive
+       DELETE /api/drive/:name        taken out */
+  if(p[0] === 'drive' && !teacher){
+    const H = HTMLLESSONS;
+    if(m === 'GET' && !p[1]){
+      const ls = Object.fromEntries((await store.listLearn()).map(d => [d.owner, (d.data || {}).html || {}]));
+      const x = ls[user.username] || {};
+      const kids = (await store.listUsers()).filter(u => u.role === 'student' && !u.disabled && u.username !== user.username && !!user.period && u.period === user.period);
+      const shared = [];
+      for(const site of Object.values(H.SITES).filter(s => s.share)) for(const u of kids) if(((ls[u.username] || {})[site.key + 'Share'] || []).includes(user.username))
+        shared.push({ owner:u.username, name:u.name, key:site.key, file:site.file, path:site.path + '?o=' + encodeURIComponent(u.username),
+          title:((ls[u.username] || {})[site.key] || '').match(/<h1[^>]*>([^<]*)<\/h1>/i)?.[1]?.trim() || '' });
+      return send(res, 200, { files:x.drive || {}, shared,
+        pages:Object.values(H.SITES).map(site => ({ key:site.key, file:site.file, path:site.path, item:site.item, len:(x[site.key] || '').length, in:x[site.key + 'In'] || null,
+          with:x[site.key + 'Share'] || [] })) });
+    }
+    const b = m === 'POST' && !p[1] ? await readJSON(req, 2000) : null;
+    const name = b ? String(b.name || '').toLowerCase() : decodeURIComponent(p[1] || '').toLowerCase();
+    if(b && (!H.FILE_NAME.test(name) || !/^[a-f0-9]{64}$/.test(String(b.id || '')) || !(await store.hasAsset(b.id)))) return send(res, 400, { error:'file' });
+    if(!b && !(m === 'DELETE' && name && !p[2])) return send(res, 405, { error:'method' });
+    const r = await withLearn(user.username, async () => {
+      const d = (await store.getLearn(user.username) || {}).data || {}, h = d.html || {}, files = { ...(h.drive || {}) };
+      if(b){ if(!files[name] && Object.keys(files).length >= 200) return { full:true }; files[name] = b.id; }
+      else delete files[name];
+      await store.saveLearn(user.username, { ...d, html:{ ...h, drive:files } });
+      return { files };
+    });
+    if(r.full) return send(res, 413, { error:'full' });
+    return send(res, 200, { files:r.files });
+  }
+
   if(p[0] === 'page'){
     const H = HTMLLESSONS, S = H.SITES[p[1] && p[2] ? p[2] : p[1]];
     if(p[2] === 'shared' || p[2] === 'share'){

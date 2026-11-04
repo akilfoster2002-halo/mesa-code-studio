@@ -646,3 +646,21 @@ test('Website Presentation: a page shared with a classmate; both type in it at t
   await call(a.cookie, '/page/wiki/share', { method:'POST', body:JSON.stringify({ with:[] }) });
   assert.strictEqual((await call(d.cookie, '/page/ana/wiki')).status, 404);
 });
+
+test('My Drive: a student keeps pictures by name; sees their pages and what is shared with them', async () => {
+  const a = await login('ana', 'tiger42'), d = await login('dev', 'bear55'), t = await login('teach', 'apple-pear');
+  const pic = await (await call(d.cookie, '/assets', { method:'POST', headers:{ 'Content-Type':'image/png' }, body:Buffer.from('a drive picture') })).json();
+  assert.strictEqual((await call(d.cookie, '/drive', { method:'POST', body:JSON.stringify({ name:'no slash/x.png', id:pic.id }) })).status, 400);
+  assert.deepStrictEqual((await (await call(d.cookie, '/drive', { method:'POST', body:JSON.stringify({ name:'Elsa.PNG', id:pic.id }) })).json()).files, { 'elsa.png':pic.id });
+  await call(d.cookie, '/learn', { method:'PUT', body:JSON.stringify({ data:{ html:{ acts:{ cwords:{ best:50 } } } } }) });   // other saves keep the Drive
+  await call(a.cookie, '/page/wiki/share', { method:'POST', body:JSON.stringify({ with:['dev'] }) });
+  const r = await (await call(d.cookie, '/drive')).json();
+  assert.deepStrictEqual(r.files, { 'elsa.png':pic.id });
+  assert.deepStrictEqual(r.pages.map(p => p.file), ['resume.html', 'character.html']);
+  assert.deepStrictEqual(r.shared.map(x => [x.owner, x.path]), [['ana', '/wiki?o=ana']]);
+  assert.deepStrictEqual((await (await call(a.cookie, '/drive')).json()).files, {});              // each student's own
+  assert.strictEqual((await call(t.cookie, '/drive')).status, 404);
+  assert.deepStrictEqual((await (await call(d.cookie, '/drive/elsa.png', { method:'DELETE' })).json()).files, {});
+  await call(a.cookie, '/page/wiki/share', { method:'POST', body:JSON.stringify({ with:[] }) });
+  assert.strictEqual((await fetch(base + '/drive')).status, 200);
+});
