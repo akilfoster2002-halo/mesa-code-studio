@@ -53,7 +53,8 @@
     shareHint:{ en:'They can type in your page too, at the same time as you.', es:'Ellos también pueden escribir en tu página, al mismo tiempo que tú.' },
     done:{ en:'Done', es:'Listo' }, cancel:{ en:'Cancel', es:'Cancelar' }, here:{ en:'Here now', es:'Aquí ahora' },
     notShared:{ en:'This page is not shared with you.', es:'Esta página no está compartida contigo.' },
-    noClassmates:{ en:'No classmates yet.', es:'Todavía no hay compañeros.' }
+    noClassmates:{ en:'No classmates yet.', es:'Todavía no hay compañeros.' },
+    noCopy:{ en:'Copy and paste are off. Type your code yourself!', es:'Copiar y pegar están desactivados. ¡Escribe tu código tú mismo!' }
   };
   const w = k => L(W[k]);
   async function api(path, opts={}){
@@ -328,9 +329,29 @@
         o.readOnly ? null : h('button', { class:'rs-btn small', type:'button', title:w('fromDrive'), onclick:fromDrive }, '☁️ ' + w('drive')));
     };
     const picker = h('input', { type:'file', accept:'image/*', hidden:true, onchange:e => { addPicture(e.target.files[0]); e.target.value = ''; } });
-    ed.addEventListener('paste', e => { const f = [...(e.clipboardData && e.clipboardData.files || [])].find(f => /^image\//.test(f.type)); if(f){ e.preventDefault(); addPicture(f); } });
+    // students type their code themselves: no copying, cutting or pasting text (pictures still paste
+    // and drop in as files); teachers keep copy and paste
+    const noCopy = o.me.role !== 'teacher';
+    let noCopyTimer = null;
+    const blocked = e => {
+      e.preventDefault();
+      const was = [status.textContent, status.className];
+      setStatus('noCopy', 'offline');
+      clearTimeout(noCopyTimer);
+      noCopyTimer = setTimeout(() => { if(status.textContent === w('noCopy')){ status.textContent = was[0]; status.className = was[1]; } }, 2500);
+    };
+    ['copy', 'cut'].forEach(k => ed.addEventListener(k, e => { if(noCopy) blocked(e); }));
+    ed.addEventListener('paste', e => {
+      const f = [...(e.clipboardData && e.clipboardData.files || [])].find(f => /^image\//.test(f.type));
+      if(f){ e.preventDefault(); addPicture(f); } else if(noCopy) blocked(e);
+    });
+    ed.addEventListener('dragstart', e => { if(noCopy) e.preventDefault(); });
     ed.addEventListener('dragover', e => { if(!o.readOnly && [...e.dataTransfer.types].includes('Files')) e.preventDefault(); });
-    ed.addEventListener('drop', e => { const f = [...e.dataTransfer.files].find(f => /^image\//.test(f.type)); if(f){ e.preventDefault(); addPicture(f); } });
+    ed.addEventListener('drop', e => {
+      const f = [...e.dataTransfer.files].find(f => /^image\//.test(f.type));
+      if(f){ e.preventDefault(); addPicture(f); } else if(noCopy) blocked(e);
+    });
+    ed.addEventListener('beforeinput', e => { if(noCopy && /^insertFrom(Paste|Drop|Yank)/.test(e.inputType)) blocked(e); });
     ed.addEventListener('scroll', scrolled);
     ['keyup', 'click', 'select'].forEach(k => ed.addEventListener(k, () => { where(); moved(); }));
     ed.addEventListener('keydown', e => {
