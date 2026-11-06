@@ -134,3 +134,38 @@ body{background:var(--bg);color:var(--ink);font:14px/1.4 'Google Sans',Roboto,sy
 .rs-caret-n{position:absolute;left:0;bottom:100%;font:600 11px/1.2 system-ui,sans-serif;color:#fff;padding:2px 6px;border-radius:4px 4px 4px 0;white-space:nowrap}
 .rs-caret-n.below{bottom:auto;top:100%;border-radius:0 4px 4px 4px}
 .rs-selbox{position:absolute;opacity:.28}
+/* 🕘 History (a teacher): who wrote each line, and the page at each moment */
+.rs-hist{background:#fff;border-radius:12px;width:min(1200px,100%);height:min(820px,calc(100vh - 32px));display:flex;flex-direction:column;overflow:hidden;box-shadow:0 8px 28px rgba(0,0,0,.3)}
+.rs-hist-h{display:flex;align-items:center;gap:10px;padding:10px 12px 10px 18px;border-bottom:1px solid var(--line)}
+.rs-hist-h b{font-size:16px}
+.rs-hist-body{flex:1;display:grid;grid-template-columns:320px 1fr;min-height:0}
+.rs-hist-side{border-right:1px solid var(--line);overflow:auto;padding:12px;display:flex;flex-direction:column;gap:8px}
+.rs-hist-side h4{margin:6px 4px 0;font-size:12px;letter-spacing:.4px;text-transform:uppercase;color:var(--muted)}
+.rs-hist-hint,.rs-hist-empty{color:var(--muted);padding:0 4px}
+.rs-hist-people{display:grid;gap:6px}
+.rs-hist-p{display:flex;gap:10px;align-items:flex-start;padding:8px;border-radius:8px;border-left:4px solid var(--who,#bdc1c6);background:#f8f9fa}
+.rs-hist-p.old{opacity:.8}
+.rs-hist-p div{display:grid;gap:1px;min-width:0}
+.rs-hist-p small{color:var(--muted)}
+.rs-hist-list{display:grid;gap:4px}
+.rs-hist-v{display:grid;gap:2px;text-align:left;border:1px solid var(--line);background:#fff;border-radius:8px;padding:8px 10px;cursor:pointer;font:inherit;color:inherit}
+.rs-hist-v:hover{background:#f1f3f4}
+.rs-hist-v.on{border-color:var(--blue);background:#e8f0fe}
+.rs-hist-v small{color:var(--muted)}
+.rs-hist-t{font-weight:600}
+.rs-hist-who{display:flex;align-items:center;gap:6px}
+.rs-hist-who .rs-av{width:20px;height:20px;font-size:11px}
+.rs-hist-plus{color:#137333;font-weight:600;margin-left:auto}
+.rs-hist-minus{color:#c5221f;font-weight:600}
+.rs-hist-main{display:flex;flex-direction:column;min-width:0;min-height:0}
+.rs-hist-tabs{display:flex;gap:4px;padding:8px 12px;border-bottom:1px solid var(--line)}
+.rs-hist-tab{border:1px solid var(--line);background:#fff;border-radius:999px;padding:5px 14px;font-family:inherit;font-size:13px;font-weight:600;cursor:pointer;color:var(--ink)}
+.rs-hist-tab.on{background:var(--blue);border-color:var(--blue);color:#fff}
+.rs-hist-view{flex:1;min-height:0;display:flex}
+.rs-hist-code{flex:1;overflow:auto;background:var(--code-bg);color:var(--code-ink);font:14px/1.55 var(--mono);padding:8px 0}
+.rs-hist-ln{display:flex;border-left:4px solid var(--who,transparent);background:color-mix(in srgb,var(--who,transparent) 14%,transparent)}
+.rs-hist-n{flex:none;width:44px;text-align:right;padding-right:12px;color:#565a72;user-select:none}
+.rs-hist-ln code{font:inherit;white-space:pre;padding-right:16px}
+.rs-hist-frame{flex:1;border:0;background:#fff}
+@media (max-width:760px){.rs-hist-body{grid-template-columns:1fr;grid-template-rows:auto 1fr}.rs-hist-side{max-height:40vh;border-right:0;border-bottom:1px solid var(--line)}}
+.rs-hist-p.old .rs-av{background:#bdc1c6}

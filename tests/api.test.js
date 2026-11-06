@@ -647,6 +647,36 @@ test('Website Presentation: a page shared with a classmate; both type in it at t
   assert.strictEqual((await call(d.cookie, '/page/ana/wiki')).status, 404);
 });
 
+test('Page history: who wrote each line, a copy every 2 minutes per person, only for a teacher', async () => {
+  await store.upsertUser({ username:'eve', name:'Eve', period:'2', role:'student', ...auth.makeHash('moon33') });
+  const b = await login('eve', 'moon33'), d = await login('dev', 'bear55'), t = await login('teach', 'apple-pear');
+  const one = 'A\nB\n';
+  await call(b.cookie, '/page/eve/wiki', { method:'PUT', body:JSON.stringify({ base:'', text:one }) });
+  await call(b.cookie, '/page/wiki/share', { method:'POST', body:JSON.stringify({ with:['dev'] }) });
+  const two = one + 'Dev line\n';
+  await call(d.cookie, '/page/eve/wiki', { method:'PUT', body:JSON.stringify({ base:one, text:two }) });
+  const three = two.replace('Dev line', 'Dev line, longer');
+  await call(d.cookie, '/page/eve/wiki', { method:'PUT', body:JSON.stringify({ base:two, text:three }) });
+  // students cannot see it
+  assert.strictEqual((await call(b.cookie, '/page/eve/wiki/history')).status, 403);
+  assert.strictEqual((await call(d.cookie, '/page/eve/wiki/history')).status, 403);
+  const r = await (await call(t.cookie, '/page/eve/wiki/history')).json();
+  assert.strictEqual(r.text, three);
+  assert.deepStrictEqual(r.lines, ['eve', 'eve', 'dev', '']);
+  assert.deepStrictEqual(r.people.map(x => [x.username, x.lines, x.saves]), [['eve', 2, 1], ['dev', 1, 2]]);
+  // dev's two saves are one copy (within 2 minutes); ben's is its own; newest first
+  assert.deepStrictEqual(r.versions.map(v => [v.by, v.saves]), [['dev', 2], ['eve', 1]]);
+  assert.strictEqual(r.versions[0].added, 'Devline'.length + 'Devline,longer'.length);
+  const old = await (await call(t.cookie, '/page/eve/wiki/history/' + r.versions[1].id)).json();
+  assert.deepStrictEqual([old.by, old.text], ['eve', one]);
+  assert.strictEqual((await call(t.cookie, '/page/eve/wiki/history/nope')).status, 404);
+  // saved the other way (/api/learn) it is kept too
+  await call(b.cookie, '/learn', { method:'PUT', body:JSON.stringify({ data:{ html:{ site:'<h1>Eve</h1>' } } }) });
+  const s = await (await call(t.cookie, '/page/eve/site/history')).json();
+  assert.deepStrictEqual([s.lines, s.versions.map(v => v.by)], [['eve'], ['eve']]);
+  await call(b.cookie, '/page/wiki/share', { method:'POST', body:JSON.stringify({ with:[] }) });
+});
+
 test('My Drive: a student keeps pictures by name; sees their pages and what is shared with them', async () => {
   const a = await login('ana', 'tiger42'), d = await login('dev', 'bear55'), t = await login('teach', 'apple-pear');
   const pic = await (await call(d.cookie, '/assets', { method:'POST', headers:{ 'Content-Type':'image/png' }, body:Buffer.from('a drive picture') })).json();

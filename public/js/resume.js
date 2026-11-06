@@ -7,7 +7,8 @@
    The code is coloured by a <pre> under a see-through <textarea> (the
    textarea does the typing; the pre only draws). Saved with the Learn
    progress (/api/learn, html.site). Turned in (html.siteIn) = read only,
-   until Unsubmit in the Classroom. A teacher: ?u=<username>, read only.
+   until Unsubmit in the Classroom. A teacher: ?u=<username>, read only, with 🕘 History:
+   who wrote each line, and the page at any moment (see server/pagehist.js).
    At /wiki it is the Website Presentation's character.html instead (html.wiki):
    it starts as the Mario page, and the student changes it to their character.
    Pictures, as on a desktop: each page has a 📁 files folder beside it. ＋ Add picture
@@ -54,7 +55,13 @@
     done:{ en:'Done', es:'Listo' }, cancel:{ en:'Cancel', es:'Cancelar' }, here:{ en:'Here now', es:'Aquí ahora' },
     notShared:{ en:'This page is not shared with you.', es:'Esta página no está compartida contigo.' },
     noClassmates:{ en:'No classmates yet.', es:'Todavía no hay compañeros.' },
-    noCopy:{ en:'Copy and paste are off. Type your code yourself!', es:'Copiar y pegar están desactivados. ¡Escribe tu código tú mismo!' }
+    noCopy:{ en:'Copy and paste are off. Type your code yourself!', es:'Copiar y pegar están desactivados. ¡Escribe tu código tú mismo!' },
+    history:{ en:'History', es:'Historial' }, whoWrote:{ en:'Who wrote it', es:'Quién lo escribió' }, versions:{ en:'Versions', es:'Versiones' },
+    now:{ en:'Now', es:'Ahora' }, linesNow:{ en:'lines now', es:'líneas ahora' }, letters:{ en:'letters', es:'letras' },
+    lastTyped:{ en:'last typed', es:'escribió por última vez' }, before:{ en:'From before history was kept', es:'De antes de guardar el historial' },
+    noHistory:{ en:'No changes saved yet. Each change is kept from now on.', es:'Todavía no hay cambios guardados. Desde ahora se guarda cada cambio.' },
+    codeTab:{ en:'Code', es:'Código' }, pageTab:{ en:'Page', es:'Página' }, parts:{ en:'parts done', es:'partes hechas' },
+    histHint:{ en:'A copy is kept at most every 2 minutes for each person typing.', es:'Se guarda una copia como máximo cada 2 minutos por cada persona que escribe.' }
   };
   const w = k => L(W[k]);
   async function api(path, opts={}){
@@ -367,6 +374,55 @@
     addEventListener('beforeunload', e => { if(!o.readOnly && ed.value !== base){ push(); e.preventDefault(); } });
     document.addEventListener('visibilitychange', () => { if(!document.hidden && !busy) push(); });
 
+    /* 🕘 History (a teacher): who wrote each line of the page now, and the page at each moment
+       (GET /api/page/:owner/:key/history) */
+    const history = async () => {
+      let r; try { r = await api(o.doc + '/history'); } catch(e){ return; }
+      const when = t => new Date(t).toLocaleString(I18N.lang === 'es' ? 'es' : 'en-US', { weekday:'short', month:'short', day:'numeric', hour:'numeric', minute:'2-digit' });
+      const nameOf = Object.fromEntries([...r.people, ...r.versions.map(v => ({ username:v.by, name:v.name }))].map(x => [x.username, x.name]));
+      const av = (u, n) => h('span', { class:'rs-av', style:'background:' + colorOf(u) }, (n || '?').slice(0, 1).toUpperCase());
+      const view = h('div', { class:'rs-hist-view' }), tabs = h('div', { class:'rs-hist-tabs' });
+      let mode = 'code', shown = { text:r.text, lines:r.lines };
+      const show = () => {
+        tabs.replaceChildren(...['code', 'page'].map(m => h('button', { type:'button', class:'rs-hist-tab' + (mode === m ? ' on' : ''), onclick:() => { mode = m; show(); } }, w(m + 'Tab'))));
+        if(mode === 'page'){ const f = h('iframe', { class:'rs-hist-frame', sandbox:'allow-same-origin', title:w('page') }); f.srcdoc = HL.withFiles(shown.text, files(), location.origin); return view.replaceChildren(f); }
+        view.replaceChildren(h('div', { class:'rs-hist-code' }, ...shown.text.split('\n').map((ln, i) => {
+          const u = shown.lines ? shown.lines[i] : null;
+          const row = h('div', { class:'rs-hist-ln', title:u ? nameOf[u] || u : '', style:u ? '--who:' + colorOf(u) : '' }, h('span', { class:'rs-hist-n' }, String(i + 1)), h('code', {}));
+          row.lastChild.innerHTML = paint(ln).replace(/\n$/, '') || ' ';
+          return row;
+        })));
+      };
+      const list = h('div', { class:'rs-hist-list' });
+      const pick = async (v, btn) => {
+        list.querySelectorAll('.on').forEach(x => x.classList.remove('on')); btn.classList.add('on');
+        if(!v){ shown = { text:r.text, lines:r.lines }; return show(); }
+        try { const x = await api(o.doc + '/history/' + encodeURIComponent(v.id)); shown = { text:x.text, lines:null }; show(); } catch(e){}
+      };
+      const nowBtn = h('button', { type:'button', class:'rs-hist-v on', onclick:e => pick(null, e.currentTarget) },
+        h('b', {}, '● ' + w('now')), h('small', {}, r.done + ' / ' + r.total + ' ' + w('parts')));
+      list.append(nowBtn, ...r.versions.map(v => h('button', { type:'button', class:'rs-hist-v', onclick:e => pick(v, e.currentTarget) },
+        h('span', { class:'rs-hist-t' }, when(v.created)),
+        h('span', { class:'rs-hist-who' }, av(v.by, v.name), v.name.split(' ')[0],
+          h('span', { class:'rs-hist-plus' }, '+' + v.added), h('span', { class:'rs-hist-minus' }, '−' + v.removed)),
+        h('small', {}, v.done + ' / ' + r.total + ' ' + w('parts')))));
+      if(!r.versions.length) list.append(h('small', { class:'rs-hist-empty' }, w('noHistory')));
+      const people = h('div', { class:'rs-hist-people' }, ...r.people.map(x => h('div', { class:'rs-hist-p', style:'--who:' + colorOf(x.username) },
+          av(x.username, x.name), h('div', {}, h('b', {}, x.name),
+            h('small', {}, x.lines + ' ' + w('linesNow') + ' · +' + x.added + ' −' + x.removed + ' ' + w('letters')),
+            x.last ? h('small', {}, w('lastTyped') + ' ' + when(x.last)) : null))),
+        r.older ? h('div', { class:'rs-hist-p old' }, h('span', { class:'rs-av' }, '·'), h('div', {}, h('b', {}, w('before')), h('small', {}, r.older + ' ' + w('linesNow')))) : null);
+      const back = h('div', { class:'rs-dlg-back', onclick:e => { if(e.target === back) back.remove(); } },
+        h('div', { class:'rs-hist', role:'dialog', 'aria-label':w('history') },
+          h('div', { class:'rs-hist-h' }, h('b', {}, '🕘 ' + w('history') + ' · ' + S.file + ' · ' + r.owner.name), h('span', { class:'grow' }),
+            h('button', { class:'rs-btn ghost', type:'button', onclick:() => back.remove() }, '✕ ' + w('close'))),
+          h('div', { class:'rs-hist-body' },
+            h('aside', { class:'rs-hist-side' }, h('h4', {}, w('whoWrote')), people, h('h4', {}, w('versions')), h('small', { class:'rs-hist-hint' }, w('histHint')), list),
+            h('section', { class:'rs-hist-main' }, tabs, view))));
+      document.body.append(back); show();
+    };
+    const histBtn = o.teacherView ? h('button', { class:'rs-btn', type:'button', onclick:history }, '🕘 ' + w('history')) : null;
+
     const back = o.teacherView ? null : h('a', { class:'rs-btn ghost', href:'/#/c/' + encodeURIComponent(o.me.period || '') + '/a/' + S.item }, '◀ ' + w('back'));
     const langBtn = h('button', { class:'rs-btn ghost', type:'button', onclick:() => { I18N.set(I18N.lang === 'es' ? 'en' : 'es'); location.reload(); } }, I18N.lang === 'es' ? 'EN' : 'ES');
     app.replaceChildren(h('div', { class:'rs' },
@@ -374,7 +430,7 @@
         h('span', { class:'rs-logo' }, '</>'),
         h('div', { class:'rs-file' }, h('b', {}, S.file), h('small', {}, (o.mine ? o.owner.name : '✏️ ' + L({ en:o.owner.name + '’s page', es:'Página de ' + o.owner.name })) + (o.readOnly ? ' · ' + w('readOnly') : ''))),
         o.character ? h('span', { class:'rs-who' }, '🎭 ' + w('character') + ': ', h('b', {}, o.character)) : null,
-        o.readOnly ? null : status, h('span', { class:'grow' }), hereBox, shareBtn, langBtn, back,
+        o.readOnly ? null : status, h('span', { class:'grow' }), hereBox, shareBtn, histBtn, langBtn, back,
         o.readOnly ? null : picker,
         o.readOnly ? null : h('button', { class:'rs-btn primary', type:'button', onclick:save, title:'Ctrl+S' }, '💾 ' + w('save'), h('kbd', {}, /Mac/.test(navigator.platform) ? '⌘S' : 'Ctrl S'))),
       o.turnedIn ? h('div', { class:'rs-banner' }, '🔒 ' + w('turnedIn')) : null,

@@ -18,6 +18,7 @@ const path = require('path');
 const crypto = require('crypto');
 
 const MAX_VERSIONS = 60;
+const MAX_PAGE_VERSIONS = 300;             // a typed page (resume, character page): its copies, by who typed
 const VERSION_GAP_MS = 2 * 60 * 1000;      // at most one automatic version every 2 minutes
 
 const now = () => new Date().toISOString();
@@ -166,6 +167,21 @@ class FileStore {
   }
   async listLearn(){ return Object.values(this.db.learn || {}); }
 
+  /* a typed page's history: a copy at most every 2 minutes per person who typed (the open copy
+     keeps the newest text, and adds up what they added and took away) */
+  async savePageVersion(owner, key, v){
+    const all = this.db.pageVersions || (this.db.pageVersions = {}), vs = all[owner + '/' + key] || (all[owner + '/' + key] = []);
+    const last = vs[vs.length - 1];
+    if(last && last.by === v.by && Date.now() - Date.parse(last.created) < VERSION_GAP_MS)
+      Object.assign(last, { text:v.text, done:v.done, added:last.added + v.added, removed:last.removed + v.removed, saves:last.saves + 1, updated:now() });
+    else { vs.push({ id:newId(), created:now(), updated:now(), by:v.by, text:v.text, done:v.done, added:v.added, removed:v.removed, saves:1 }); thin(vs, MAX_PAGE_VERSIONS, 50); }
+    this._save();
+  }
+  async listPageVersions(owner, key){
+    return ((this.db.pageVersions || {})[owner + '/' + key] || []).map(({ text, ...v }) => ({ ...v, len:text.length })).reverse();
+  }
+  async getPageVersion(owner, key, id){ return ((this.db.pageVersions || {})[owner + '/' + key] || []).find(v => v.id === id) || null; }
+
   /* a class (one per period): the teacher's posts on the Stream and the Classwork settings */
   async getClass(period){ return (this.db.classes || {})[period] || null; }
   async saveClass(period, data){
@@ -237,11 +253,11 @@ function row(u, ps, recent){
 
 /* Keep the newest 20 as they are, then thin the older ones so the history
    still reaches back to the first day without growing forever. */
-function thin(vs){
-  while(vs.length > MAX_VERSIONS){
-    // drop the version (outside the newest 20, never the first) closest in time to its neighbour
+function thin(vs, max = MAX_VERSIONS, newest = 20){
+  while(vs.length > max){
+    // drop the version (outside the newest ones, never the first) closest in time to its neighbour
     let best = -1, gap = Infinity;
-    for(let i = 1; i < vs.length - 20; i++){
+    for(let i = 1; i < vs.length - newest; i++){
       const g = Date.parse(vs[i+1].created) - Date.parse(vs[i-1].created);
       if(g < gap){ gap = g; best = i; }
     }
@@ -331,6 +347,20 @@ class PgStore {
         updated    TIMESTAMPTZ DEFAULT now(),
         PRIMARY KEY (assignment, owner)
       );
+      CREATE TABLE IF NOT EXISTS cs_page_versions (
+        id      TEXT PRIMARY KEY,
+        owner   TEXT NOT NULL,
+        key     TEXT NOT NULL,
+        author  TEXT NOT NULL,
+        created TIMESTAMPTZ DEFAULT now(),
+        updated TIMESTAMPTZ DEFAULT now(),
+        text    TEXT NOT NULL,
+        done    INT NOT NULL DEFAULT 0,
+        added   INT NOT NULL DEFAULT 0,
+        removed INT NOT NULL DEFAULT 0,
+        saves   INT NOT NULL DEFAULT 1
+      );
+      CREATE INDEX IF NOT EXISTS cs_page_versions_doc ON cs_page_versions(owner, key, created);
       CREATE TABLE IF NOT EXISTS cs_classes (
         period  TEXT PRIMARY KEY,
         data    JSONB NOT NULL,
@@ -469,6 +499,33 @@ class PgStore {
   async listLearn(){
     const r = await this.q('SELECT owner,data,updated FROM cs_learn');
     return r.rows.map(d => ({ ...d, updated:iso(d.updated) }));
+  }
+  async savePageVersion(owner, key, v){
+    const last = (await this.q('SELECT id,author,created FROM cs_page_versions WHERE owner=$1 AND key=$2 ORDER BY created DESC LIMIT 1', [owner, key])).rows[0];
+    if(last && last.author === v.by && Date.now() - new Date(last.created).getTime() < VERSION_GAP_MS){
+      await this.q(`UPDATE cs_page_versions SET text=$2, done=$3, added=added+$4, removed=removed+$5, saves=saves+1, updated=now() WHERE id=$1`,
+        [last.id, v.text, v.done, v.added, v.removed]);
+      return;
+    }
+    await this.q('INSERT INTO cs_page_versions (id,owner,key,author,text,done,added,removed) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)',
+      [newId(), owner, key, v.by, v.text, v.done, v.added, v.removed]);
+    const vs = (await this.q('SELECT id,created FROM cs_page_versions WHERE owner=$1 AND key=$2 ORDER BY created', [owner, key])).rows
+      .map(x => ({ id:x.id, created:iso(x.created) }));
+    if(vs.length > MAX_PAGE_VERSIONS){
+      const keep = vs.slice(); thin(keep, MAX_PAGE_VERSIONS, 50);
+      const left = new Set(keep.map(x => x.id)), drop = vs.filter(x => !left.has(x.id)).map(x => x.id);
+      if(drop.length) await this.q('DELETE FROM cs_page_versions WHERE id = ANY($1)', [drop]);
+    }
+  }
+  async listPageVersions(owner, key){
+    const r = await this.q(`SELECT id,author,created,updated,done,added,removed,saves,length(text) len FROM cs_page_versions
+      WHERE owner=$1 AND key=$2 ORDER BY created DESC`, [owner, key]);
+    return r.rows.map(({ author, ...v }) => ({ ...v, by:author, created:iso(v.created), updated:iso(v.updated) }));
+  }
+  async getPageVersion(owner, key, id){
+    const r = await this.q('SELECT * FROM cs_page_versions WHERE owner=$1 AND key=$2 AND id=$3', [owner, key, id]);
+    const v = r.rows[0]; if(!v) return null;
+    const { author, ...x } = v; return { ...x, by:author, created:iso(v.created), updated:iso(v.updated) };
   }
   async getSubmission(assignment, owner){
     const r = await this.q('SELECT * FROM cs_submissions WHERE assignment=$1 AND owner=$2', [assignment, owner]);

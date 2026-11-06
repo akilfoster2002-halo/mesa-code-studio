@@ -43,6 +43,7 @@ const ai = require('./ai');
 const FEEDBACK = require('../public/js/feedback-def.js');
 const HTMLLESSONS = require('../public/js/html-lessons.js');
 const MERGE = require('../public/js/merge.js');
+const HIST = require('./pagehist.js');
 
 const PORT = Number(process.env.PORT) || 8790;
 const PUBLIC = path.join(__dirname, '..', 'public');
@@ -535,8 +536,14 @@ async function api(req, res, url){
       const b = await readJSON(req, 200000);
       const merged = await withLearn(user.username, async () => {
         const old = (await store.getLearn(user.username) || {}).data || {};
-        const out = mergeLearn(old, b.data || {});
+        const out = mergeLearn(old, b.data || {}), changed = [];
+        // a typed page that changed: who typed what (see pagehist.js)
+        for(const S of Object.values(HTMLLESSONS.SITES)){
+          const was = (old.html || {})[S.key] || '', is = out.html[S.key] || '';
+          if(was !== is){ const t = HIST.record(out.html, S.key, was, is, user.username); out.html = t.html; changed.push([S, is, t]); }
+        }
         await store.saveLearn(user.username, out);
+        for(const [S, text, t] of changed) await keepVersion(user.username, S, text, t, user.username);
         return out;
       });
       return send(res, 200, { data:merged });
@@ -613,10 +620,31 @@ async function api(req, res, url){
       }
       return send(res, 404, { error:'none' });
     }
-    if(!S || !p[1] || (p[3] && p[3] !== 'files')) return send(res, 404, { error:'none' });
+    if(!S || !p[1] || (p[3] && p[3] !== 'files' && p[3] !== 'history')) return send(res, 404, { error:'none' });
     const owner = await store.getUser(p[1]);
     if(!owner || owner.role !== 'student') return send(res, 404, { error:'none' });
     const htmlOf = async () => ((await store.getLearn(owner.username) || {}).data || {}).html || {};
+    /* the page's history, for a teacher:
+         GET /api/page/:owner/:key/history       the page now, who wrote each line, each person's
+                                                  totals, and the copies (newest first)
+         GET /api/page/:owner/:key/history/:id    one copy's text */
+    if(p[3] === 'history'){
+      if(!teacher) return send(res, 403, { error:'teacher' });
+      if(m !== 'GET' || p[5]) return send(res, 405, { error:'method' });
+      if(p[4]){
+        const v = await store.getPageVersion(owner.username, S.key, p[4]);
+        return v ? send(res, 200, { id:v.id, created:v.created, updated:v.updated, by:v.by, text:v.text }) : send(res, 404, { error:'none' });
+      }
+      const x = await htmlOf(), text = x[S.key] || '';
+      const names = Object.fromEntries((await store.listUsers()).map(u => [u.username, u.name]));
+      const ls = x[S.key + 'Lines'], lines = Array.isArray(ls) && ls.length === text.split('\n').length ? ls : text.split('\n').map(() => '');
+      const count = {}; for(const u of lines) count[u] = (count[u] || 0) + 1;
+      const people = Object.entries(x[S.key + 'By'] || {}).map(([u, v]) => ({ username:u, name:names[u] || u, ...v, lines:count[u] || 0 }))
+        .sort((a, b) => b.lines - a.lines || b.added - a.added);
+      const versions = (await store.listPageVersions(owner.username, S.key)).map(v => ({ ...v, name:names[v.by] || v.by }));
+      return send(res, 200, { owner:{ username:owner.username, name:owner.name }, text, lines, people, versions, total:S.parts.length,
+        done:S.info(text, S.who ? x[S.who] : '').has.length, older:count[''] || 0 });
+    }
     const x = await htmlOf(), mine = owner.username === user.username;
     const shared = !mine && !teacher && S.share && ((x[S.key + 'Share'] || []).includes(user.username)) && await sameClass(user, owner.username);
     if(!mine && !teacher && !shared) return send(res, 404, { error:'none' });
@@ -658,7 +686,11 @@ async function api(req, res, url){
         if(h[S.key + 'In']) return { locked:true, h };                    // turned in
         const now = h[S.key] || '';
         const text = MERGE.merge3(b.base, b.text, now).slice(0, H.SITE_MAX);
-        if(text !== now){ await store.saveLearn(owner.username, { ...d, html:{ ...h, [S.key]:text } }); moveCursors(doc, now, text); }
+        if(text !== now){
+          const t = HIST.record(h, S.key, now, text, user.username);          // who typed what
+          await store.saveLearn(owner.username, { ...d, html:{ ...t.html, [S.key]:text } }); moveCursors(doc, now, text);
+          await keepVersion(owner.username, S, text, t, user.username);
+        }
         // my cursor (in what I sent), moved to where it is in the page now
         const mySel = selOf(b.sel, b.text.length), hs = mySel ? MERGE.hunks(b.text, text) : null;
         return { h:{ ...h, [S.key]:text }, sel:mySel ? mySel.map(i => Math.min(text.length, MERGE.mapPoint(i, hs))) : undefined };
@@ -832,6 +864,14 @@ async function api(req, res, url){
 
 /* Learn progress only grows: a level keeps its most stars, the word game its
    fastest time, so two computers (or an old tab) can never take stars away. */
+/* a copy of a typed page in its history (at most one every 2 minutes per person; see store.js) */
+async function keepVersion(owner, S, text, t, by){
+  try {
+    const h = (((await store.getLearn(owner)) || {}).data || {}).html || {};
+    await store.savePageVersion(owner, S.key, { by, text, done:S.info(text, S.who ? h[S.who] : '').has.length, added:t.added, removed:t.removed });
+  } catch(e){ console.error('page history', e.message); }        // the page itself is saved either way
+}
+
 function mergeLearn(old, add){
   const out = { levels:{ ...(old.levels || {}) }, words:old.words || null };
   for(const [id, v] of Object.entries(add.levels || {})){
