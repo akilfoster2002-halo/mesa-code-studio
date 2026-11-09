@@ -169,3 +169,8 @@ body{background:var(--bg);color:var(--ink);font:14px/1.4 'Google Sans',Roboto,sy
 .rs-hist-frame{flex:1;border:0;background:#fff}
 @media (max-width:760px){.rs-hist-body{grid-template-columns:1fr;grid-template-rows:auto 1fr}.rs-hist-side{max-height:40vh;border-right:0;border-bottom:1px solid var(--line)}}
 .rs-hist-p.old .rs-av{background:#bdc1c6}
+/* the checklist folds to one line: how many are done, and the next one */
+.rs-fold{display:inline-flex;align-items:center;gap:6px;font:600 12.5px inherit;color:var(--muted);background:none;border:1px solid var(--line);border-radius:999px;padding:3px 10px 3px 8px;cursor:pointer;margin-right:4px}
+.rs-fold:hover{background:#f1f3f4;color:#3c4043}
+.rs-fold b{color:#137333}
+.rs-fold-i{font-size:10px;width:10px}

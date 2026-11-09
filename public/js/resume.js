@@ -49,7 +49,8 @@
     driveEmpty:{ en:'Your Drive has no pictures yet. Add one from your computer, or open My Drive.', es:'Tu unidad aún no tiene imágenes. Añade una de tu computadora o abre Mi unidad.' },
     openDrive:{ en:'Open My Drive', es:'Abrir Mi unidad' }, close:{ en:'Close', es:'Cerrar' },
     delFile:{ en:'Take this file out of the folder?', es:'¿Quitar este archivo de la carpeta?' }, full:{ en:'The folder is full (40 files).', es:'La carpeta está llena (40 archivos).' },
-    line:{ en:'Ln', es:'Lín' }, col:{ en:'Col', es:'Col' }, has:{ en:'Your page has', es:'Tu página tiene' },
+    line:{ en:'Ln', es:'Lín' }, col:{ en:'Col', es:'Col' }, has:{ en:'Your page has', es:'Tu página tiene' }, next:{ en:'Next', es:'Sigue' }, allDone:{ en:'Every part is done!', es:'¡Todas las partes están hechas!' },
+    showChecks:{ en:'Show the whole checklist', es:'Mostrar toda la lista' }, hideChecks:{ en:'Fold the checklist to one line', es:'Doblar la lista en una línea' },
     share:{ en:'Share', es:'Compartir' }, shareH:{ en:'Share with classmates', es:'Compartir con compañeros' },
     shareHint:{ en:'They can type in your page too, at the same time as you.', es:'Ellos también pueden escribir en tu página, al mismo tiempo que tú.' },
     done:{ en:'Done', es:'Listo' }, cancel:{ en:'Cancel', es:'Cancelar' }, here:{ en:'Here now', es:'Aquí ahora' },
@@ -150,6 +151,20 @@
     const tabTitle = h('span', { class:'rs-tabt' });
     const pos = h('span', { class:'rs-pos' });
     const checks = h('div', { class:'rs-checks' });
+    // the checklist under the code can be folded to one line (this computer remembers it)
+    let folded = false, lastHas = [];
+    try { folded = localStorage.getItem('rs-fold-' + S.key) === '1'; } catch(e){}
+    const chip = (p, has) => h('span', { class:'rs-chip' + (has.includes(p.id) ? ' ok' : ''), title:p.say ? L(p.say) : null }, (has.includes(p.id) ? '✓ ' : '') + p.en);
+    const drawChecks = has => {
+      lastHas = has;
+      const next = S.parts.find(p => !has.includes(p.id));
+      const fold = h('button', { class:'rs-fold', type:'button', 'aria-expanded':String(!folded), title:folded ? w('showChecks') : w('hideChecks'),
+        onclick:() => { folded = !folded; try { localStorage.setItem('rs-fold-' + S.key, folded ? '1' : '0'); } catch(e){} drawChecks(lastHas); } },
+        h('span', { class:'rs-fold-i' }, folded ? '▸' : '▾'), w('has'), h('b', {}, has.length + ' / ' + S.parts.length));
+      checks.classList.toggle('folded', folded);
+      if(folded) return checks.replaceChildren(fold, next ? h('span', { class:'rs-checks-g' }, w('next') + ':') : h('span', { class:'rs-checks-g' }, '🎉 ' + w('allDone')), next ? chip(next, has) : '');
+      checks.replaceChildren(fold, ...S.groups.flatMap(g => [h('span', { class:'rs-checks-g' }, g.n + ':'), ...S.parts.filter(p => p.group === g.n).map(p => chip(p, has))]));
+    };
     const setStatus = (k, cls) => { status.textContent = (k === 'saved' ? '✓ ' : k === 'offline' ? '⚠ ' : '') + w(k); status.className = 'rs-status ' + (cls || k); };
     const draw = () => {
       hlIn.innerHTML = paint(ed.value);
@@ -203,9 +218,7 @@
       tabTitle.textContent = t && t.trim() ? t.trim() : S.file;
       document.title = (t && t.trim() ? t.trim() + ' · ' : '') + S.file;
       const has = S.info(ed.value, o.character).has;
-      checks.replaceChildren(h('span', { class:'rs-checks-l' }, w('has')),
-        ...S.groups.flatMap(g => [h('span', { class:'rs-checks-g' }, g.n + ':'),
-          ...S.parts.filter(p => p.group === g.n).map(p => h('span', { class:'rs-chip' + (has.includes(p.id) ? ' ok' : ''), title:p.say ? L(p.say) : null }, (has.includes(p.id) ? '✓ ' : '') + p.en))]));
+      drawChecks(has);
     };
     // someone else's changes: put in the code, the cursor and scroll kept where they were
     const setText = text => {
