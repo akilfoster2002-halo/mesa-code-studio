@@ -86,7 +86,22 @@ test('My Resume: the skeleton parts it has; done once it is turned in', () => {
   const C = require('../public/js/classwork.js');
   const page = '<!DOCTYPE html>\n<html>\n<head>\n<title>[Your Name] - Resume</title>\n<style>\n</style>\n</head>\n<body>\n<h1>[Your Name]</h1>\n'
     + '<p><em>[One-line headline]</em></p>\n<h2>About Me</h2>\n<p>[About Me: 2-3 sentences]</p>\n<h2>Contact</h2>\n<p>Email: [your school email]<br>\nSchool: [School Name]</p>\n</body>\n</html>';
-  assert.deepStrictEqual(H.siteInfo(page), { len:page.length, has:H.SITE_PARTS.map(p => p.id), ok:true });
+  const parts12 = H.SITE_PARTS.filter(p => p.group <= 2).map(p => p.id);
+  assert.deepStrictEqual(H.siteInfo(page).has, parts12);                            // parts 1 and 2: the HTML
+  // parts 3 and 4: the CSS (and the <section>, <header>, <footer> it styles)
+  const styled = page.replace('<style>\n</style>', '<style>\n body { background-color: lavender; color: black; font-family: Verdana, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; }\n'
+      + ' h1 { color: purple; font-size: 44px; text-align: center; }\n h2 { color: teal; }\n li { font-size: 18px; }\n img { width: 150px; border: 5px solid purple; border-radius: 50%; }\n'
+      + ' section { background-color: white; padding: 20px; margin: 20px 0; border-radius: 12px; }\n header, footer { text-align: center; }\n</style>')
+    .replace('<h1>[Your Name]</h1>\n<p><em>[One-line headline]</em></p>', '<header>\n<h1>[Your Name]</h1>\n<p><em>[One-line headline]</em></p>\n</header>')
+    .replace('<h2>About Me</h2>', '<section>\n<h2>About Me</h2>').replace('<h2>Contact</h2>', '</section>\n<section>\n<h2>Contact</h2>')
+    .replace('</body>', '</section>\n<section><h2>Skills</h2><ul><li>[a skill]</li></ul></section>\n<footer><p>[Your Name]</p></footer>\n</body>');
+  assert.deepStrictEqual(H.siteInfo(styled), { len:styled.length, has:H.SITE_PARTS.map(p => p.id), ok:true });
+  const cssHas = x => H.siteInfo(x).has.filter(id => !parts12.includes(id));
+  assert.deepStrictEqual(cssHas(page), []);
+  assert.ok(!cssHas(styled.replace('background-color: lavender; ', '')).includes('cssbg'));  // background-color is not color
+  assert.ok(cssHas(styled.replace('background-color: lavender; ', '')).includes('csscolor'));
+  assert.ok(!cssHas(styled.replace('border-radius: 50%', 'border-radius: 10px')).includes('cssround'));
+  assert.ok(!cssHas(styled.replace('h2 { color: teal; }', '/* h2 { color: teal; } */')).includes('cssh2'));   // a comment does not count
   assert.ok(H.SITE_PARTS.every(p => H.SITE_GROUPS.some(g => g.n === p.group)));
   const has = x => H.siteInfo(x).has;
   assert.ok(!has(page.replace('<br>', '')).includes('br'));                        // Email and School on one line

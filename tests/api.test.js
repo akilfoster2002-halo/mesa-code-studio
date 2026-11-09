@@ -567,7 +567,8 @@ test('My Resume: saved with Learn; the teacher reads it; grades say how far it i
   assert.deepStrictEqual(await (await call(t.cookie, '/admin/site/ana')).json(), { name:'Ana', html:page });
   const me = await (await call(cookie, '/me')).json();
   const row = (await (await call(t.cookie, '/room/' + me.period + '/grades')).json()).find(r => r.username === 'ana');
-  assert.strictEqual(row.learn.site.ok, true);
+  assert.ok(['h1', 'br', 'oneh1', 'brackets'].every(id => row.learn.site.has.includes(id)));   // parts 1 and 2 done
+  assert.strictEqual(row.learn.site.ok, false);                                     // the CSS (parts 3 and 4) is still to do
   assert.strictEqual(row.learn.html.cwords.best, 90);
   // turned in: it cannot change until it is unsubmitted
   await call(cookie, '/learn', { method:'PUT', body:JSON.stringify({ data:{ html:{ siteIn:true } } }) });
