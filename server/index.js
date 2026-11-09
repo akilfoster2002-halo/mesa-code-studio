@@ -44,6 +44,7 @@ const FEEDBACK = require('../public/js/feedback-def.js');
 const HTMLLESSONS = require('../public/js/html-lessons.js');
 const MERGE = require('../public/js/merge.js');
 const HIST = require('./pagehist.js');
+const HINTS = require('./hints.js');
 
 const PORT = Number(process.env.PORT) || 8790;
 const PUBLIC = path.join(__dirname, '..', 'public');
@@ -358,6 +359,31 @@ async function api(req, res, url){
     if(!p[2] && m === 'GET') return send(res, 200, teacher
       ? { ...room, students:kidsOf().map(u => ({ username:u.username, name:u.name })).sort((x, y) => x.name.localeCompare(y.name)) }
       : { ...room, assignments:room.assignments.filter(a => isFor(a, user.username)) });
+
+    /* My Resume hints: POST /api/room/:p/hints   teacher → a "✏️ To do" comment for every checklist box
+       (Parts 1–3) not ticked yet, in each student's resume.html that is typed and not turned in.
+       Saved like typing: the History shows the teacher added those lines. */
+    if(p[2] === 'hints' && !p[3] && m === 'POST'){
+      if(!teacher) return send(res, 403, { error:'teacher' });
+      const S = HTMLLESSONS.SITES.site, out = { added:[], done:0, empty:0, turnedIn:0 };
+      for(const u of kidsOf().sort((x, y) => x.name.localeCompare(y.name))){
+        const r = await withLearn(u.username, async () => {
+          const d = (await store.getLearn(u.username) || {}).data || {}, h = d.html || {};
+          if(h[S.key + 'In']) return 'turnedIn';
+          const now = h[S.key] || '';
+          if(!now.trim()) return 'empty';
+          const x = HINTS.hint(now);
+          if(x.text === now) return 'done';
+          const t = HIST.record(h, S.key, now, x.text, user.username);
+          await store.saveLearn(u.username, { ...d, html:{ ...t.html, [S.key]:x.text } });
+          moveCursors(u.username + '/' + S.key, now, x.text);
+          await keepVersion(u.username, S, x.text, t, user.username);
+          return x.hints;
+        });
+        if(typeof r === 'number') out.added.push({ username:u.username, name:u.name, hints:r }); else out[r]++;
+      }
+      return send(res, 200, out);
+    }
 
     /* a teacher's assignment: students attach HTML files and turn them in */
     if(p[2] === 'assignments' && p[3] && p[4]){

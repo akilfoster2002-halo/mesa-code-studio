@@ -583,6 +583,27 @@ test('My Resume: saved with Learn; the teacher reads it; grades say how far it i
   assert.strictEqual((await fetch(base + '/resume')).status, 200);                  // the editor tab
 });
 
+test('My Resume hints: the teacher adds ✏️ To do comments to every started page not turned in', async () => {
+  const ana = await login('ana', 'tiger42'), ben = await login('ben', 'owl11'), dev = await login('dev', 'bear55'), t = await login('teach', 'apple-pear');
+  const page = '<!DOCTYPE html>\n<html>\n<head>\n<title>Ana</title>\n<style>\n</style>\n</head>\n<body>\n<h1>Ana</h1>\n<h2>About Me</h2>\n<p>Hi.</p>\n</body>\n</html>\n';
+  await call(ana.cookie, '/learn', { method:'PUT', body:JSON.stringify({ data:{ html:{ site:page, siteIn:false } } }) });
+  await call(ben.cookie, '/learn', { method:'PUT', body:JSON.stringify({ data:{ html:{ site:'' } } }) });
+  await call(dev.cookie, '/learn', { method:'PUT', body:JSON.stringify({ data:{ html:{ site:page } } }) });
+  await call(dev.cookie, '/learn', { method:'PUT', body:JSON.stringify({ data:{ html:{ siteIn:true } } }) });
+  assert.strictEqual((await call(ana.cookie, '/room/2/hints', { method:'POST', body:'{}' })).status, 403);
+  const r = await (await call(t.cookie, '/room/2/hints', { method:'POST', body:'{}' })).json();
+  assert.deepStrictEqual(r.added.map(x => x.username), ['ana']);
+  assert.ok(r.added[0].hints > 5);
+  assert.ok(r.empty >= 1); assert.strictEqual(r.turnedIn, 1);                     // ben: nothing typed · dev: turned in
+  const got = (await (await call(ana.cookie, '/learn')).json()).data.html;
+  assert.ok(got.site.includes('<!-- ✏️ To do: Add a one-line headline in italics under your name -->'));
+  assert.ok(got.siteLines.some(u => u === 'teach'));                                  // the History shows the teacher wrote those lines
+  assert.strictEqual(((await (await call(dev.cookie, '/learn')).json()).data.html).site, page);   // turned in: not touched
+  const again = await (await call(t.cookie, '/room/2/hints', { method:'POST', body:'{}' })).json();
+  assert.deepStrictEqual([again.added.length, again.done], [0, 1]);                // nothing new: the hints never pile up
+  assert.strictEqual((await (await call(ana.cookie, '/learn')).json()).data.html.site, got.site);
+});
+
 test('Website Presentation: the teacher gives a character; the page saves, turns in and shows in grades', async () => {
   const H = require('../public/js/html-lessons.js');
   const { cookie } = await login('ana', 'tiger42'), t = await login('teach', 'apple-pear');

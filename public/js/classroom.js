@@ -48,7 +48,10 @@
     sureGame:{ en:'Turn in your game? You can still play it, but not change it.', es:'¿Entregar tu juego? Todavía puedes jugarlo, pero no cambiarlo.' },
     gameLocked:{ en:'Locked. You can still play it. To change it, ask your teacher to give it back.', es:'Bloqueado. Todavía puedes jugarlo. Para cambiarlo, pide a tu maestro que te lo devuelva.' },
     noGame:{ en:'No game yet', es:'Aún no hay juego' },
-    seeSite:{ en:'See it', es:'Verlo' }, openEditor:{ en:'Open in the editor', es:'Abrir en el editor' },
+    seeSite:{ en:'See it', es:'Verlo' },
+    addHints:{ en:'Add hints', es:'Agregar pistas' }, hintsT:{ en:'Put a ✏️ To do comment in each student’s code for every box not ticked yet (Parts 1–3)', es:'Poner un comentario ✏️ To do en el código de cada estudiante por cada casilla sin marcar (Partes 1–3)' },
+    sureHints:{ en:'Add ✏️ To do hints to every resume in this class that is started and not turned in? Old hints are replaced; the pages look the same.', es:'¿Agregar pistas ✏️ To do a cada currículum empezado y no entregado de esta clase? Las pistas viejas se reemplazan; las páginas se ven igual.' },
+    hintsDone:{ en:'hints added to', es:'pistas agregadas a' }, pages:{ en:'pages', es:'páginas' }, openEditor:{ en:'Open in the editor', es:'Abrir en el editor' },
     needs:{ en:'Your page needs:', es:'Tu página necesita:' }, notStarted:{ en:'not started', es:'sin empezar' },
     editorHint:{ en:'Click the file to open the editor.', es:'Haz clic en el archivo para abrir el editor.' },
     character:{ en:'Your character', es:'Tu personaje' }, noCharacter:{ en:'Your teacher will give you a character.', es:'Tu maestro te dará un personaje.' },
@@ -657,7 +660,17 @@
     };
     box.replaceChildren(h('section', { class:'cr-topic' }, h('h2', { class:'cr-topic-h' }, w('studentWork'),
         h('small', { class:'cr-n' }, n + ' ' + (it.turnin ? w('turnedIn') : w('done')).toLowerCase() + ' · ' + rows.length + ' ' + w('students').toLowerCase()),
-        it.turnin && n < rows.length ? h('button', { class:'btn small cr-allin', type:'button', onclick:turn('lock', { locked:true, period }, w('sureAllIn')) }, '🔒 ' + w('allIn')) : null),
+        it.turnin && n < rows.length ? h('button', { class:'btn small cr-allin', type:'button', onclick:turn('lock', { locked:true, period }, w('sureAllIn')) }, '🔒 ' + w('allIn')) : null,
+        // My Resume: a ✏️ To do comment in each student's code for every box not ticked yet
+        it.site === 'site' ? h('button', { class:'btn small cr-allin', type:'button', title:w('hintsT'), onclick:async e => {
+          if(!confirm(w('sureHints'))) return;
+          e.target.disabled = true;
+          try { const r = await put('/room/' + period + '/hints', {}, 'POST');
+            hintsSaid[period] = '✏️ ' + r.added.reduce((n, x) => n + x.hints, 0) + ' ' + w('hintsDone') + ' ' + r.added.length + ' ' + w('pages'); }
+          catch(x){ e.target.disabled = false; return; }
+          studentWork(period, it, box);
+        } }, '✏️ ' + w('addHints')) : null,
+        it.site === 'site' && hintsSaid[period] ? h('small', { class:'cr-n' }, hintsSaid[period]) : null),
       ...rows.map(r => { const st = status(it, r);
         return h('div', { class:'cr-person cr-swrow' }, avatar(r.name, color(period)), h('div', { class:'cr-sw-name' }, h('b', {}, r.name), h('div', { class:'muted' }, r.username)),
           it.slips ? h('div', { class:'cr-slips' }, ...(r.slips.length ? r.slips.map(x => h('button', { class:'cr-chip', type:'button', title:w('seeSlip'), onclick:() => showSlip(x.project, r.username) }, '💬 ' + x.game + ' · ' + x.owner))
@@ -671,6 +684,8 @@
             ? h('button', { class:'btn small', type:'button', title:w('giveBackT'), onclick:turn('students/' + r.username + '/lock', { locked:false }) }, '↩ ' + w('giveBack'))
             : h('button', { class:'btn small', type:'button', onclick:turn('students/' + r.username + '/lock', { locked:true }) }, '🔒 ' + w('turnIn'))) : null); })));
   }
+
+  const hintsSaid = {};          // period → what the last ✏️ Add hints did
 
   // who a student types a shared page with: the classmates on their page, and whose pages they are on
   function partners(r, rows, key){
