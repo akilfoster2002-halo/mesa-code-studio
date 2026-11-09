@@ -267,3 +267,7 @@ button.cr-game{cursor:pointer;font:inherit;text-align:left;width:100%;grid-templ
 .cr-partners{font-size:12.5px}
 .cr-shared .cr-attach{padding:8px 12px}
 .cr-shared .cr-attach-t b{font-family:inherit;font-size:14px}
+/* My Resume hints: the buttons side by side; a student who is behind has an orange ✏️ */
+.cr-allin + .cr-allin{margin-left:6px}
+.cr-hint{padding:2px 8px;margin-left:6px}
+.cr-hint.behind{border-color:#e8590c;background:#fff4e6}

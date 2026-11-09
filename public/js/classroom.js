@@ -49,7 +49,11 @@
     gameLocked:{ en:'Locked. You can still play it. To change it, ask your teacher to give it back.', es:'Bloqueado. Todavía puedes jugarlo. Para cambiarlo, pide a tu maestro que te lo devuelva.' },
     noGame:{ en:'No game yet', es:'Aún no hay juego' },
     seeSite:{ en:'See it', es:'Verlo' },
-    addHints:{ en:'Add hints', es:'Agregar pistas' }, hintsT:{ en:'Put a ✏️ To do comment in each student’s code for every box not ticked yet (Parts 1–3)', es:'Poner un comentario ✏️ To do en el código de cada estudiante por cada casilla sin marcar (Partes 1–3)' },
+    hintsAll:{ en:'Hints: everyone', es:'Pistas: todos' }, hintsBehind:{ en:'Hints: behind only', es:'Pistas: solo atrasados' },
+    hintsBehindT:{ en:'Hints only for students with under half of Parts 1–3 ticked', es:'Pistas solo para quienes tienen menos de la mitad de las Partes 1–3' },
+    sureHintsBehind:{ en:'Add ✏️ To do hints for these students (under half of Parts 1–3 done)? Old hints are replaced; their pages look the same.', es:'¿Agregar pistas ✏️ To do a estos estudiantes (menos de la mitad de las Partes 1–3)? Las pistas viejas se reemplazan; sus páginas se ven igual.' },
+    hintOneT:{ en:'Add ✏️ To do hints to this student’s code', es:'Agregar pistas ✏️ To do al código de este estudiante' }, behindT:{ en:'Behind: under half of Parts 1–3', es:'Atrasado: menos de la mitad de las Partes 1–3' },
+    sureHintOne:{ en:'Add ✏️ To do hints to the resume of', es:'¿Agregar pistas ✏️ To do al currículum de' }, page:{ en:'page', es:'página' }, hintsT:{ en:'Put a ✏️ To do comment in each student’s code for every box not ticked yet (Parts 1–3)', es:'Poner un comentario ✏️ To do en el código de cada estudiante por cada casilla sin marcar (Partes 1–3)' },
     sureHints:{ en:'Add ✏️ To do hints to every resume in this class that is started and not turned in? Old hints are replaced; the pages look the same.', es:'¿Agregar pistas ✏️ To do a cada currículum empezado y no entregado de esta clase? Las pistas viejas se reemplazan; las páginas se ven igual.' },
     hintsDone:{ en:'hints added to', es:'pistas agregadas a' }, pages:{ en:'pages', es:'páginas' }, openEditor:{ en:'Open in the editor', es:'Abrir en el editor' },
     needs:{ en:'Your page needs:', es:'Tu página necesita:' }, notStarted:{ en:'not started', es:'sin empezar' },
@@ -661,15 +665,12 @@
     box.replaceChildren(h('section', { class:'cr-topic' }, h('h2', { class:'cr-topic-h' }, w('studentWork'),
         h('small', { class:'cr-n' }, n + ' ' + (it.turnin ? w('turnedIn') : w('done')).toLowerCase() + ' · ' + rows.length + ' ' + w('students').toLowerCase()),
         it.turnin && n < rows.length ? h('button', { class:'btn small cr-allin', type:'button', onclick:turn('lock', { locked:true, period }, w('sureAllIn')) }, '🔒 ' + w('allIn')) : null,
-        // My Resume: a ✏️ To do comment in each student's code for every box not ticked yet
-        it.site === 'site' ? h('button', { class:'btn small cr-allin', type:'button', title:w('hintsT'), onclick:async e => {
-          if(!confirm(w('sureHints'))) return;
-          e.target.disabled = true;
-          try { const r = await put('/room/' + period + '/hints', {}, 'POST');
-            hintsSaid[period] = '✏️ ' + r.added.reduce((n, x) => n + x.hints, 0) + ' ' + w('hintsDone') + ' ' + r.added.length + ' ' + w('pages'); }
-          catch(x){ e.target.disabled = false; return; }
-          studentWork(period, it, box);
-        } }, '✏️ ' + w('addHints')) : null,
+        // My Resume: a ✏️ To do comment in a student's code for every box not ticked yet (Parts 1–3):
+        // only the students who are behind, or everyone who has started
+        it.site === 'site' && behindOf(rows).length ? h('button', { class:'btn small cr-allin', type:'button', title:w('hintsBehindT'),
+          onclick:hintsFor(period, it, box, behindOf(rows), w('sureHintsBehind') + '\n\n' + behindOf(rows).map(u => '• ' + rows.find(r => r.username === u).name).join('\n')) },
+          '✏️ ' + w('hintsBehind') + ' (' + behindOf(rows).length + ')') : null,
+        it.site === 'site' ? h('button', { class:'btn small cr-allin', type:'button', title:w('hintsT'), onclick:hintsFor(period, it, box, null, w('sureHints')) }, '✏️ ' + w('hintsAll')) : null,
         it.site === 'site' && hintsSaid[period] ? h('small', { class:'cr-n' }, hintsSaid[period]) : null),
       ...rows.map(r => { const st = status(it, r);
         return h('div', { class:'cr-person cr-swrow' }, avatar(r.name, color(period)), h('div', { class:'cr-sw-name' }, h('b', {}, r.name), h('div', { class:'muted' }, r.username)),
@@ -680,12 +681,27 @@
           it.games ? h('div', { class:'cr-games row' }, ...(r.games.length ? r.games.map(g => gameTile(g, h('small', { class:'muted' }, g.blocks + ' 🧩'))) : [h('small', { class:'muted' }, w('noGame'))]))
             : h('div', { class:'cr-st' }, bar(st.pct), h('small', {}, st.text)), h('span', { class:'grow' }),
           stateChip(st, it),
+          it.site === 'site' && canHint(r) ? h('button', { class:'btn small cr-hint' + (isBehind(r) ? ' behind' : ''), type:'button', title:(isBehind(r) ? w('behindT') + ' · ' : '') + w('hintOneT'),
+            onclick:hintsFor(period, it, box, [r.username], w('sureHintOne') + ' ' + r.name + '?') }, '✏️') : null,
           it.turnin ? (st.state === 'done'
             ? h('button', { class:'btn small', type:'button', title:w('giveBackT'), onclick:turn('students/' + r.username + '/lock', { locked:false }) }, '↩ ' + w('giveBack'))
             : h('button', { class:'btn small', type:'button', onclick:turn('students/' + r.username + '/lock', { locked:true }) }, '🔒 ' + w('turnIn'))) : null); })));
   }
 
-  const hintsSaid = {};          // period → what the last ✏️ Add hints did
+  const hintsSaid = {};          // period → what the last ✏️ hints did
+  /* My Resume hints: who can get them (started, not turned in) and who is behind (under half of Parts 1–3 ticked) */
+  const canHint = r => { const x = (r.learn || {}).site || {}; return !!x.len && !x.in; };
+  const isBehind = r => { const HL = HTMLLESSONS, early = HL.SITE_PARTS.filter(p => p.group <= 3).map(p => p.id);
+    return canHint(r) && early.filter(id => (((r.learn || {}).site || {}).has || []).includes(id)).length < early.length / 2; };
+  const behindOf = rows => rows.filter(isBehind).map(r => r.username);
+  const hintsFor = (period, it, box, only, ask) => async e => {
+    if(!confirm(ask)) return;
+    e.target.disabled = true;
+    try { const r = await put('/room/' + period + '/hints', only ? { only } : {}, 'POST');
+      hintsSaid[period] = '✏️ ' + r.added.reduce((n, x) => n + x.hints, 0) + ' ' + w('hintsDone') + ' ' + r.added.length + ' ' + (r.added.length === 1 ? w('page') : w('pages')); }
+    catch(x){ e.target.disabled = false; return; }
+    studentWork(period, it, box);
+  };
 
   // who a student types a shared page with: the classmates on their page, and whose pages they are on
   function partners(r, rows, key){

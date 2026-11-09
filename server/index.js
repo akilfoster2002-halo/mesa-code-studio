@@ -360,13 +360,15 @@ async function api(req, res, url){
       ? { ...room, students:kidsOf().map(u => ({ username:u.username, name:u.name })).sort((x, y) => x.name.localeCompare(y.name)) }
       : { ...room, assignments:room.assignments.filter(a => isFor(a, user.username)) });
 
-    /* My Resume hints: POST /api/room/:p/hints   teacher → a "✏️ To do" comment for every checklist box
+    /* My Resume hints: POST /api/room/:p/hints { only? }   teacher → a "✏️ To do" comment for every checklist box
        (Parts 1–3) not ticked yet, in each student's resume.html that is typed and not turned in.
        Saved like typing: the History shows the teacher added those lines. */
     if(p[2] === 'hints' && !p[3] && m === 'POST'){
       if(!teacher) return send(res, 403, { error:'teacher' });
       const S = HTMLLESSONS.SITES.site, out = { added:[], done:0, empty:0, turnedIn:0 };
-      for(const u of kidsOf().sort((x, y) => x.name.localeCompare(y.name))){
+      // { only:[usernames] }: just those students (the ones behind, or one student); none = the whole class
+      const b = await readJSON(req, 20000), only = Array.isArray(b.only) ? new Set(b.only.map(String)) : null;
+      for(const u of kidsOf().filter(u => !only || only.has(u.username)).sort((x, y) => x.name.localeCompare(y.name))){
         const r = await withLearn(u.username, async () => {
           const d = (await store.getLearn(u.username) || {}).data || {}, h = d.html || {};
           if(h[S.key + 'In']) return 'turnedIn';

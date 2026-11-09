@@ -602,6 +602,13 @@ test('My Resume hints: the teacher adds ✏️ To do comments to every started p
   const again = await (await call(t.cookie, '/room/2/hints', { method:'POST', body:'{}' })).json();
   assert.deepStrictEqual([again.added.length, again.done], [0, 1]);                // nothing new: the hints never pile up
   assert.strictEqual((await (await call(ana.cookie, '/learn')).json()).data.html.site, got.site);
+  // only some students (the ones behind, or one): the others are not touched or counted
+  await call(ana.cookie, '/learn', { method:'PUT', body:JSON.stringify({ data:{ html:{ site:page } } }) });
+  const some = await (await call(t.cookie, '/room/2/hints', { method:'POST', body:JSON.stringify({ only:['ben', 'cara'] }) })).json();
+  assert.deepStrictEqual([some.added.length, some.empty, some.done, some.turnedIn], [0, 1, 0, 0]);   // cara is in another class
+  assert.strictEqual((await (await call(ana.cookie, '/learn')).json()).data.html.site, page);
+  const one = await (await call(t.cookie, '/room/2/hints', { method:'POST', body:JSON.stringify({ only:['ana'] }) })).json();
+  assert.deepStrictEqual(one.added.map(x => x.username), ['ana']);
 });
 
 test('Website Presentation: the teacher gives a character; the page saves, turns in and shows in grades', async () => {
