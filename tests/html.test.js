@@ -88,16 +88,25 @@ test('My Resume: the skeleton parts it has; done once it is turned in', () => {
     + '<p><em>[One-line headline]</em></p>\n<h2>About Me</h2>\n<p>[About Me: 2-3 sentences]</p>\n<h2>Contact</h2>\n<p>Email: [your school email]<br>\nSchool: [School Name]</p>\n</body>\n</html>';
   const parts12 = H.SITE_PARTS.filter(p => p.group <= 2).map(p => p.id);
   assert.deepStrictEqual(H.siteInfo(page).has, parts12);                            // parts 1 and 2: the HTML
-  // parts 3 and 4: the CSS (and the <section>, <header>, <footer> it styles)
-  const styled = page.replace('<style>\n</style>', '<style>\n body { background-color: lavender; color: black; font-family: Verdana, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; }\n'
-      + ' h1 { color: purple; font-size: 44px; text-align: center; }\n h2 { color: teal; }\n li { font-size: 18px; }\n img { width: 150px; border: 5px solid purple; border-radius: 50%; }\n'
-      + ' section { background-color: white; padding: 20px; margin: 20px 0; border-radius: 12px; }\n header, footer { text-align: center; }\n</style>')
-    .replace('<h1>[Your Name]</h1>\n<p><em>[One-line headline]</em></p>', '<header>\n<h1>[Your Name]</h1>\n<p><em>[One-line headline]</em></p>\n</header>')
-    .replace('<h2>About Me</h2>', '<section>\n<h2>About Me</h2>').replace('<h2>Contact</h2>', '</section>\n<section>\n<h2>Contact</h2>')
-    .replace('</body>', '</section>\n<section><h2>Skills</h2><ul><li>[a skill]</li></ul></section>\n<footer><p>[Your Name]</p></footer>\n</body>');
+  // parts 3 to 5: every section, as in the example page, then the CSS that styles it
+  const styled = '<!DOCTYPE html>\n<html>\n<head>\n<title>[Your Name] - Resume</title>\n<style>\n'
+    + ' body { background-color: lavender; color: black; font-family: Verdana, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; }\n'
+    + ' h1 { color: purple; font-size: 44px; text-align: center; }\n h2 { color: teal; }\n li { font-size: 18px; }\n img { width: 150px; border: 5px solid purple; border-radius: 50%; }\n'
+    + ' section { background-color: white; padding: 20px; margin: 20px 0; border-radius: 12px; }\n header, footer { text-align: center; }\n</style>\n</head>\n<body>\n'
+    + '<header>\n<h1>[Your Name]</h1>\n<img src="avatar.png" alt="Pixel art avatar of me">\n<p><em>[One-line headline]</em></p>\n</header>\n'
+    + '<section>\n<h2>About Me</h2>\n<p>[About Me: 2-3 sentences]</p>\n</section>\n<section>\n<h2>Contact</h2>\n<p>Email: [your school email]<br>\nSchool: [School Name]</p>\n</section>\n'
+    + '<section>\n<h2>Education</h2>\n<ul>\n<li>[School] – [grade]</li>\n</ul>\n</section>\n<section>\n<h2>Skills</h2>\n<ul>\n<li>HTML</li>\n<li>Teamwork</li>\n<li>Problem solving</li>\n</ul>\n</section>\n'
+    + '<section>\n<h2>Activities and Experience</h2>\n<ul>\n<li>[Club] – 2025</li>\n</ul>\n</section>\n<section>\n<h2>Projects</h2>\n<ol>\n<li>My first web page</li>\n</ol>\n</section>\n'
+    + '<section>\n<h2>Languages</h2>\n<ul>\n<li>English</li>\n</ul>\n</section>\n<footer>\n<p>[Your Name] · 2026</p>\n</footer>\n</body>\n</html>';
   assert.deepStrictEqual(H.siteInfo(styled), { len:styled.length, has:H.SITE_PARTS.map(p => p.id), ok:true });
-  const cssHas = x => H.siteInfo(x).has.filter(id => !parts12.includes(id));
-  assert.deepStrictEqual(cssHas(page), []);
+  const later = x => H.siteInfo(x).has.filter(id => !parts12.includes(id));
+  assert.deepStrictEqual(later(page), []);
+  assert.ok(!later(styled.replace('<li>Teamwork</li>\n', '')).includes('skills'));                   // Skills needs 3 <li>
+  assert.ok(!later(styled.replace('<ol>\n<li>My first', '<ul>\n<li>My first').replace('</li>\n</ol>', '</li>\n</ul>')).includes('projects'));   // Projects is an <ol>
+  assert.ok(!later(styled.replace('alt="Pixel art avatar of me"', 'alt=""')).includes('avatar'));    // the alt words describe it
+  assert.ok(!later(styled.replace(/<footer>[\s\S]*<\/footer>/, '')).includes('footer'));
+  assert.ok(!later(styled.replace('<section>\n<h2>Languages</h2>', '<h2>Languages</h2>').replace('</ul>\n</section>\n<footer>', '</ul>\n<footer>')).includes('sections'));
+  const cssHas = later;
   assert.ok(!cssHas(styled.replace('background-color: lavender; ', '')).includes('cssbg'));  // background-color is not color
   assert.ok(cssHas(styled.replace('background-color: lavender; ', '')).includes('csscolor'));
   assert.ok(!cssHas(styled.replace('border-radius: 50%', 'border-radius: 10px')).includes('cssround'));

@@ -186,9 +186,13 @@
   const SITE_GROUPS = [
     { n:1, en:'Part 1 · The skeleton', es:'Parte 1 · El esqueleto' },
     { n:2, en:'Part 2 · About Me & Contact', es:'Parte 2 · Sobre mí y Contacto' },
-    { n:3, en:'Part 3 · CSS: the page & the words', es:'Parte 3 · CSS: la página y las letras' },
-    { n:4, en:'Part 4 · CSS: the avatar & the boxes', es:'Parte 4 · CSS: el avatar y las cajas' }
+    { n:3, en:'Part 3 · All the sections', es:'Parte 3 · Todas las secciones' },
+    { n:4, en:'Part 4 · CSS: the page & the words', es:'Parte 4 · CSS: la página y las letras' },
+    { n:5, en:'Part 5 · CSS: the avatar & the boxes', es:'Parte 5 · CSS: el avatar y las cajas' }
   ];
+  // a section's list: the <h2> (any of the words in `head`), then its <ul> or <ol> before the next <h2>, with at least n <li>
+  const LIST = (s, head, tag, n) => { const m = s.match(new RegExp('<h2[^>]*>[^<]*(?:' + head + ')[^<]*<\\/h2>(?:(?!<h2)[\\s\\S])*?<' + tag + '[^>]*>([\\s\\S]*?)<\\/' + tag + '>', 'i'));
+    return !!m && (m[1].match(/<li[\s>]/gi) || []).length >= n; };
   // CSS in the page's <style>: the declarations of every rule for one selector ("body", "h1"…),
   // so  css(s, 'h1', 'font-size')  is true when some h1 rule sets a font-size (comments don't count)
   const STYLE = s => ((s.match(/<style[^>]*>([\s\S]*?)<\/style>/i) || [])[1] || '').replace(/\/\*[\s\S]*?\*\//g, '');
@@ -217,34 +221,49 @@
       test:s => (s.match(/<h1[\s>]/gi) || []).length === 1 && (s.match(/<h2[\s>]/gi) || []).length >= 2 },
     { id:'brackets', group:2, en:'[placeholders]', say:{ en:'Placeholders stay in [brackets]: no real information yet', es:'Los espacios quedan entre [corchetes]: nada de información real todavía' },
       test:s => (s.match(/\[[^\]<\n]+\]/g) || []).length >= 3 && !/@/.test(s.replace(/<head>[\s\S]*<\/head>/i, '')) },
-    // Part 3 · CSS for the whole page, the name, the section titles and the lists
-    { id:'cssbg', group:3, en:'body { background-color }', say:{ en:'A background color for the whole page', es:'Un color de fondo para toda la página' },
+    // Part 3 · every section of the resume, in HTML (as in the example page)
+    { id:'header', group:3, en:'<header> h1 + img + headline </header>', say:{ en:'Your name, avatar and headline together in a <header>', es:'Tu nombre, avatar y titular juntos en un <header>' },
+      test:s => /<header[\s>](?:(?!<\/header>)[\s\S])*<h1[\s>](?:(?!<\/header>)[\s\S])*<img[\s>](?:(?!<\/header>)[\s\S])*<em>[\s\S]*?<\/header>/i.test(s) },
+    { id:'avatar', group:3, en:'<img src="…" alt="…">', say:{ en:'Your avatar, with alt words that describe it', es:'Tu avatar, con palabras alt que lo describen' },
+      test:s => /<img\s[^>]*src\s*=\s*["'][^"']+["'][^>]*>/i.test(s) && /<img\s[^>]*alt\s*=\s*["'][^"']*\w[^"']*\w[^"']*["'][^>]*>/i.test(s) },
+    { id:'education', group:3, en:'<h2>Education</h2> + <ul>', say:{ en:'Education: your school, grade and year in a list', es:'Educación: tu escuela, grado y año en una lista' },
+      test:s => LIST(s, 'education|educaci', 'ul', 1) },
+    { id:'skills', group:3, en:'<h2>Skills</h2> + <ul> (3 <li>)', say:{ en:'Skills: at least 3 things you are good at', es:'Habilidades: por lo menos 3 cosas que haces bien' },
+      test:s => LIST(s, 'skill|habilidad', 'ul', 3) },
+    { id:'activities', group:3, en:'<h2>Activities and Experience</h2> + <ul>', say:{ en:'Clubs, sports, jobs or helping out, in a list', es:'Clubes, deportes, trabajos o ayudar, en una lista' },
+      test:s => LIST(s, 'activit|experien|actividad', 'ul', 1) },
+    { id:'projects', group:3, en:'<h2>Projects</h2> + <ol>', say:{ en:'Projects in a numbered list (<ol>)', es:'Proyectos en una lista numerada (<ol>)' },
+      test:s => LIST(s, 'project|proyecto', 'ol', 1) },
+    { id:'languages', group:3, en:'<h2>Languages</h2> + <ul>', say:{ en:'The languages you speak, in a list', es:'Los idiomas que hablas, en una lista' },
+      test:s => LIST(s, 'language|idioma', 'ul', 1) },
+    { id:'sections', group:3, en:'<section> … </section> × 7', say:{ en:'Each section (About Me to Languages) inside its own <section>', es:'Cada sección (About Me hasta Languages) dentro de su propio <section>' },
+      test:s => (s.match(/<section[\s>][\s\S]*?<\/section>/gi) || []).length >= 7 },
+    { id:'footer', group:3, en:'<footer> … </footer>', say:{ en:'A footer at the bottom with your name and the year', es:'Un pie de página al final con tu nombre y el año' },
+      test:s => /<footer[\s>][\s\S]*?<p[\s>][\s\S]*?<\/footer>/i.test(s) },
+    // Part 4 · CSS for the whole page, the name, the section titles and the lists
+    { id:'cssbg', group:4, en:'body { background-color }', say:{ en:'A background color for the whole page', es:'Un color de fondo para toda la página' },
       test:s => css(s, 'body', 'background-color') },
-    { id:'csscolor', group:3, en:'body { color }', say:{ en:'A color for the words', es:'Un color para las letras' }, test:s => css(s, 'body', 'color') },
-    { id:'cssfont', group:3, en:'body { font-family }', say:{ en:'A font for the page, like Verdana, sans-serif', es:'Una letra (fuente) para la página, como Verdana, sans-serif' },
+    { id:'csscolor', group:4, en:'body { color }', say:{ en:'A color for the words', es:'Un color para las letras' }, test:s => css(s, 'body', 'color') },
+    { id:'cssfont', group:4, en:'body { font-family }', say:{ en:'A font for the page, like Verdana, sans-serif', es:'Una letra (fuente) para la página, como Verdana, sans-serif' },
       test:s => css(s, 'body', 'font-family') },
-    { id:'csscenter', group:3, en:'body { max-width; margin: 0 auto }', say:{ en:'The page is not too wide, and it sits in the middle', es:'La página no es muy ancha y queda en el centro' },
+    { id:'csscenter', group:4, en:'body { max-width; margin: 0 auto }', say:{ en:'The page is not too wide, and it sits in the middle', es:'La página no es muy ancha y queda en el centro' },
       test:s => css(s, 'body', 'max-width') && css(s, 'body', 'margin', '0(px)?\\s+auto') },
-    { id:'csspad', group:3, en:'body { padding }', say:{ en:'Space between the edge and your words', es:'Espacio entre el borde y tus palabras' }, test:s => css(s, 'body', 'padding') },
-    { id:'cssh1', group:3, en:'h1 { color; font-size }', say:{ en:'Your name has its own color and a big size', es:'Tu nombre tiene su propio color y un tamaño grande' },
+    { id:'csspad', group:4, en:'body { padding }', say:{ en:'Space between the edge and your words', es:'Espacio entre el borde y tus palabras' }, test:s => css(s, 'body', 'padding') },
+    { id:'cssh1', group:4, en:'h1 { color; font-size }', say:{ en:'Your name has its own color and a big size', es:'Tu nombre tiene su propio color y un tamaño grande' },
       test:s => css(s, 'h1', 'color') && css(s, 'h1', 'font-size') },
-    { id:'cssh1c', group:3, en:'h1 { text-align: center }', say:{ en:'Your name is in the center', es:'Tu nombre está en el centro' }, test:s => css(s, 'h1', 'text-align', 'center') },
-    { id:'cssh2', group:3, en:'h2 { color }', say:{ en:'Every section title has a color', es:'Cada título de sección tiene un color' }, test:s => css(s, 'h2', 'color') },
-    { id:'cssli', group:3, en:'li { font-size }', say:{ en:'A size for the words in your lists', es:'Un tamaño para las palabras de tus listas' }, test:s => css(s, 'li', 'font-size') },
-    // Part 4 · CSS for the avatar, the white boxes (<section>) and the top and bottom (<header>, <footer>)
-    { id:'cssimg', group:4, en:'img { width }', say:{ en:'The avatar has a size (like 150px)', es:'El avatar tiene un tamaño (como 150px)' }, test:s => css(s, 'img', 'width') },
-    { id:'cssborder', group:4, en:'img { border }', say:{ en:'A border around the avatar, like 5px solid purple', es:'Un borde alrededor del avatar, como 5px solid purple' },
+    { id:'cssh1c', group:4, en:'h1 { text-align: center }', say:{ en:'Your name is in the center', es:'Tu nombre está en el centro' }, test:s => css(s, 'h1', 'text-align', 'center') },
+    { id:'cssh2', group:4, en:'h2 { color }', say:{ en:'Every section title has a color', es:'Cada título de sección tiene un color' }, test:s => css(s, 'h2', 'color') },
+    { id:'cssli', group:4, en:'li { font-size }', say:{ en:'A size for the words in your lists', es:'Un tamaño para las palabras de tus listas' }, test:s => css(s, 'li', 'font-size') },
+    // Part 5 · CSS for the avatar, the white boxes (<section>) and the top and bottom (<header>, <footer>)
+    { id:'cssimg', group:5, en:'img { width }', say:{ en:'The avatar has a size (like 150px)', es:'El avatar tiene un tamaño (como 150px)' }, test:s => css(s, 'img', 'width') },
+    { id:'cssborder', group:5, en:'img { border }', say:{ en:'A border around the avatar, like 5px solid purple', es:'Un borde alrededor del avatar, como 5px solid purple' },
       test:s => css(s, 'img', 'border') },
-    { id:'cssround', group:4, en:'img { border-radius: 50% }', say:{ en:'The avatar is a circle', es:'El avatar es un círculo' }, test:s => css(s, 'img', 'border-radius', '50%') },
-    { id:'sections', group:4, en:'<section> … </section>', say:{ en:'Each part of your resume is inside a <section> (3 or more)', es:'Cada parte de tu currículum está dentro de un <section> (3 o más)' },
-      test:s => (s.match(/<section[\s>][\s\S]*?<\/section>/gi) || []).length >= 3 },
-    { id:'csssection', group:4, en:'section { background-color; padding }', say:{ en:'Each section is a box with a color and space inside', es:'Cada sección es una caja con color y espacio adentro' },
+    { id:'cssround', group:5, en:'img { border-radius: 50% }', say:{ en:'The avatar is a circle', es:'El avatar es un círculo' }, test:s => css(s, 'img', 'border-radius', '50%') },
+    { id:'csssection', group:5, en:'section { background-color; padding }', say:{ en:'Each section is a box with a color and space inside', es:'Cada sección es una caja con color y espacio adentro' },
       test:s => css(s, 'section', 'background-color') && css(s, 'section', 'padding') },
-    { id:'csssround', group:4, en:'section { margin; border-radius }', say:{ en:'Space between the boxes, and round corners', es:'Espacio entre las cajas y esquinas redondas' },
+    { id:'csssround', group:5, en:'section { margin; border-radius }', say:{ en:'Space between the boxes, and round corners', es:'Espacio entre las cajas y esquinas redondas' },
       test:s => css(s, 'section', 'margin') && css(s, 'section', 'border-radius') },
-    { id:'headfoot', group:4, en:'<header> … </header>  <footer> … </footer>', say:{ en:'Your name, avatar and headline in a <header>; a <footer> at the bottom', es:'Tu nombre, avatar y titular en un <header>; un <footer> al final' },
-      test:s => /<header[\s>][\s\S]*<h1[\s>][\s\S]*<\/header>/i.test(s) && /<footer[\s>][\s\S]*<\/footer>/i.test(s) },
-    { id:'csshf', group:4, en:'header, footer { text-align: center }', say:{ en:'The top and the bottom are in the center', es:'Lo de arriba y lo de abajo están en el centro' },
+    { id:'csshf', group:5, en:'header, footer { text-align: center }', say:{ en:'The top and the bottom are in the center', es:'Lo de arriba y lo de abajo están en el centro' },
       test:s => css(s, 'header', 'text-align', 'center') && css(s, 'footer', 'text-align', 'center') }
   ];
   const siteInfo = s => { s = typeof s === 'string' ? s : ''; const has = SITE_PARTS.filter(p => p.test(s)).map(p => p.id);
