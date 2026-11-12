@@ -46,7 +46,7 @@ test('Classwork: Game Design (the block game) and Game Feedback are the built-in
   for(const it of C.ITEMS){ assert.ok((it.href || it.site) && it.title.en && it.title.es && it.line.en && it.line.es, it.id); assert.match(it.id, /^[a-z0-9-]{1,30}$/); }
   const empty = C.studentData(null, null, []);
   for(const a of C.ASSIGNMENTS) assert.strictEqual(C.status(a, empty).state, 'none', a.id);
-  assert.deepStrictEqual(C.ASSIGNMENTS.map(a => a.id), ['game', 'feedback', 'html', 'wiki', 'site']);   // block game, feedback, HTML Practice, Website Presentation, My Resume
+  assert.deepStrictEqual(C.ASSIGNMENTS.map(a => a.id), ['game', 'feedback', 'html', 'wiki', 'gameweb', 'site']);   // block game, feedback, HTML Practice, Website Presentation, Game Website, My Resume
   const fb = n => C.status(C.ITEMS.find(i => i.id === 'feedback'), C.studentData(null, null, [], {}, false, Array(n).fill({})));
   assert.deepStrictEqual([fb(0).state, fb(3).state, fb(4).state, fb(1).text], ['none', 'started', 'done', '1 / 4 💬']);
   const by = d => C.status(C.ITEMS.find(i => i.id === 'game'), d);

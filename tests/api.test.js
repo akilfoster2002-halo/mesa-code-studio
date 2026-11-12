@@ -611,6 +611,27 @@ test('My Resume hints: the teacher adds ✏️ To do comments to every started p
   assert.deepStrictEqual(one.added.map(x => x.username), ['ana']);
 });
 
+test('Game Website: index.html saved and turned in like My Resume, with its own pictures folder', async () => {
+  const ana = await login('ana', 'tiger42'), t = await login('teach', 'apple-pear');
+  const H = require('../public/js/html-lessons.js');
+  const page = H.GAME_START.replace('Your Game Title', 'Space Cats');
+  const put = await call(ana.cookie, '/page/ana/game', { method:'PUT', body:JSON.stringify({ base:'', text:page }) });
+  assert.strictEqual(put.status, 200);
+  const mine = (await (await call(ana.cookie, '/learn')).json()).data.html;
+  assert.strictEqual(mine.game, page);
+  assert.strictEqual(mine.site !== page, true);                                  // the resume is its own page
+  const rows = await (await call(t.cookie, '/room/2/grades')).json();
+  const row = rows.find(r => r.username === 'ana');
+  assert.deepStrictEqual(row.learn.game.has, []);                                 // the starting code ticks nothing
+  assert.ok(row.learn.game.len > 0);
+  await call(ana.cookie, '/learn', { method:'PUT', body:JSON.stringify({ data:{ html:{ gameIn:true } } }) });
+  assert.ok((await (await call(ana.cookie, '/learn')).json()).data.html.gameIn);
+  assert.strictEqual((await call(ana.cookie, '/page/ana/game', { method:'PUT', body:JSON.stringify({ base:page, text:page + 'x' }) })).status, 423);   // turned in: locked
+  const seen = await (await call(t.cookie, '/admin/site/ana?f=game')).json();
+  assert.strictEqual(seen.html, page);
+  await call(ana.cookie, '/learn', { method:'PUT', body:JSON.stringify({ data:{ html:{ gameIn:false } } }) });
+});
+
 test('Website Presentation: the teacher gives a character; the page saves, turns in and shows in grades', async () => {
   const H = require('../public/js/html-lessons.js');
   const { cookie } = await login('ana', 'tiger42'), t = await login('teach', 'apple-pear');
@@ -715,7 +736,7 @@ test('My Drive: a student keeps pictures by name; sees their pages and what is s
   await call(a.cookie, '/page/wiki/share', { method:'POST', body:JSON.stringify({ with:['dev'] }) });
   const r = await (await call(d.cookie, '/drive')).json();
   assert.deepStrictEqual(r.files, { 'elsa.png':pic.id });
-  assert.deepStrictEqual(r.pages.map(p => p.file), ['resume.html', 'character.html']);
+  assert.deepStrictEqual(r.pages.map(p => p.file), ['resume.html', 'character.html', 'index.html']);
   assert.deepStrictEqual(r.shared.map(x => [x.owner, x.path]), [['ana', '/wiki?o=ana']]);
   assert.deepStrictEqual((await (await call(a.cookie, '/drive')).json()).files, {});              // each student's own
   assert.strictEqual((await call(t.cookie, '/drive')).status, 404);

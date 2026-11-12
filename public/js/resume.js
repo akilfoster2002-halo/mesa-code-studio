@@ -27,7 +27,7 @@
 (function(){
   const { h, $ } = UI;
   const HL = window.HTMLLESSONS;
-  const S = /^\/wiki/.test(location.pathname) ? HL.SITES.wiki : HL.SITES.site, k = S.key;
+  const S = /^\/wiki/.test(location.pathname) ? HL.SITES.wiki : /^\/game/.test(location.pathname) ? HL.SITES.game : HL.SITES.site, k = S.key;
   const app = $('#app');
   const L = o => (I18N.lang === 'es' && o.es) || o.en;
   const W = {

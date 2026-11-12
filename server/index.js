@@ -169,7 +169,7 @@ function serveStatic(req, res, pathname){
   if(pathname === '/design' || pathname === '/design/') pathname = '/design.html';
   if(pathname === '/learn' || pathname === '/learn/') pathname = '/learn.html';
   if(pathname === '/html' || pathname === '/html/') pathname = '/html.html';
-  if(pathname === '/resume' || pathname === '/resume/' || pathname === '/wiki' || pathname === '/wiki/') pathname = '/resume.html';   // one editor for both pages
+  if(/^\/(resume|wiki|game)\/?$/.test(pathname)) pathname = '/resume.html';   // one editor for both pages
   if(pathname === '/drive' || pathname === '/drive/') pathname = '/drive.html';
   const file = path.normalize(path.join(PUBLIC, decodeURIComponent(pathname)));
   if(!file.startsWith(PUBLIC)) return send(res, 403, 'forbidden');

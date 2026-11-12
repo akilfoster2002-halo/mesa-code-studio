@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Dino Dash</title>
+  <style>
+    /* The whole page: sand colors that match the game */
+    body {
+      background-color: #fdf1d6;
+      color: #3b2f1e;
+      font-family: Verdana, sans-serif;
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 20px;
+    }
+    /* The game title */
+    h1 {
+      color: #2e7d32;
+      font-size: 52px;
+      margin-bottom: 0;
+    }
+    /* Each section title */
+    h2 { color: #2e7d32; }
+    /* Each feature card title */
+    h3 { color: #b8863b; }
+    /* Every picture: a size, a border and round corners */
+    img {
+      width: 420px;
+      border: 4px solid #3f9b3a;
+      border-radius: 12px;
+    }
+    /* The white box around each section */
+    section {
+      background-color: white;
+      padding: 20px;
+      margin: 20px 0;
+      border-radius: 12px;
+    }
+    /* The top and the bottom of the page are centered */
+    header, footer { text-align: center; }
+    /* The "How to play" button */
+    .button {
+      background-color: #3f9b3a;
+      color: white;
+      padding: 12px 24px;
+      border-radius: 30px;
+      text-decoration: none;
+      font-weight: bold;
+    }
+    /* Captions under the pictures */
+    .caption {
+      font-style: italic;
+      color: #7a6a4f;
+    }
+  </style>
+</head>
+<body>
+  <!-- 1. Top of the page -->
+  <header>
+    <h1>Dino Dash</h1>
+    <p>Jump the cactus. Beat the desert.</p>
+    <img src="cover.svg" alt="A green pixel dinosaur running across the desert toward a cactus">
+    <p class="caption">Dino Dash, made in Code Studio</p>
+    <p><a class="button" href="#how-to-play">How to play</a></p>
+  </header>
+
+  <!-- 2. How to play -->
+  <section id="how-to-play">
+    <h2>How to play</h2>
+    <p><b>Goal:</b> Help the dino run as far as you can without touching a cactus.</p>
+    <ul>
+      <li><b>Green flag:</b> start the game</li>
+      <li><b>Space bar:</b> jump</li>
+    </ul>
+    <p><b>You win when</b> your score reaches 30.</p>
+    <p><b>You lose when</b> the dino touches a cactus.</p>
+  </section>
+
+  <!-- 3. Screenshots -->
+  <section>
+    <h2>Screenshots</h2>
+    <img src="start.svg" alt="The start screen of Dino Dash with the dino standing on the sand">
+    <p class="caption">Ready to run: click the green flag.</p>
+    <img src="jump.svg" alt="The dino jumping high over a cactus with a score of 17">
+    <p class="caption">Timing is everything: jump right before the cactus.</p>
+    <img src="over.svg" alt="The game over screen after the dino hits a cactus at a score of 23">
+    <p class="caption">So close! Game over at 23 points.</p>
+  </section>
+
+  <!-- 4. Features -->
+  <section>
+    <h2>Why it's fun</h2>
+    <h3>One-button play</h3>
+    <p>All you need is the space bar, so anyone can start playing in seconds.</p>
+    <h3>It gets faster</h3>
+    <p>The cacti speed up as your score goes up, so every run feels harder.</p>
+    <h3>Beat your best score</h3>
+    <p>Every run is a new chance to get closer to 30.</p>
+  </section>
+
+  <!-- 5. What players say -->
+  <section>
+    <h2>What players say</h2>
+    <p>"I liked how the jumping feels!" – Maria</p>
+    <p>"It gets harder the longer you play." – Leo</p>
+  </section>
+
+  <!-- 6. How I made it -->
+  <section>
+    <h2>How I made it</h2>
+    <ul>
+      <li><b>A loop:</b> a forever loop moves the cactus to the left and sends it back to the right side of the screen.</li>
+      <li><b>An if/then:</b> if the dino is touching the cactus, the game says "Game over" and stops all.</li>
+      <li><b>A variable:</b> score goes up by 1 every second, and the game speeds up when it gets bigger.</li>
+      <li><b>A bug I fixed:</b> the dino kept falling through the ground, so I added a block that sets its y position back to the ground after each jump.</li>
+      <li><b>What I learned:</b> testing my game again and again helps me find bugs fast.</li>
+    </ul>
+  </section>
+
+  <!-- 7. Footer -->
+  <footer>
+    <p>Alex · Period 2</p>
+  </footer>
+</body>
+</html>

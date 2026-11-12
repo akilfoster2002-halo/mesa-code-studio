@@ -46,6 +46,10 @@
       { id:'wiki', kind:'assignment', at:'2026-11-03T14:00:00Z', site:'wiki', icon:'🎭', title:{ en:'Website Presentation', es:'Presentación del sitio web' },
         line:{ en:'Change the Mario page into a page about your character. Then present it to the class.', es:'Cambia la página de Mario por una página sobre tu personaje. Luego preséntala a la clase.' },
         status:siteStatus('wiki') },
+      { id:'gameweb', kind:'assignment', at:'2026-11-12T14:00:00Z', site:'game', icon:'🖥', title:{ en:'Game Website', es:'Sitio web del juego' },
+        line:{ en:'Build a web page that advertises the game you made in Code Studio: 7 sections, your own HTML and CSS. Use your design packet, your game and your showcase feedback.',
+          es:'Crea una página web que anuncie el juego que hiciste en Code Studio: 7 secciones, tu propio HTML y CSS. Usa tu paquete de diseño, tu juego y los comentarios de la exhibición.' },
+        status:siteStatus('game') },
       { id:'site', kind:'assignment', at:'2026-10-29T14:10:00Z', due:RESUME_DUE, site:'site', icon:'📄', title:{ en:'My Resume', es:'Mi currículum' },
         line:{ en:'Type your resume.html in the editor. Every class you add to it.', es:'Escribe tu resume.html en el editor. Cada clase le añades algo.' },
         status:siteStatus('site', RESUME_DUE) }

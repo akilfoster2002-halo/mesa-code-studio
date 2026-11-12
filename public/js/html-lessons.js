@@ -434,9 +434,134 @@
   const withFiles = (text, files, origin) => String(text || '').replace(/(\b(?:src|href)\s*=\s*)(["'])([^"']+)\2/gi,
     (all, at, q, v) => files[v.trim()] ? at + q + (origin || '') + files[v.trim()] + q : all);
 
+  /* ---------------------------------------------------------------- GAME WEBSITE
+     The culminating task: index.html, a landing page for the game the student
+     made in Code Studio (at /game). It starts from a small skeleton: the head,
+     empty CSS rules and a comment for each of the 7 sections; the student writes
+     the rest. The checklist follows the 7 sections of the student guide, plus
+     the self-check (style, no resume left, privacy, pictures). Comments never
+     count: the starting code's comments tick nothing. */
+  const GAME_START = `<!DOCTYPE html>
+<html>
+<head>
+  <!-- The name on the browser tab: your game's title -->
+  <title>Your Game Title</title>
+  <style>
+    /* The whole page: background color, text color and font */
+    body {
+
+    }
+    /* Your game title */
+    h1 {
+
+    }
+    /* Each section title */
+    h2 {
+
+    }
+    /* Your pictures: their size and border */
+    img {
+
+    }
+    /* The box around each section */
+    section {
+
+    }
+  </style>
+</head>
+<body>
+  <!-- 1. Top of the page: game title, a one-sentence tagline, a cover picture, a "How to play" button -->
+
+  <!-- 2. How to play: the goal, every key and what it does, how you win, how you lose -->
+
+  <!-- 3. Screenshots: 2 or 3 pictures of your game, each with alt text and a caption -->
+
+  <!-- 4. Features: 3 short cards that explain why your game is fun -->
+
+  <!-- 5. What players say: 1 or 2 kind quotes from classmates (first names only) -->
+
+  <!-- 6. How I made it: a loop, an if/then, a bug you fixed, and what you learned -->
+
+  <!-- 7. Footer: your first name and class period -->
+
+</body>
+</html>
+`;
+  const GAME_GROUPS = [
+    { n:1, en:'1 · Top of the page', es:'1 · Parte de arriba' },
+    { n:2, en:'2 · How to play', es:'2 · Cómo jugar' },
+    { n:3, en:'3 · Screenshots', es:'3 · Capturas de pantalla' },
+    { n:4, en:'4 · Features', es:'4 · Características' },
+    { n:5, en:'5 · What players say', es:'5 · Lo que dicen los jugadores' },
+    { n:6, en:'6 · How I made it', es:'6 · Cómo lo hice' },
+    { n:7, en:'7 · Footer', es:'7 · Pie de página' },
+    { n:8, en:'Style & self-check', es:'Estilo y autoevaluación' }
+  ];
+  const noNotes = s => String(s || '').replace(/<!--[\s\S]*?-->/g, '');
+  const words = s => String(s || '').replace(/<[^>]*>/g, ' ').replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ').trim();
+  // one section of the game page: from its <h2> to the next <h2>, the footer or the end of the body
+  const GSEC = (s, re) => (s.match(new RegExp('<h2[^>]*>[^<]*(?:' + re + ')[\\s\\S]*?(?=<h2[\\s>]|<footer[\\s>]|<\\/body>|$)', 'i')) || [''])[0];
+  const imgs = s => s.match(/<img\b[^>]*>/gi) || [];
+  const hasAlt = tag => /\balt\s*=\s*["'][^"']*\w[^"']*\w[^"']*["']/i.test(tag);
+  const hasSrc = tag => /\bsrc\s*=\s*["'][^"']+["']/i.test(tag);
+  const HOW = 'how to play|c[oó]mo jugar', SHOTS = 'screenshot|captura', FEAT = 'feature|fun|why|caracter[ií]stic|divertid',
+    SAY = 'say|player|review|opin|dicen', MADE = 'made|make|built|hice|hecho';
+  const RESUME_H2 = /<h2[^>]*>[^<]*(about me|education|skills|contact|languages|activities|sobre m[ií]|educaci[oó]n|habilidades|contacto|idiomas)[^<]*<\/h2>/i;
+  const GAME_PARTS = [
+    { id:'gtitle', group:1, en:'<title> = <h1>', say:{ en:'Your game title, in the browser tab and in the big heading', es:'El título de tu juego, en la pestaña y en el título grande' },
+      test:s => { const t = words((s.match(/<title>([\s\S]*?)<\/title>/i) || [])[1]).toLowerCase(), h = words((noNotes(s).match(/<h1[^>]*>([\s\S]*?)<\/h1>/i) || [])[1]).toLowerCase();
+        return !!t && t !== 'your game title' && t === h; } },
+    { id:'gtagline', group:1, en:'<p> tagline', say:{ en:'One sentence under the title that makes people want to play', es:'Una oración bajo el título que dé ganas de jugar' },
+      test:s => /<\/h1>\s*<p[^>]*>(?:(?!<\/p>)[\s\S])*?\w/i.test(noNotes(s)) },
+    { id:'gcover', group:1, en:'<img> cover picture', say:{ en:'A cover picture at the top, with alt text', es:'Una imagen de portada arriba, con texto alternativo' },
+      test:s => { const top = noNotes(s).split(/<h2[\s>]/i)[0]; return imgs(top).some(t => hasSrc(t) && hasAlt(t)); } },
+    { id:'gbutton', group:1, en:'<a href="#…"> How to play', say:{ en:'A "How to play" button that jumps to that section', es:'Un botón "How to play" que lleva a esa sección' },
+      test:s => { s = noNotes(s); return [...s.matchAll(/<a\b[^>]*href\s*=\s*["']#([\w-]+)["']/gi)].some(m => new RegExp('\\bid\\s*=\\s*["\']' + m[1] + '["\']', 'i').test(s)); } },
+    { id:'ghow', group:2, en:'<h2>How to play</h2>', say:{ en:'A How to play heading', es:'Un título How to play' }, test:s => !!GSEC(noNotes(s), HOW) },
+    { id:'gkeys', group:2, en:'<ul> + <li> keys', say:{ en:'Every key and what it does, in a list', es:'Cada tecla y lo que hace, en una lista' },
+      test:s => /<ul[\s>][\s\S]*?<li[\s>][\s\S]*?\w[\s\S]*?<\/ul>/i.test(GSEC(noNotes(s), HOW)) },
+    { id:'gwinlose', group:2, en:'You win… You lose…', say:{ en:'The goal, how you win and how you lose', es:'La meta, cómo ganas y cómo pierdes' },
+      test:s => { const t = words(GSEC(noNotes(s), HOW)); return /\bwin|\bgan[ao]s?\b|ganar/i.test(t) && /\blos[es]|\blost\b|\bpierd|perder/i.test(t); } },
+    { id:'gshots', group:3, en:'<img> × 2 or more', say:{ en:'At least 2 pictures of your game being played', es:'Por lo menos 2 imágenes de tu juego' },
+      test:s => imgs(GSEC(noNotes(s), SHOTS)).filter(hasSrc).length >= 2 },
+    { id:'galt', group:3, en:'alt="…" on each', say:{ en:'Every screenshot has alt text that describes it', es:'Cada captura tiene texto alternativo que la describe' },
+      test:s => { const i = imgs(GSEC(noNotes(s), SHOTS)); return i.length >= 2 && i.every(hasAlt); } },
+    { id:'gcaps', group:3, en:'a caption for each', say:{ en:'A caption (a short sentence) under every screenshot', es:'Un pie de foto (una oración corta) bajo cada captura' },
+      test:s => { const x = GSEC(noNotes(s), SHOTS), n = imgs(x).length;
+        return n >= 2 && (x.match(/<(?:p|figcaption)\b[^>]*>(?:(?!<\/(?:p|figcaption)>)[\s\S])*?\w/gi) || []).length >= n; } },
+    { id:'gfeat', group:4, en:'<h2> + 3 × <h3> + <p>', say:{ en:'3 cards: a short title and a sentence about why your game is fun', es:'3 tarjetas: un título corto y una oración de por qué tu juego es divertido' },
+      test:s => { const x = GSEC(noNotes(s), FEAT); return (x.match(/<h3[\s>]/gi) || []).length >= 3 && (x.match(/<p[\s>]/gi) || []).length >= 3; } },
+    { id:'gquotes', group:5, en:'"quote" – first name', say:{ en:'1 or 2 kind quotes from classmates, each with a first name', es:'1 o 2 citas amables de compañeros, cada una con un nombre' },
+      test:s => /["“][^"”<]{3,}["”]\s*[–—-]\s*[A-ZÁÉÍÓÚÑ]/.test(words(GSEC(noNotes(s), SAY))) },
+    { id:'gmade', group:6, en:'<h2>How I made it</h2>', say:{ en:'A How I made it heading (or How I will make it)', es:'Un título How I made it (o How I will make it)' },
+      test:s => !!GSEC(noNotes(s), MADE) },
+    { id:'gloop', group:6, en:'a loop', say:{ en:'Explain a loop in your game (forever, repeat…)', es:'Explica un bucle de tu juego (forever, repeat…)' },
+      test:s => /\bloops?\b|forever|repeat|bucle|repetir/i.test(words(GSEC(noNotes(s), MADE))) },
+    { id:'gif', group:6, en:'an if/then', say:{ en:'Explain an if/then in your game', es:'Explica un if/then (si/entonces) de tu juego' },
+      test:s => /\bif\b|\bsi\b[\s\S]*entonces/i.test(words(GSEC(noNotes(s), MADE))) },
+    { id:'gbug', group:6, en:'a bug I fixed', say:{ en:'A bug you fixed, and what you learned', es:'Un error que arreglaste, y lo que aprendiste' },
+      test:s => /\bbugs?\b|\bfix|arregl|\berror/i.test(words(GSEC(noNotes(s), MADE))) },
+    { id:'gfooter', group:7, en:'<footer> name · period', say:{ en:'Your first name and class period in a footer', es:'Tu nombre y tu período en un pie de página' },
+      test:s => /<footer[\s>][\s\S]*?\b(period|per[ií]odo|per\.?\s*\d|p\s?\d)[\s\S]*?<\/footer>/i.test(noNotes(s)) },
+    { id:'gcssbody', group:8, en:'body { background-color; color; font-family }', say:{ en:'Colors and a font for the whole page', es:'Colores y una letra para toda la página' },
+      test:s => css(s, 'body', 'background-color') && css(s, 'body', 'color') && css(s, 'body', 'font-family') },
+    { id:'gcssh', group:8, en:'h1 / h2 { color }', say:{ en:'Your headings have colors that match your game', es:'Tus títulos tienen colores que combinan con tu juego' },
+      test:s => css(s, 'h1', 'color') || css(s, 'h2', 'color') },
+    { id:'gcssimg', group:8, en:'img { width }', say:{ en:'Your pictures have a size', es:'Tus imágenes tienen un tamaño' }, test:s => css(s, 'img', 'width') },
+    { id:'gpics', group:8, en:'every <img> has src + alt', say:{ en:'Every picture has a file name and alt text (no broken pictures)', es:'Cada imagen tiene nombre de archivo y texto alternativo' },
+      test:s => { const i = imgs(noNotes(s)); return i.length >= 3 && i.every(t => hasSrc(t) && hasAlt(t)); } },
+    { id:'gnoresume', group:8, en:'no resume left', say:{ en:'No About Me, Education, Skills or Contact sections from your resume', es:'Nada de tu currículum (About Me, Education, Skills, Contact)' },
+      test:s => { s = noNotes(s); return (s.match(/<h2[\s>]/gi) || []).length >= 3 && !RESUME_H2.test(s); } },
+    { id:'gprivacy', group:8, en:'privacy', say:{ en:'No last name, email or phone number: first name and period only', es:'Sin apellido, correo ni teléfono: solo tu nombre y período' },
+      test:s => { const t = words(noNotes(s).replace(/<head[\s>][\s\S]*?<\/head>/i, '')); return t.length > 200 && !/@/.test(t) && !/\d{3}[\s.-]?\d{3}[\s.-]\d{4}/.test(t); } }
+  ];
+  const gameInfo = s => { s = typeof s === 'string' ? s : ''; const has = GAME_PARTS.filter(p => p.test(s)).map(p => p.id);
+    return { len:s.length, has, ok:has.length === GAME_PARTS.length }; };
+
   const SITES = {
     site:{ key:'site', item:'site', file:'resume.html', path:'/resume', start:'', groups:SITE_GROUPS, parts:SITE_PARTS, info:s => siteInfo(s) },
-    wiki:{ key:'wiki', item:'wiki', file:'character.html', path:'/wiki', start:WIKI_START, groups:WIKI_GROUPS, parts:WIKI_PARTS, info:wikiInfo, who:'wikiChar', share:true, files:WIKI_FILES }
+    wiki:{ key:'wiki', item:'wiki', file:'character.html', path:'/wiki', start:WIKI_START, groups:WIKI_GROUPS, parts:WIKI_PARTS, info:wikiInfo, who:'wikiChar', share:true, files:WIKI_FILES },
+    game:{ key:'game', item:'gameweb', file:'index.html', path:'/game', start:GAME_START, groups:GAME_GROUPS, parts:GAME_PARTS, info:gameInfo }
   };
   // every page's progress from a Learn record's html: { site:{ len, has, ok, in }, wiki:{ …, who } }
   const sitesOf = html => { html = html || {};
@@ -448,6 +573,6 @@
 
   const HTMLLESSONS = { ACTS, CARDS, TYPE, CLOSE, MATCH_WORDS, MATCH_TAGS, wrap, BUILD, FIX, PAGE_START, GOALS, score,
     C1_ACTS, C1_WORDS, C1_SORT, C1_ELEMENTS, C1_TAGS, C1_JOBS, C1_PLACE, C1_PAGE, C1_ORDER, C1_EXIT, C1_H1, SITE_MAX, SITE_GROUPS, SITE_PARTS, siteInfo,
-    WIKI_PIC, WIKI_FILES, FILE_NAME, fileName, filesOf, withFiles, WIKI_START, WIKI_GROUPS, WIKI_PARTS, wikiInfo, SITES, sitesOf };
+    WIKI_PIC, WIKI_FILES, FILE_NAME, fileName, filesOf, withFiles, WIKI_START, WIKI_GROUPS, WIKI_PARTS, wikiInfo, GAME_START, GAME_GROUPS, GAME_PARTS, gameInfo, SITES, sitesOf };
   if(typeof module !== 'undefined') module.exports = HTMLLESSONS; else root.HTMLLESSONS = HTMLLESSONS;
 })(this);
