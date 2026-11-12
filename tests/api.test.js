@@ -632,6 +632,28 @@ test('Game Website: index.html saved and turned in like My Resume, with its own 
   await call(ana.cookie, '/learn', { method:'PUT', body:JSON.stringify({ data:{ html:{ gameIn:false } } }) });
 });
 
+test('Locking a typed page: the teacher locks My Resume for a class; students read it but cannot change, turn in or unsubmit it', async () => {
+  const ana = await login('ana', 'tiger42'), t = await login('teach', 'apple-pear');
+  const page = '<h1>Ana</h1>';
+  await call(ana.cookie, '/learn', { method:'PUT', body:JSON.stringify({ data:{ html:{ site:page, siteIn:false } } }) });
+  await call(t.cookie, '/room/2/work/site', { method:'PUT', body:JSON.stringify({ hidden:false, due:'2026-11-11' }) });
+  assert.strictEqual((await call(ana.cookie, '/room/2/work/site', { method:'PUT', body:JSON.stringify({ locked:false }) })).status, 403);   // only the teacher
+  const room = await (await call(t.cookie, '/room/2/work/site', { method:'PUT', body:JSON.stringify({ locked:true }) })).json();
+  assert.deepStrictEqual(room.work.site, { hidden:false, due:'2026-11-11', locked:true });            // the due date is kept
+  const got = await (await call(ana.cookie, '/page/ana/site')).json();
+  assert.deepStrictEqual([got.text, got.locked], [page, true]);                                       // still opens, read only
+  assert.strictEqual((await call(ana.cookie, '/page/ana/site', { method:'PUT', body:JSON.stringify({ base:page, text:page + '!' }) })).status, 423);
+  await call(ana.cookie, '/learn', { method:'PUT', body:JSON.stringify({ data:{ html:{ site:'changed', siteIn:true } } }) });
+  const h = (await (await call(ana.cookie, '/learn')).json()).data.html;
+  assert.deepStrictEqual([h.site, !!h.siteIn], [page, false]);                                        // no change, no turn in
+  assert.strictEqual((await call(ana.cookie, '/page/ana/site/files', { method:'POST', body:JSON.stringify({ name:'a.png', id:'0'.repeat(64) }) })).status, 423);
+  assert.strictEqual((await (await call(ana.cookie, '/page/ana/game')).json()).locked, false);        // the other pages are not locked
+  assert.strictEqual((await call(t.cookie, '/room/2/hints', { method:'POST', body:'{}' })).status, 423);   // no hints into a locked page
+  const open = await (await call(t.cookie, '/room/2/work/site', { method:'PUT', body:JSON.stringify({ locked:false }) })).json();
+  assert.deepStrictEqual(open.work.site, { hidden:false, due:'2026-11-11' });
+  assert.strictEqual((await call(ana.cookie, '/page/ana/site', { method:'PUT', body:JSON.stringify({ base:page, text:page + '!' }) })).status, 200);
+});
+
 test('Website Presentation: the teacher gives a character; the page saves, turns in and shows in grades', async () => {
   const H = require('../public/js/html-lessons.js');
   const { cookie } = await login('ana', 'tiger42'), t = await login('teach', 'apple-pear');

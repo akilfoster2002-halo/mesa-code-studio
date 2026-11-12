@@ -49,6 +49,11 @@
     gameLocked:{ en:'Locked. You can still play it. To change it, ask your teacher to give it back.', es:'Bloqueado. Todavía puedes jugarlo. Para cambiarlo, pide a tu maestro que te lo devuelva.' },
     noGame:{ en:'No game yet', es:'Aún no hay juego' },
     seeSite:{ en:'See it', es:'Verlo' },
+    lockEdit:{ en:'Lock editing', es:'Bloquear cambios' }, unlockEdit:{ en:'Unlock editing', es:'Desbloquear cambios' },
+    lockT:{ en:'Students in this class can open their page but not change it, turn it in or unsubmit it', es:'Los estudiantes de esta clase pueden abrir su página pero no cambiarla, entregarla ni anular la entrega' },
+    sureLock:{ en:'Lock this assignment for the whole class? Students can still open and read their page, but nobody can change it, turn it in or unsubmit it until you unlock it.', es:'¿Bloquear esta tarea para toda la clase? Los estudiantes pueden abrir y leer su página, pero nadie puede cambiarla, entregarla ni anular la entrega hasta que la desbloquees.' },
+    sureUnlock:{ en:'Unlock this assignment? Students in this class can change their page again.', es:'¿Desbloquear esta tarea? Los estudiantes de esta clase pueden cambiar su página otra vez.' },
+    lockedS:{ en:'Locked by your teacher', es:'Bloqueado por tu docente' },
     hintsAll:{ en:'Hints: everyone', es:'Pistas: todos' }, hintsBehind:{ en:'Hints: behind only', es:'Pistas: solo atrasados' },
     hintsBehindT:{ en:'Hints only for students with under half of Parts 1–3 ticked', es:'Pistas solo para quienes tienen menos de la mitad de las Partes 1–3' },
     sureHintsBehind:{ en:'Add ✏️ To do hints for these students (under half of Parts 1–3 done)? Old hints are replaced; their pages look the same.', es:'¿Agregar pistas ✏️ To do a estos estudiantes (menos de la mitad de las Partes 1–3)? Las pistas viejas se reemplazan; sus páginas se ven igual.' },
@@ -448,6 +453,8 @@
           h('span', { class:'cr-attach-t' }, h('b', {}, S.file), h('small', {}, 'HTML · ' + (text ? (((mine.learn[k] || {}).has || []).length + ' / ' + S.parts.length + ' 🏷') : w('notStarted')))),
           h('span', { class:'cr-attach-go' }, '↗')),
         inAt ? h('small', { class:'muted' }, '🔒 ' + w('turnedIn') + ' ' + fmtWhen(inAt)) : h('small', { class:'muted' }, w('editorHint')),
+        // locked by the teacher: the page can be opened and read, not changed, turned in or unsubmitted
+        setting(it).locked ? h('small', { class:'cr-locked' }, '🔒 ' + w('lockedS')) :
         h('button', { class:'btn ' + (inAt ? '' : 'primary') + ' cr-gc-btn', type:'button', disabled:!inAt && !text, onclick:async e => {
           e.target.disabled = true;
           try { await put('/learn', { data:{ html:{ [k + 'In']:!inAt } } }); refreshResume(); } catch(x){ e.target.disabled = false; }
@@ -665,12 +672,20 @@
     box.replaceChildren(h('section', { class:'cr-topic' }, h('h2', { class:'cr-topic-h' }, w('studentWork'),
         h('small', { class:'cr-n' }, n + ' ' + (it.turnin ? w('turnedIn') : w('done')).toLowerCase() + ' · ' + rows.length + ' ' + w('students').toLowerCase()),
         it.turnin && n < rows.length ? h('button', { class:'btn small cr-allin', type:'button', onclick:turn('lock', { locked:true, period }, w('sureAllIn')) }, '🔒 ' + w('allIn')) : null,
+        // a typed page (My Resume, Website Presentation, Game Website): the teacher locks it for this class
+        it.site ? h('button', { class:'btn small cr-allin' + (setting(it).locked ? ' on' : ''), type:'button', title:w('lockT'), onclick:async e => {
+          const set = setting(it);
+          if(!confirm(set.locked ? w('sureUnlock') : w('sureLock'))) return;
+          e.target.disabled = true;
+          try { room = await put('/room/' + period + '/work/' + it.id, { ...set, locked:!set.locked }); } catch(x){ e.target.disabled = false; return; }
+          studentWork(period, it, box);
+        } }, setting(it).locked ? '🔓 ' + w('unlockEdit') : '🔒 ' + w('lockEdit')) : null,
         // My Resume: a ✏️ To do comment in a student's code for every box not ticked yet (Parts 1–3):
         // only the students who are behind, or everyone who has started
-        it.site === 'site' && behindOf(rows).length ? h('button', { class:'btn small cr-allin', type:'button', title:w('hintsBehindT'),
+        it.site === 'site' && !setting(it).locked && behindOf(rows).length ? h('button', { class:'btn small cr-allin', type:'button', title:w('hintsBehindT'),
           onclick:hintsFor(period, it, box, behindOf(rows), w('sureHintsBehind') + '\n\n' + behindOf(rows).map(u => '• ' + rows.find(r => r.username === u).name).join('\n')) },
           '✏️ ' + w('hintsBehind') + ' (' + behindOf(rows).length + ')') : null,
-        it.site === 'site' ? h('button', { class:'btn small cr-allin', type:'button', title:w('hintsT'), onclick:hintsFor(period, it, box, null, w('sureHints')) }, '✏️ ' + w('hintsAll')) : null,
+        it.site === 'site' && !setting(it).locked ? h('button', { class:'btn small cr-allin', type:'button', title:w('hintsT'), onclick:hintsFor(period, it, box, null, w('sureHints')) }, '✏️ ' + w('hintsAll')) : null,
         it.site === 'site' && hintsSaid[period] ? h('small', { class:'cr-n' }, hintsSaid[period]) : null),
       ...rows.map(r => { const st = status(it, r);
         return h('div', { class:'cr-person cr-swrow' }, avatar(r.name, color(period)), h('div', { class:'cr-sw-name' }, h('b', {}, r.name), h('div', { class:'muted' }, r.username)),
@@ -681,7 +696,7 @@
           it.games ? h('div', { class:'cr-games row' }, ...(r.games.length ? r.games.map(g => gameTile(g, h('small', { class:'muted' }, g.blocks + ' 🧩'))) : [h('small', { class:'muted' }, w('noGame'))]))
             : h('div', { class:'cr-st' }, bar(st.pct), h('small', {}, st.text)), h('span', { class:'grow' }),
           stateChip(st, it),
-          it.site === 'site' && canHint(r) ? h('button', { class:'btn small cr-hint' + (isBehind(r) ? ' behind' : ''), type:'button', title:(isBehind(r) ? w('behindT') + ' · ' : '') + w('hintOneT'),
+          it.site === 'site' && !setting(it).locked && canHint(r) ? h('button', { class:'btn small cr-hint' + (isBehind(r) ? ' behind' : ''), type:'button', title:(isBehind(r) ? w('behindT') + ' · ' : '') + w('hintOneT'),
             onclick:hintsFor(period, it, box, [r.username], w('sureHintOne') + ' ' + r.name + '?') }, '✏️') : null,
           it.turnin ? (st.state === 'done'
             ? h('button', { class:'btn small', type:'button', title:w('giveBackT'), onclick:turn('students/' + r.username + '/lock', { locked:false }) }, '↩ ' + w('giveBack'))

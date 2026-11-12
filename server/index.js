@@ -366,6 +366,7 @@ async function api(req, res, url){
     if(p[2] === 'hints' && !p[3] && m === 'POST'){
       if(!teacher) return send(res, 403, { error:'teacher' });
       const S = HTMLLESSONS.SITES.site, out = { added:[], done:0, empty:0, turnedIn:0 };
+      if((room.work[S.item] || {}).locked) return send(res, 423, { error:'locked' });     // locked: the pages stay as they are
       // { only:[usernames] }: just those students (the ones behind, or one student); none = the whole class
       const b = await readJSON(req, 20000), only = Array.isArray(b.only) ? new Set(b.only.map(String)) : null;
       for(const u of kidsOf().filter(u => !only || only.has(u.username)).sort((x, y) => x.name.localeCompare(y.name))){
@@ -492,10 +493,11 @@ async function api(req, res, url){
       return send(res, 200, room);
     }
     if(p[2] === 'work' && /^[a-z0-9-]{1,30}$/.test(p[3] || '') && !p[4] && m === 'PUT'){
-      const b = await readJSON(req, 2000);
-      const due = /^\d{4}-\d{2}-\d{2}$/.test(b.due || '') ? b.due : null;
-      const w = { hidden:!!b.hidden, due };
-      if(!w.hidden && !w.due) delete room.work[p[3]]; else room.work[p[3]] = w;
+      const b = await readJSON(req, 2000), was = room.work[p[3]] || {};
+      const due = 'due' in b ? (/^\d{4}-\d{2}-\d{2}$/.test(b.due || '') ? b.due : null) : was.due || null;
+      // locked: the students' typed page for this item can no longer change (only the teacher unlocks it)
+      const w = { hidden:'hidden' in b ? !!b.hidden : !!was.hidden, due, ...(('locked' in b ? !!b.locked : !!was.locked) ? { locked:true } : {}) };
+      if(!w.hidden && !w.due && !w.locked) delete room.work[p[3]]; else room.work[p[3]] = w;
       await store.saveClass(period, room);
       return send(res, 200, room);
     }
@@ -562,6 +564,7 @@ async function api(req, res, url){
     if(m === 'GET'){ const d = await store.getLearn(user.username); return send(res, 200, { data:d ? d.data : null }); }
     if(m === 'PUT'){
       const b = await readJSON(req, 200000);
+      for(const k of await lockedSites(user)) if(b.data && b.data.html){ delete b.data.html[k]; delete b.data.html[k + 'In']; }
       const merged = await withLearn(user.username, async () => {
         const old = (await store.getLearn(user.username) || {}).data || {};
         const out = mergeLearn(old, b.data || {}), changed = [];
@@ -677,10 +680,12 @@ async function api(req, res, url){
     const shared = !mine && !teacher && S.share && ((x[S.key + 'Share'] || []).includes(user.username)) && await sameClass(user, owner.username);
     if(!mine && !teacher && !shared) return send(res, 404, { error:'none' });
     const doc = owner.username + '/' + S.key;
-    const out = (h, text, sel) => ({ text, h:MERGE.hash(text), in:h[S.key + 'In'] || null, who:S.who ? h[S.who] || '' : undefined,
+    const locked = (await lockedSites(owner)).includes(S.key);
+    const out = (h, text, sel) => ({ text, h:MERGE.hash(text), in:h[S.key + 'In'] || null, locked, who:S.who ? h[S.who] || '' : undefined,
       owner:{ username:owner.username, name:owner.name }, with:h[S.key + 'Share'] || [], files:h[S.key + 'Files'] || {}, here:here(doc, teacher ? null : user, sel), canEdit:!teacher });
     if(p[3] === 'files'){
       if(teacher) return send(res, 403, { error:'teacher' });
+      if(locked) return send(res, 423, { error:'locked' });
       const name = String(m === 'DELETE' ? decodeURIComponent(p[4] || '') : '').toLowerCase();
       const b = m === 'POST' && !p[4] ? await readJSON(req, 2000) : null;
       if(b && (!H.FILE_NAME.test(String(b.name || '')) || !/^[a-f0-9]{64}$/.test(String(b.id || '')) || !(await store.hasAsset(b.id)))) return send(res, 400, { error:'file' });
@@ -703,11 +708,12 @@ async function api(req, res, url){
       // ?c=from,to: my cursor, in my copy (only kept when my copy is the page as it is now)
       const same = !!url.searchParams.get('h') && url.searchParams.get('h') === MERGE.hash(text);
       const sel = same ? selOf(url.searchParams.get('c'), text.length) : undefined;
-      if(same) return send(res, 200, { same:true, in:x[S.key + 'In'] || null, with:x[S.key + 'Share'] || [], files:x[S.key + 'Files'] || {}, here:here(doc, teacher ? null : user, sel) });
+      if(same) return send(res, 200, { same:true, in:x[S.key + 'In'] || null, locked, with:x[S.key + 'Share'] || [], files:x[S.key + 'Files'] || {}, here:here(doc, teacher ? null : user, sel) });
       return send(res, 200, out(x, text));
     }
     if(m === 'PUT' && !teacher){
       const b = await readJSON(req, 3 * H.SITE_MAX);
+      if(locked) return send(res, 423, { error:'locked', ...out(x, x[S.key] || '') });
       if(typeof b.base !== 'string' || typeof b.text !== 'string') return send(res, 400, { error:'text' });
       const r = await withLearn(owner.username, async () => {
         const d = (await store.getLearn(owner.username) || {}).data || {}, h = d.html || {};
@@ -898,6 +904,14 @@ async function keepVersion(owner, S, text, t, by){
     const h = (((await store.getLearn(owner)) || {}).data || {}).html || {};
     await store.savePageVersion(owner, S.key, { by, text, done:S.info(text, S.who ? h[S.who] : '').has.length, added:t.added, removed:t.removed });
   } catch(e){ console.error('page history', e.message); }        // the page itself is saved either way
+}
+
+/* a typed page (My Resume, Website Presentation, Game Website) the teacher has locked for a class:
+   its students can open and read it, not change it, turn it in or unsubmit it (Classwork setting `locked`) */
+async function lockedSites(u){
+  if(!u || u.role !== 'student' || !u.period) return [];
+  const work = (((await store.getClass(String(u.period))) || {}).data || {}).work || {};
+  return Object.values(HTMLLESSONS.SITES).filter(S => (work[S.item] || {}).locked).map(S => S.key);
 }
 
 function mergeLearn(old, add){

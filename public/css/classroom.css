@@ -271,3 +271,5 @@ button.cr-game{cursor:pointer;font:inherit;text-align:left;width:100%;grid-templ
 .cr-allin + .cr-allin{margin-left:6px}
 .cr-hint{padding:2px 8px;margin-left:6px}
 .cr-hint.behind{border-color:#e8590c;background:#fff4e6}
+.cr-allin.on{border-color:#c5221f;color:#c5221f;background:#fce8e6}
+.cr-locked{display:block;margin-top:6px;font-weight:700;color:#c5221f}

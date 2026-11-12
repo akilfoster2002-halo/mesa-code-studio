@@ -36,6 +36,7 @@
     save:{ en:'Save & refresh', es:'Guardar y actualizar' }, back:{ en:'Classroom', es:'Clase' },
     page:{ en:'Your page', es:'Tu página' }, code:{ en:'Your code', es:'Tu código' },
     turnedIn:{ en:'Turned in. To make changes, Unsubmit in the Classroom.', es:'Entregado. Para hacer cambios, anula la entrega en la Clase.' },
+    lockedT:{ en:'Locked by your teacher. You can look at your page but not change it.', es:'Bloqueado por tu docente. Puedes ver tu página pero no cambiarla.' },
     viewing:{ en:'Viewing', es:'Viendo' }, readOnly:{ en:'read only', es:'solo lectura' },
     login:{ en:'Log in to the Classroom first.', es:'Primero inicia sesión en la Clase.' }, open:{ en:'Open the Classroom', es:'Abrir la Clase' },
     empty:{ en:'Start typing your ' + S.file + ' here…', es:'Empieza a escribir tu ' + S.file + ' aquí…' },
@@ -129,11 +130,11 @@
     let r;
     try { r = await api(doc); }
     catch(e){ return app.replaceChildren(h('div', { class:'rs-msg' }, h('b', {}, '🔒 ' + w('notShared')), h('a', { class:'rs-btn primary', href:'/' }, w('open')))); }
-    const mine = owner === me.username, turnedIn = !!r.in, readOnly = turnedIn || !r.canEdit;
+    const mine = owner === me.username, turnedIn = !!r.in, locked = !!r.locked, readOnly = turnedIn || locked || !r.canEdit;
     // the Website Presentation starts as the Mario page (saved as soon as it opens)
     const fresh = !r.text && !!S.start && mine && !readOnly;
     editor({ me, doc, mine, text:fresh ? S.start : r.text, base:r.text, owner:r.owner, with:r.with || [], here:r.here || [], files:r.files || {},
-      readOnly, turnedIn, character:r.who || '', teacherView });
+      readOnly, turnedIn, locked, character:r.who || '', teacherView });
   }
 
   function editor(o){
@@ -243,7 +244,7 @@
         people(r.here || [], r.with || o.with);
         if(r.files && JSON.stringify(r.files) !== JSON.stringify(o.files)){ o.files = r.files; drawFiles(); refresh(); }   // a classmate added a picture
         if(!o.readOnly) setStatus(ed.value === base ? 'saved' : 'edited');
-        if(r.in && !o.readOnly) return location.reload();
+        if((r.in || r.locked) && !o.readOnly) return location.reload();
       } catch(e){
         if(e.status === 423) return location.reload();          // turned in: read only now
         if(!o.readOnly) setStatus('offline');
@@ -345,8 +346,8 @@
             if(!confirm(w('delFile') + '\n' + n)) return;
             try { o.files = (await fileApi('/' + encodeURIComponent(n), { method:'DELETE' })).files; drawFiles(); refresh(); } catch(e){}
           } }, '✕') : null)),
-        o.readOnly ? null : h('button', { class:'rs-btn small', type:'button', title:w('picHint'), onclick:() => picker.click() }, '＋ ' + w('addPic')),
-        o.readOnly ? null : h('button', { class:'rs-btn small', type:'button', title:w('fromDrive'), onclick:fromDrive }, '☁️ ' + w('drive')));
+        o.readOnly ? '' : h('button', { class:'rs-btn small', type:'button', title:w('picHint'), onclick:() => picker.click() }, '＋ ' + w('addPic')),
+        o.readOnly ? '' : h('button', { class:'rs-btn small', type:'button', title:w('fromDrive'), onclick:fromDrive }, '☁️ ' + w('drive')));
     };
     const picker = h('input', { type:'file', accept:'image/*', hidden:true, onchange:e => { addPicture(e.target.files[0]); e.target.value = ''; } });
     // students type their code themselves: no copying, cutting or pasting text (pictures still paste
@@ -446,7 +447,7 @@
         o.readOnly ? null : status, h('span', { class:'grow' }), hereBox, shareBtn, histBtn, langBtn, back,
         o.readOnly ? null : picker,
         o.readOnly ? null : h('button', { class:'rs-btn primary', type:'button', onclick:save, title:'Ctrl+S' }, '💾 ' + w('save'), h('kbd', {}, /Mac/.test(navigator.platform) ? '⌘S' : 'Ctrl S'))),
-      o.turnedIn ? h('div', { class:'rs-banner' }, '🔒 ' + w('turnedIn')) : null,
+      o.locked && !o.teacherView ? h('div', { class:'rs-banner' }, '🔒 ' + w('lockedT')) : o.turnedIn ? h('div', { class:'rs-banner' }, '🔒 ' + w('turnedIn')) : null,
       filesBar,
       h('main', { class:'rs-main' },
         h('section', { class:'rs-pane rs-code' }, h('div', { class:'rs-pane-h' }, h('span', { class:'rs-dot' }), w('code'), h('span', { class:'grow' }), pos),
