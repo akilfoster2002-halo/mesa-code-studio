@@ -358,7 +358,9 @@ async function api(req, res, url){
     const kidsOf = () => users.filter(u => u.role === 'student' && !u.disabled && String(u.period) === period);
     if(!p[2] && m === 'GET') return send(res, 200, teacher
       ? { ...room, students:kidsOf().map(u => ({ username:u.username, name:u.name })).sort((x, y) => x.name.localeCompare(y.name)) }
-      : { ...room, assignments:room.assignments.filter(a => isFor(a, user.username)) });
+      : { ...room, assignments:room.assignments.filter(a => isFor(a, user.username)),
+          work:Object.fromEntries(Object.entries(room.work).map(([k, v]) => { const { open, ...rest } = v || {};
+            return [k, { ...rest, ...(rest.locked && Array.isArray(open) && open.includes(user.username) ? { locked:false, extension:true } : {}) }]; })) });
 
     /* My Resume hints: POST /api/room/:p/hints { only? }   teacher → a "✏️ To do" comment for every checklist box
        (Parts 1–3) not ticked yet, in each student's resume.html that is typed and not turned in.
@@ -496,7 +498,10 @@ async function api(req, res, url){
       const b = await readJSON(req, 2000), was = room.work[p[3]] || {};
       const due = 'due' in b ? (/^\d{4}-\d{2}-\d{2}$/.test(b.due || '') ? b.due : null) : was.due || null;
       // locked: the students' typed page for this item can no longer change (only the teacher unlocks it)
-      const w = { hidden:'hidden' in b ? !!b.hidden : !!was.hidden, due, ...(('locked' in b ? !!b.locked : !!was.locked) ? { locked:true } : {}) };
+      // open: students given an extension (they keep working while the class is locked); only students of this class
+      const kids = new Set(users.filter(u => u.role === 'student' && String(u.period) === period).map(u => u.username));
+      const open = 'open' in b ? [...new Set((Array.isArray(b.open) ? b.open : []).map(String))].filter(u => kids.has(u)) : (Array.isArray(was.open) ? was.open : []);
+      const w = { hidden:'hidden' in b ? !!b.hidden : !!was.hidden, due, ...(('locked' in b ? !!b.locked : !!was.locked) ? { locked:true } : {}), ...(open.length ? { open } : {}) };
       if(!w.hidden && !w.due && !w.locked) delete room.work[p[3]]; else room.work[p[3]] = w;
       await store.saveClass(period, room);
       return send(res, 200, room);
@@ -910,7 +915,8 @@ async function keepVersion(owner, S, text, t, by){
 async function lockedSites(u){
   if(!u || u.role !== 'student' || !u.period) return [];
   const work = (((await store.getClass(String(u.period))) || {}).data || {}).work || {};
-  return Object.values(HTMLLESSONS.SITES).filter(S => (work[S.item] || {}).locked).map(S => S.key);
+  // an extension: a student the teacher let keep working (work[item].open) is not locked
+  return Object.values(HTMLLESSONS.SITES).filter(S => { const w = work[S.item] || {}; return w.locked && !(Array.isArray(w.open) && w.open.includes(u.username)); }).map(S => S.key);
 }
 
 function mergeLearn(old, add){

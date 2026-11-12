@@ -54,6 +54,9 @@
     sureLock:{ en:'Lock this assignment for the whole class? Students can still open and read their page, but nobody can change it, turn it in or unsubmit it until you unlock it.', es:'¿Bloquear esta tarea para toda la clase? Los estudiantes pueden abrir y leer su página, pero nadie puede cambiarla, entregarla ni anular la entrega hasta que la desbloquees.' },
     sureUnlock:{ en:'Unlock this assignment? Students in this class can change their page again.', es:'¿Desbloquear esta tarea? Los estudiantes de esta clase pueden cambiar su página otra vez.' },
     lockedS:{ en:'Locked by your teacher', es:'Bloqueado por tu docente' },
+    extOn:{ en:'Extension', es:'Extensión' }, extOff:{ en:'Locked', es:'Bloqueado' },
+    extOnT:{ en:'Give this student an extension: they can keep working while the class is locked', es:'Dar una extensión: puede seguir trabajando aunque la clase esté bloqueada' },
+    extOffT:{ en:'End the extension: lock this student’s page again', es:'Terminar la extensión: bloquear su página otra vez' },
     hintsAll:{ en:'Hints: everyone', es:'Pistas: todos' }, hintsBehind:{ en:'Hints: behind only', es:'Pistas: solo atrasados' },
     hintsBehindT:{ en:'Hints only for students with under half of Parts 1–3 ticked', es:'Pistas solo para quienes tienen menos de la mitad de las Partes 1–3' },
     sureHintsBehind:{ en:'Add ✏️ To do hints for these students (under half of Parts 1–3 done)? Old hints are replaced; their pages look the same.', es:'¿Agregar pistas ✏️ To do a estos estudiantes (menos de la mitad de las Partes 1–3)? Las pistas viejas se reemplazan; sus páginas se ven igual.' },
@@ -696,6 +699,14 @@
           it.games ? h('div', { class:'cr-games row' }, ...(r.games.length ? r.games.map(g => gameTile(g, h('small', { class:'muted' }, g.blocks + ' 🧩'))) : [h('small', { class:'muted' }, w('noGame'))]))
             : h('div', { class:'cr-st' }, bar(st.pct), h('small', {}, st.text)), h('span', { class:'grow' }),
           stateChip(st, it),
+          // an extension: this student keeps working while the assignment is locked for the class
+          it.site && setting(it).locked ? h('button', { class:'btn small cr-ext' + ((setting(it).open || []).includes(r.username) ? ' on' : ''), type:'button',
+            title:(setting(it).open || []).includes(r.username) ? w('extOffT') : w('extOnT'), onclick:async e => {
+              const set = setting(it), open = set.open || [], has = open.includes(r.username);
+              e.target.disabled = true;
+              try { room = await put('/room/' + period + '/work/' + it.id, { ...set, open:has ? open.filter(u => u !== r.username) : [...open, r.username] }); } catch(x){ e.target.disabled = false; return; }
+              studentWork(period, it, box);
+            } }, (setting(it).open || []).includes(r.username) ? '🔓 ' + w('extOn') : '🔒 ' + w('extOff')) : null,
           it.site === 'site' && !setting(it).locked && canHint(r) ? h('button', { class:'btn small cr-hint' + (isBehind(r) ? ' behind' : ''), type:'button', title:(isBehind(r) ? w('behindT') + ' · ' : '') + w('hintOneT'),
             onclick:hintsFor(period, it, box, [r.username], w('sureHintOne') + ' ' + r.name + '?') }, '✏️') : null,
           it.turnin ? (st.state === 'done'

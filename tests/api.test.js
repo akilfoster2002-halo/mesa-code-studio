@@ -658,6 +658,16 @@ test('Locking a typed page: the teacher locks My Resume for a class; students re
   await call(ana.cookie, '/learn', { method:'PUT', body:JSON.stringify({ data:{ html:{ site:page + '<p>Fixed by teacher</p>' } } }) });   // (ignored: locked)
   assert.strictEqual((await call(ana.cookie, '/page/ana/site', { method:'PUT', body:JSON.stringify({ base:page, text:'student' }) })).status, 423);   // still locked for her
   await call(t.cookie, '/page/ana/site', { method:'PUT', body:JSON.stringify({ base:page + '<p>Fixed by teacher</p>', text:page }) });               // back as it was
+  // an extension: one student keeps working while the class stays locked (only students of this class)
+  const ext = await (await call(t.cookie, '/room/2/work/site', { method:'PUT', body:JSON.stringify({ open:['ana', 'cara'] }) })).json();
+  assert.deepStrictEqual(ext.work.site, { hidden:false, due:'2026-11-11', locked:true, open:['ana'] });
+  assert.strictEqual((await call(ana.cookie, '/page/ana/site', { method:'PUT', body:JSON.stringify({ base:page, text:page + '<p>more</p>' }) })).status, 200);
+  assert.deepStrictEqual((await (await call(ana.cookie, '/room/2')).json()).work.site, { hidden:false, due:'2026-11-11', locked:false, extension:true });
+  const dev = await login('dev', 'bear55');
+  assert.deepStrictEqual((await (await call(dev.cookie, '/room/2')).json()).work.site, { hidden:false, due:'2026-11-11', locked:true });   // no names shown to classmates
+  assert.strictEqual((await call(dev.cookie, '/page/dev/site', { method:'PUT', body:JSON.stringify({ base:'', text:'x' }) })).status, 423);
+  await call(ana.cookie, '/page/ana/site', { method:'PUT', body:JSON.stringify({ base:page + '<p>more</p>', text:page }) });
+  await call(t.cookie, '/room/2/work/site', { method:'PUT', body:JSON.stringify({ open:[] }) });
   const open = await (await call(t.cookie, '/room/2/work/site', { method:'PUT', body:JSON.stringify({ locked:false }) })).json();
   assert.deepStrictEqual(open.work.site, { hidden:false, due:'2026-11-11' });
   assert.strictEqual((await call(ana.cookie, '/page/ana/site', { method:'PUT', body:JSON.stringify({ base:page, text:page + '!' }) })).status, 200);
