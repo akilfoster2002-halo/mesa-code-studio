@@ -446,7 +446,7 @@
 <head>
   <!-- The name on the browser tab: your game's title -->
   <title>Your Game Title</title>
-  <style>
+  <style> /* this is where you write your css code */
     /* The whole page: background color, text color and font */
     body {
 
@@ -467,9 +467,13 @@
     section {
 
     }
+    /* The top of the page: title, tagline, cover picture and button */
+    header {
+
+    }
   </style>
 </head>
-<body>
+<body> <!-- this is where your HTML starts -->
   <!-- 1. Top of the page: game title, a one-sentence tagline, a cover picture, a "How to play" button -->
 
   <!-- 2. How to play: the goal, every key and what it does, how you win, how you lose -->
