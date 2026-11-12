@@ -36,6 +36,8 @@
     save:{ en:'Save & refresh', es:'Guardar y actualizar' }, back:{ en:'Classroom', es:'Clase' },
     page:{ en:'Your page', es:'Tu página' }, code:{ en:'Your code', es:'Tu código' },
     turnedIn:{ en:'Turned in. To make changes, Unsubmit in the Classroom.', es:'Entregado. Para hacer cambios, anula la entrega en la Clase.' },
+    teacherEdit:{ en:'You are editing this student’s page as the teacher. Your changes save to their page and show in its History.', es:'Estás editando la página de este estudiante como docente. Tus cambios se guardan en su página y aparecen en su historial.' },
+    teacherLocked:{ en:'(Locked for the student.)', es:'(Bloqueada para el estudiante.)' }, teacherIn:{ en:'(Turned in.)', es:'(Entregada.)' },
     lockedT:{ en:'Locked by your teacher. You can look at your page but not change it.', es:'Bloqueado por tu docente. Puedes ver tu página pero no cambiarla.' },
     viewing:{ en:'Viewing', es:'Viendo' }, readOnly:{ en:'read only', es:'solo lectura' },
     login:{ en:'Log in to the Classroom first.', es:'Primero inicia sesión en la Clase.' }, open:{ en:'Open the Classroom', es:'Abrir la Clase' },
@@ -130,7 +132,7 @@
     let r;
     try { r = await api(doc); }
     catch(e){ return app.replaceChildren(h('div', { class:'rs-msg' }, h('b', {}, '🔒 ' + w('notShared')), h('a', { class:'rs-btn primary', href:'/' }, w('open')))); }
-    const mine = owner === me.username, turnedIn = !!r.in, locked = !!r.locked, readOnly = turnedIn || locked || !r.canEdit;
+    const mine = owner === me.username, turnedIn = !!r.in, locked = !!r.locked, readOnly = teacherView ? false : turnedIn || locked || !r.canEdit;
     // the Website Presentation starts as the Mario page (saved as soon as it opens)
     const fresh = !r.text && !!S.start && mine && !readOnly;
     editor({ me, doc, mine, text:fresh ? S.start : r.text, base:r.text, owner:r.owner, with:r.with || [], here:r.here || [], files:r.files || {},
@@ -244,7 +246,7 @@
         people(r.here || [], r.with || o.with);
         if(r.files && JSON.stringify(r.files) !== JSON.stringify(o.files)){ o.files = r.files; drawFiles(); refresh(); }   // a classmate added a picture
         if(!o.readOnly) setStatus(ed.value === base ? 'saved' : 'edited');
-        if((r.in || r.locked) && !o.readOnly) return location.reload();
+        if((r.in || r.locked) && !o.readOnly && !o.teacherView) return location.reload();
       } catch(e){
         if(e.status === 423) return location.reload();          // turned in: read only now
         if(!o.readOnly) setStatus('offline');
@@ -347,7 +349,7 @@
             try { o.files = (await fileApi('/' + encodeURIComponent(n), { method:'DELETE' })).files; drawFiles(); refresh(); } catch(e){}
           } }, '✕') : null)),
         o.readOnly ? '' : h('button', { class:'rs-btn small', type:'button', title:w('picHint'), onclick:() => picker.click() }, '＋ ' + w('addPic')),
-        o.readOnly ? '' : h('button', { class:'rs-btn small', type:'button', title:w('fromDrive'), onclick:fromDrive }, '☁️ ' + w('drive')));
+        o.readOnly || o.teacherView ? '' : h('button', { class:'rs-btn small', type:'button', title:w('fromDrive'), onclick:fromDrive }, '☁️ ' + w('drive')));
     };
     const picker = h('input', { type:'file', accept:'image/*', hidden:true, onchange:e => { addPicture(e.target.files[0]); e.target.value = ''; } });
     // students type their code themselves: no copying, cutting or pasting text (pictures still paste
@@ -447,7 +449,8 @@
         o.readOnly ? null : status, h('span', { class:'grow' }), hereBox, shareBtn, histBtn, langBtn, back,
         o.readOnly ? null : picker,
         o.readOnly ? null : h('button', { class:'rs-btn primary', type:'button', onclick:save, title:'Ctrl+S' }, '💾 ' + w('save'), h('kbd', {}, /Mac/.test(navigator.platform) ? '⌘S' : 'Ctrl S'))),
-      o.locked && !o.teacherView ? h('div', { class:'rs-banner' }, '🔒 ' + w('lockedT')) : o.turnedIn ? h('div', { class:'rs-banner' }, '🔒 ' + w('turnedIn')) : null,
+      o.teacherView ? h('div', { class:'rs-banner teach' }, '✏️ ' + w('teacherEdit') + (o.locked ? ' ' + w('teacherLocked') : o.turnedIn ? ' ' + w('teacherIn') : '')) :
+      o.locked ? h('div', { class:'rs-banner' }, '🔒 ' + w('lockedT')) : o.turnedIn ? h('div', { class:'rs-banner' }, '🔒 ' + w('turnedIn')) : null,
       filesBar,
       h('main', { class:'rs-main' },
         h('section', { class:'rs-pane rs-code' }, h('div', { class:'rs-pane-h' }, h('span', { class:'rs-dot' }), w('code'), h('span', { class:'grow' }), pos),

@@ -649,6 +649,15 @@ test('Locking a typed page: the teacher locks My Resume for a class; students re
   assert.strictEqual((await call(ana.cookie, '/page/ana/site/files', { method:'POST', body:JSON.stringify({ name:'a.png', id:'0'.repeat(64) }) })).status, 423);
   assert.strictEqual((await (await call(ana.cookie, '/page/ana/game')).json()).locked, false);        // the other pages are not locked
   assert.strictEqual((await call(t.cookie, '/room/2/hints', { method:'POST', body:'{}' })).status, 423);   // no hints into a locked page
+  // the teacher can still change a student's page: locked for the class, and turned in too
+  const byTeacher = await call(t.cookie, '/page/ana/site', { method:'PUT', body:JSON.stringify({ base:page, text:page + '<p>Fixed by teacher</p>' }) });
+  assert.strictEqual(byTeacher.status, 200);
+  assert.strictEqual((await (await call(t.cookie, '/page/ana/site')).json()).canEdit, true);
+  const hist = await (await call(t.cookie, '/page/ana/site/history')).json();
+  assert.ok(hist.people.some(x => x.username === 'teach'));                                          // the History shows the teacher's lines
+  await call(ana.cookie, '/learn', { method:'PUT', body:JSON.stringify({ data:{ html:{ site:page + '<p>Fixed by teacher</p>' } } }) });   // (ignored: locked)
+  assert.strictEqual((await call(ana.cookie, '/page/ana/site', { method:'PUT', body:JSON.stringify({ base:page, text:'student' }) })).status, 423);   // still locked for her
+  await call(t.cookie, '/page/ana/site', { method:'PUT', body:JSON.stringify({ base:page + '<p>Fixed by teacher</p>', text:page }) });               // back as it was
   const open = await (await call(t.cookie, '/room/2/work/site', { method:'PUT', body:JSON.stringify({ locked:false }) })).json();
   assert.deepStrictEqual(open.work.site, { hidden:false, due:'2026-11-11' });
   assert.strictEqual((await call(ana.cookie, '/page/ana/site', { method:'PUT', body:JSON.stringify({ base:page, text:page + '!' }) })).status, 200);
@@ -682,10 +691,10 @@ test('Website Presentation: a page shared with a classmate; both type in it at t
   const start = '<h1>Elsa</h1>\n<p>She has ice powers.</p>\n';
   await call(a.cookie, '/page/ana/wiki', { method:'PUT', body:JSON.stringify({ base:'', text:start }) });
   const now = (await (await call(a.cookie, '/page/ana/wiki')).json()).text;
-  // not shared yet: a classmate cannot open it; a teacher can read it
+  // not shared yet: a classmate cannot open it; a teacher can read and edit it
   assert.strictEqual((await call(d.cookie, '/page/ana/wiki')).status, 404);
-  assert.strictEqual((await (await call(t.cookie, '/page/ana/wiki')).json()).canEdit, false);
-  assert.strictEqual((await call(t.cookie, '/page/ana/wiki', { method:'PUT', body:JSON.stringify({ base:now, text:'x' }) })).status, 405);
+  assert.strictEqual((await (await call(t.cookie, '/page/ana/wiki')).json()).canEdit, true);
+  assert.strictEqual((await call(t.cookie, '/page/ana/wiki', { method:'PUT', body:JSON.stringify({ base:now, text:now }) })).status, 200);
   // share: only classmates in the same period stay on the list
   assert.deepStrictEqual((await (await call(a.cookie, '/page/wiki/share', { method:'POST', body:JSON.stringify({ with:['dev', 'cara', 'teach'] }) })).json()).with, ['dev']);
   assert.strictEqual((await call(c.cookie, '/page/ana/wiki')).status, 404);

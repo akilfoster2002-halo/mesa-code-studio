@@ -174,3 +174,4 @@ body{background:var(--bg);color:var(--ink);font:14px/1.4 'Google Sans',Roboto,sy
 .rs-fold:hover{background:#f1f3f4;color:#3c4043}
 .rs-fold b{color:#137333}
 .rs-fold-i{font-size:10px;width:10px}
+.rs-banner.teach{background:#e6f4ea;color:#0d652d}

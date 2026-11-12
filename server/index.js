@@ -682,17 +682,16 @@ async function api(req, res, url){
     const doc = owner.username + '/' + S.key;
     const locked = (await lockedSites(owner)).includes(S.key);
     const out = (h, text, sel) => ({ text, h:MERGE.hash(text), in:h[S.key + 'In'] || null, locked, who:S.who ? h[S.who] || '' : undefined,
-      owner:{ username:owner.username, name:owner.name }, with:h[S.key + 'Share'] || [], files:h[S.key + 'Files'] || {}, here:here(doc, teacher ? null : user, sel), canEdit:!teacher });
+      owner:{ username:owner.username, name:owner.name }, with:h[S.key + 'Share'] || [], files:h[S.key + 'Files'] || {}, here:here(doc, teacher ? null : user, sel), canEdit:true });
     if(p[3] === 'files'){
-      if(teacher) return send(res, 403, { error:'teacher' });
-      if(locked) return send(res, 423, { error:'locked' });
+      if(locked && !teacher) return send(res, 423, { error:'locked' });
       const name = String(m === 'DELETE' ? decodeURIComponent(p[4] || '') : '').toLowerCase();
       const b = m === 'POST' && !p[4] ? await readJSON(req, 2000) : null;
       if(b && (!H.FILE_NAME.test(String(b.name || '')) || !/^[a-f0-9]{64}$/.test(String(b.id || '')) || !(await store.hasAsset(b.id)))) return send(res, 400, { error:'file' });
       if(!b && !(m === 'DELETE' && name)) return send(res, 405, { error:'method' });
       const r = await withLearn(owner.username, async () => {
         const d = (await store.getLearn(owner.username) || {}).data || {}, h = d.html || {};
-        if(h[S.key + 'In']) return { locked:true };
+        if(h[S.key + 'In'] && !teacher) return { locked:true };       // turned in (a teacher can still change it)
         const files = { ...(h[S.key + 'Files'] || {}) };
         if(b){ if(!files[b.name.toLowerCase()] && Object.keys(files).length >= 40) return { full:true }; files[b.name.toLowerCase()] = b.id; }
         else delete files[name];
@@ -711,13 +710,13 @@ async function api(req, res, url){
       if(same) return send(res, 200, { same:true, in:x[S.key + 'In'] || null, locked, with:x[S.key + 'Share'] || [], files:x[S.key + 'Files'] || {}, here:here(doc, teacher ? null : user, sel) });
       return send(res, 200, out(x, text));
     }
-    if(m === 'PUT' && !teacher){
+    if(m === 'PUT'){
       const b = await readJSON(req, 3 * H.SITE_MAX);
-      if(locked) return send(res, 423, { error:'locked', ...out(x, x[S.key] || '') });
+      if(locked && !teacher) return send(res, 423, { error:'locked', ...out(x, x[S.key] || '') });
       if(typeof b.base !== 'string' || typeof b.text !== 'string') return send(res, 400, { error:'text' });
       const r = await withLearn(owner.username, async () => {
         const d = (await store.getLearn(owner.username) || {}).data || {}, h = d.html || {};
-        if(h[S.key + 'In']) return { locked:true, h };                    // turned in
+        if(h[S.key + 'In'] && !teacher) return { locked:true, h };        // turned in (a teacher can still change it)
         const now = h[S.key] || '';
         const text = MERGE.merge3(b.base, b.text, now).slice(0, H.SITE_MAX);
         if(text !== now){
