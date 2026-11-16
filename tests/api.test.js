@@ -810,3 +810,31 @@ test('Website Presentation: classmates see where each other’s cursor is, and i
   assert.deepStrictEqual(a3.here.find(x => x.username === 'dev').sel, [0, 4]);
   await call(a.cookie, '/page/wiki/share', { method:'POST', body:JSON.stringify({ with:[] }) });
 });
+
+test('Review: the teacher loads a whole class’s pages at once and keeps a 1–4 grade only they see', async () => {
+  const s = await login('dev', 'bear55'), t = await login('teach', 'apple-pear');
+  const page = (await (await call(s.cookie, '/learn')).json()).data.html.site || '';         // their page, as saved by the tests above
+  assert.strictEqual((await call(s.cookie, '/room/2/review/site')).status, 403);                 // students cannot
+  const r = await (await call(t.cookie, '/room/2/review/site')).json();
+  const dev = r.students.find(x => x.username === 'dev');
+  assert.deepStrictEqual([r.site, dev.text, dev.grade, r.students.every(x => x.username !== 'cara')], ['site', page, null, true]);
+  assert.strictEqual((await call(t.cookie, '/room/2/review/nope')).status, 404);
+  assert.strictEqual((await call(t.cookie, '/room/2/review/constructor')).status, 404);
+  const grade = g => call(t.cookie, '/room/2/review/site/dev', { method:'PUT', body:JSON.stringify({ grade:g }) });
+  assert.strictEqual((await grade(7)).status, 400);
+  assert.strictEqual((await call(t.cookie, '/room/2/review/site/cara', { method:'PUT', body:JSON.stringify({ grade:2 }) })).status, 404);   // not in period 2
+  assert.deepStrictEqual(await (await grade(2)).json(), { username:'dev', grade:2 });
+  // other class settings saved later keep the grade; a student never sees it
+  await call(t.cookie, '/room/2/work/site', { method:'PUT', body:JSON.stringify({ due:'2026-12-01' }) });
+  assert.strictEqual((await (await call(t.cookie, '/room/2/review/site')).json()).students.find(x => x.username === 'dev').grade, 2);
+  // a student never sees a Review grade: not in their class, not in Grades, not with their own work, and cannot set one
+  const seen = JSON.stringify(await (await call(s.cookie, '/room/2')).json()) + JSON.stringify(await (await call(s.cookie, '/learn')).json());
+  assert.ok(!/reviews|"grade":2/.test(seen));
+  assert.strictEqual((await call(s.cookie, '/room/2/grades')).status, 403);
+  assert.strictEqual((await call(s.cookie, '/room/2/review/site/dev', { method:'PUT', body:JSON.stringify({ grade:4 }) })).status, 403);
+  assert.strictEqual((await call(s.cookie, '/room/2/work/site', { method:'PUT', body:JSON.stringify({ due:null }) })).status, 403);
+  await grade(null);
+  assert.strictEqual((await (await call(t.cookie, '/room/2/review/site')).json()).students.find(x => x.username === 'dev').grade, null);
+  await call(t.cookie, '/room/2/work/site', { method:'PUT', body:JSON.stringify({ due:null }) });
+  assert.strictEqual((await fetch(base + '/review')).status, 200);
+});

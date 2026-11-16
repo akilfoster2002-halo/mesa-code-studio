@@ -170,6 +170,7 @@ function serveStatic(req, res, pathname){
   if(pathname === '/learn' || pathname === '/learn/') pathname = '/learn.html';
   if(pathname === '/html' || pathname === '/html/') pathname = '/html.html';
   if(/^\/(resume|wiki|game)\/?$/.test(pathname)) pathname = '/resume.html';   // one editor for both pages
+  if(pathname === '/review' || pathname === '/review/') pathname = '/review.html';     // the teacher's Review page
   if(pathname === '/drive' || pathname === '/drive/') pathname = '/drive.html';
   const file = path.normalize(path.join(PUBLIC, decodeURIComponent(pathname)));
   if(!file.startsWith(PUBLIC)) return send(res, 403, 'forbidden');
@@ -352,13 +353,14 @@ async function api(req, res, url){
     if(!/^[\w-]{1,20}$/.test(period)) return send(res, 400, { error:'period' });
     const cls = (await store.getClass(period) || {}).data || {};
     const room = { posts:Array.isArray(cls.posts) ? cls.posts : [], work:cls.work && typeof cls.work === 'object' ? cls.work : {},
-      assignments:Array.isArray(cls.assignments) ? cls.assignments : [] };
+      assignments:Array.isArray(cls.assignments) ? cls.assignments : [],
+      ...(cls.reviews && typeof cls.reviews === 'object' ? { reviews:cls.reviews } : {}) };      // the teacher's Review grades (never sent to students)
     // an assignment with `to` (usernames) is only for those students; without it, the whole class
     const isFor = (a, username) => !Array.isArray(a.to) || !a.to.length || a.to.includes(username);
     const kidsOf = () => users.filter(u => u.role === 'student' && !u.disabled && String(u.period) === period);
     if(!p[2] && m === 'GET') return send(res, 200, teacher
       ? { ...room, students:kidsOf().map(u => ({ username:u.username, name:u.name })).sort((x, y) => x.name.localeCompare(y.name)) }
-      : { ...room, assignments:room.assignments.filter(a => isFor(a, user.username)),
+      : { posts:room.posts, assignments:room.assignments.filter(a => isFor(a, user.username)),
           work:Object.fromEntries(Object.entries(room.work).map(([k, v]) => { const { open, ...rest } = v || {};
             return [k, { ...rest, ...(rest.locked && Array.isArray(open) && open.includes(user.username) ? { locked:false, extension:true } : {}) }]; })) });
 
@@ -388,6 +390,41 @@ async function api(req, res, url){
         if(typeof r === 'number') out.added.push({ username:u.username, name:u.name, hints:r }); else out[r]++;
       }
       return send(res, 200, out);
+    }
+
+    /* REVIEW (teacher): every student's typed page for one assignment, in one go, for /review
+         GET /api/room/:p/review/:site            each student: the page, its files, turned in, extension,
+                                                   last saved, a big drop in its length, and my grade
+         PUT /api/room/:p/review/:site/:username  { grade: 1–4 | null }   my grade, kept with the class */
+    if(p[2] === 'review' && HTMLLESSONS.SITES[p[3]] && Object.prototype.hasOwnProperty.call(HTMLLESSONS.SITES, p[3])){
+      if(!teacher) return send(res, 403, { error:'teacher' });
+      const S = HTMLLESSONS.SITES[p[3]], set = room.work[S.item] || {}, grades = (room.reviews || {})[S.key] || {};
+      if(p[4] && !p[5] && m === 'PUT'){
+        if(!kidsOf().some(u => u.username === p[4])) return send(res, 404, { error:'none' });
+        const b = await readJSON(req, 500), g = b.grade == null || b.grade === '' ? null : Number(b.grade);
+        if(g !== null && ![1, 2, 3, 4].includes(g)) return send(res, 400, { error:'grade' });
+        const cur = await store.getClass(period), data = { ...((cur || {}).data || {}) };      // the newest copy: only this grade changes
+        const reviews = { ...(data.reviews || {}) }, mine = { ...(reviews[S.key] || {}) };
+        if(g === null) delete mine[p[4]]; else mine[p[4]] = g;
+        reviews[S.key] = mine; await store.saveClass(period, { ...data, reviews });
+        return send(res, 200, { username:p[4], grade:g });
+      }
+      if(p[4] || m !== 'GET') return send(res, 405, { error:'method' });
+      const learn = Object.fromEntries((await store.listLearn()).map(d => [d.owner, (d.data || {}).html || {}]));
+      const open = new Set(Array.isArray(set.open) ? set.open : []);
+      const students = [];
+      for(const u of kidsOf().sort((a, b) => a.name.localeCompare(b.name))){
+        const x = learn[u.username] || {}, text = x[S.key] || '';
+        const vs = text ? (await store.listPageVersions(u.username, S.key)).slice().reverse() : [];     // oldest first
+        // a big drop: most of the page gone at once (deleted by mistake?) and not typed back since
+        let top = 0, drop = null;
+        for(const v of vs){ if(top >= 400 && v.len < top * 0.4) drop = { at:v.created, from:top, to:v.len }; top = Math.max(top, v.len); }
+        if(drop && text.length >= drop.from * 0.6) drop = null;
+        students.push({ username:u.username, name:u.name, text, files:x[S.key + 'Files'] || {}, in:x[S.key + 'In'] || null,
+          extension:!!set.locked && open.has(u.username), saved:vs.length ? vs[vs.length - 1].updated || vs[vs.length - 1].created : null,
+          versions:vs.length, drop, grade:grades[u.username] || null, ...(S.who ? { who:x[S.who] || '' } : {}) });
+      }
+      return send(res, 200, { site:S.key, item:S.item, period, locked:!!set.locked, due:set.due || null, students });
     }
 
     /* a teacher's assignment: students attach HTML files and turn them in */

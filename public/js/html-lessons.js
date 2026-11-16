@@ -572,11 +572,62 @@
     return Object.fromEntries(Object.values(SITES).map(x => [x.key, { ...x.info(html[x.key], x.who ? html[x.who] : ''), in:html[x.key + 'In'] || null,
       ...(x.who ? { who:html[x.who] || '' } : {}), ...(x.share ? { with:html[x.key + 'Share'] || [] } : {}) }])); };
 
+  /* MY RESUME RUBRIC — the level (1–4) a teacher's Review page suggests for a resume.html:
+       1 Identify & Define     Part 1 complete or nearly complete
+       2 Use & Organize        Parts 1–2 complete, Part 3 in progress
+       3 Investigate & Construct  Parts 1–4 complete
+       4 Design & Create       Parts 1–5 complete + clean code + something beyond the model page
+     The checklist, read the way the rubric reads it: the [placeholders] box is left out (the rubric
+     asks for the real school email), and About Me / Contact accept small wording differences. */
+  const RUBRIC_TESTS = {
+    about:s => /<h2[^>]*>\s*(?:about|sobre m)[^<]*<\/h2>/i.test(s),
+    aboutp:s => /<h2[^>]*>\s*(?:about|sobre m)[^<]*<\/h2>\s*<p[^>]*>[\s\S]*?\S[\s\S]*?<\/p>/i.test(s),
+    contact:s => /<h2[^>]*>\s*(?:contacts?|contacto)\s*<\/h2>/i.test(s),
+    br:s => { const m = s.match(/<h2[^>]*>\s*(?:contacts?|contacto)\s*<\/h2>((?:(?!<h2|<\/section)[\s\S])*)/i);
+      return !!m && /\S+@\S+\.\w/.test(m[1]) && /mesa|school|charter|academy|escuela/i.test(m[1].replace(/\S+@\S+/g, '')); }
+  };
+  const RUBRIC_PARTS = SITE_PARTS.filter(p => p.id !== 'brackets').map(p => RUBRIC_TESTS[p.id] ? { ...p, test:RUBRIC_TESTS[p.id],
+    say:p.id === 'br' ? { en:'Your school email and your school in Contact', es:'Tu correo escolar y tu escuela en Contacto' } : p.say } : p);
+  const RUBRIC_LEVELS = { 1:'Identify & Define', 2:'Use & Organize', 3:'Investigate & Construct', 4:'Design & Create' };
+  const EXTRA_TAGS = ['a', 'h3', 'h4', 'strong', 'b', 'i', 'u', 'span', 'div', 'table', 'hr', 'figure', 'figcaption', 'video', 'iframe', 'button', 'nav', 'blockquote'];
+  const MODEL_SELS = ['body', 'h1', 'h2', 'li', 'img', 'section', 'header', 'footer', 'ul', 'ol', 'p'];
+  function resumeLevel(s){
+    s = typeof s === 'string' ? s : '';
+    const groups = [1, 2, 3, 4, 5].map(n => { const ps = RUBRIC_PARTS.filter(p => p.group === n), miss = ps.filter(p => !p.test(s));
+      return { n, total:ps.length, done:ps.length - miss.length, missing:miss.map(p => p.id) }; });
+    const g = n => groups[n - 1], full = n => !g(n).missing.length, upTo = n => groups.slice(0, n).every(x => !x.missing.length);
+    // clean code: one page, nothing after </html>, no starter code, every list closed
+    const flags = [];
+    if((s.match(/<html[\s>]/gi) || []).length > 1 || (s.match(/<body[\s>]/gi) || []).length > 1) flags.push('The page is pasted in twice (two <html> or <body> tags)');
+    if(/<\/html>\s*\S/i.test(s)) flags.push('Code after </html>');
+    if(/my first (?:heading|paragraph)/i.test(s)) flags.push('Starter code left in ("My first heading")');
+    if((s.match(/<[uo]l[\s>]/gi) || []).length !== (s.match(/<\/[uo]l>/gi) || []).length) flags.push('A list is not closed (<ul>/<ol> without its closing tag)');
+    // beyond the model page: other tags, or CSS for other selectors (classes, ids, :hover…)
+    const tags = [...new Set((s.match(/<([a-z][a-z0-9]*)/gi) || []).map(t => t.slice(1).toLowerCase()))].filter(t => EXTRA_TAGS.includes(t));
+    const sels = [];
+    STYLE(s).replace(/([^{}]+)\{[^{}]*\}/g, (m, x) => { for(const y of x.split(',')){ const t = y.trim().toLowerCase();
+      if(t && (/[:.#\s>]/.test(t) || !MODEL_SELS.includes(t)) && !sels.includes(t)) sels.push(t); } return m; });
+    const extras = [...tags.map(t => '<' + t + '>'), ...sels.slice(0, 6).map(t => t + ' { }')];
+    const empty = !s.trim();
+    let level = empty ? 0 : upTo(5) && !flags.length && extras.length ? 4 : upTo(4) ? 3 : upTo(2) ? 2 : 1;
+    let why = empty ? 'Nothing typed yet' :
+      level === 4 ? 'Parts 1–5 complete, clean code, and design elements beyond the model page: confirm they are original' :
+      level === 3 ? (upTo(5) ? 'Parts 1–5 complete, but ' + (flags.length ? 'the code is not clean' : 'nothing beyond the model page yet') : 'Parts 1–4 complete') :
+      level === 2 ? 'Parts 1–2 complete, Part 3 in progress' :
+      !full(1) ? 'Part 1 not complete' : 'Part 2 not complete';
+    // what the next level still needs (the boxes, or the clean-code / design step)
+    const next = level === 0 || level === 4 ? [] : level === 3 ? (upTo(5) ? [] : groups.slice(0, 5).flatMap(x => x.missing)) :
+      groups.slice(0, level === 2 ? 4 : 2).flatMap(x => x.missing);
+    const close = level > 0 && level < 4 && (next.length === 1 || (level === 3 && upTo(5) && flags.length + (extras.length ? 0 : 1) === 1));
+    return { level, name:RUBRIC_LEVELS[level] || '', why, groups, flags, extras, next, close };
+  }
+
   /* how a score is made out of 100 */
   const score = (right, total) => total ? Math.min(100, Math.round(100 * right / total)) : 0;
 
   const HTMLLESSONS = { ACTS, CARDS, TYPE, CLOSE, MATCH_WORDS, MATCH_TAGS, wrap, BUILD, FIX, PAGE_START, GOALS, score,
     C1_ACTS, C1_WORDS, C1_SORT, C1_ELEMENTS, C1_TAGS, C1_JOBS, C1_PLACE, C1_PAGE, C1_ORDER, C1_EXIT, C1_H1, SITE_MAX, SITE_GROUPS, SITE_PARTS, siteInfo,
-    WIKI_PIC, WIKI_FILES, FILE_NAME, fileName, filesOf, withFiles, WIKI_START, WIKI_GROUPS, WIKI_PARTS, wikiInfo, GAME_START, GAME_GROUPS, GAME_PARTS, gameInfo, SITES, sitesOf };
+    WIKI_PIC, WIKI_FILES, FILE_NAME, fileName, filesOf, withFiles, WIKI_START, WIKI_GROUPS, WIKI_PARTS, wikiInfo, GAME_START, GAME_GROUPS, GAME_PARTS, gameInfo, SITES, sitesOf,
+    RUBRIC_PARTS, RUBRIC_LEVELS, resumeLevel };
   if(typeof module !== 'undefined') module.exports = HTMLLESSONS; else root.HTMLLESSONS = HTMLLESSONS;
 })(this);

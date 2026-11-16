@@ -49,6 +49,7 @@
     gameLocked:{ en:'Locked. You can still play it. To change it, ask your teacher to give it back.', es:'Bloqueado. Todavía puedes jugarlo. Para cambiarlo, pide a tu maestro que te lo devuelva.' },
     noGame:{ en:'No game yet', es:'Aún no hay juego' },
     seeSite:{ en:'See it', es:'Verlo' },
+    review:{ en:'Review all', es:'Revisar todo' }, reviewT:{ en:'Look through every student’s page in one tab, with their progress and the rubric level', es:'Revisa la página de cada estudiante en una pestaña, con su progreso y el nivel de la rúbrica' },
     lockEdit:{ en:'Lock editing', es:'Bloquear cambios' }, unlockEdit:{ en:'Unlock editing', es:'Desbloquear cambios' },
     lockT:{ en:'Students in this class can open their page but not change it, turn it in or unsubmit it', es:'Los estudiantes de esta clase pueden abrir su página pero no cambiarla, entregarla ni anular la entrega' },
     sureLock:{ en:'Lock this assignment for the whole class? Students can still open and read their page, but nobody can change it, turn it in or unsubmit it until you unlock it.', es:'¿Bloquear esta tarea para toda la clase? Los estudiantes pueden abrir y leer su página, pero nadie puede cambiarla, entregarla ni anular la entrega hasta que la desbloquees.' },
@@ -675,6 +676,8 @@
     box.replaceChildren(h('section', { class:'cr-topic' }, h('h2', { class:'cr-topic-h' }, w('studentWork'),
         h('small', { class:'cr-n' }, n + ' ' + (it.turnin ? w('turnedIn') : w('done')).toLowerCase() + ' · ' + rows.length + ' ' + w('students').toLowerCase()),
         it.turnin && n < rows.length ? h('button', { class:'btn small cr-allin', type:'button', onclick:turn('lock', { locked:true, period }, w('sureAllIn')) }, '🔒 ' + w('allIn')) : null,
+        // Review: every student's page in one tab, one after another (or a grid), with progress and the rubric level
+        it.site ? h('a', { class:'btn small cr-allin primary', href:'/review?p=' + encodeURIComponent(period) + '&s=' + it.site, target:'_blank', rel:'noopener', title:w('reviewT') }, '🔎 ' + w('review') + ' ↗') : null,
         // a typed page (My Resume, Website Presentation, Game Website): the teacher locks it for this class
         it.site ? h('button', { class:'btn small cr-allin' + (setting(it).locked ? ' on' : ''), type:'button', title:w('lockT'), onclick:async e => {
           const set = setting(it);
