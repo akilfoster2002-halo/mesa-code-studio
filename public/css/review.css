@@ -69,6 +69,7 @@ button,select{font:inherit}
 .rv-frame{flex:1;width:100%;border:0;background:#fff;border-radius:4px;box-shadow:0 2px 12px rgba(0,0,0,.4)}
 .rv-code{flex:1;min-width:0;display:flex;overflow:auto;background:var(--code-bg)}
 .rv-stage.both .rv-code{flex:1}
+.rv-editor{flex:1;width:100%;border:0;background:#fff}
 .rv-code pre{margin:0;padding:14px 12px;font:14px/1.55 var(--mono);color:var(--code-ink);white-space:pre}
 .rv-gut{background:var(--code-gut);color:#555a73;text-align:right;user-select:none;position:sticky;left:0}
 .rv-src{flex:1}

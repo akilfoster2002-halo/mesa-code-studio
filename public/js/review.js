@@ -111,7 +111,7 @@
     period = q.get('p') && periods.includes(q.get('p')) ? q.get('p') : periods[0];
     S = HL.SITES[Object.prototype.hasOwnProperty.call(HL.SITES, q.get('s')) ? q.get('s') : 'site'];
     view = q.get('v') === 'grid' ? 'grid' : 'one';
-    mode = ['page', 'code', 'both'].includes(store.get('mode')) ? store.get('mode') : 'page';
+    mode = ['page', 'code', 'both', 'editor'].includes(store.get('mode')) ? store.get('mode') : 'page';
     sort = ['az', 'level'].includes(store.get('sort')) ? store.get('sort') : 'az';
     if(!period) return app.replaceChildren(h('div', { class:'rv-msg' }, h('b', {}, 'No classes yet.')));
     await load(q.get('u'), periods);
@@ -141,7 +141,14 @@
   }
   const url = () => { const q = new URLSearchParams({ p:period, s:S.key }); if(view === 'grid') q.set('v', 'grid');
     else if(d.students[cur]) q.set('u', d.students[cur].username); history.replaceState(null, '', '/review?' + q); };
-  function go(n){ if(!d.students.length) return; cur = (cur + n + d.students.length) % d.students.length; drawOne(); }
+  function go(n){ if(!d.students.length) return; const was = d.students[cur]; cur = (cur + n + d.students.length) % d.students.length; drawOne(); if(mode === 'editor') fresh(was); }
+  // after the editor (where the teacher can type in the page), get that student's page as it is now
+  async function fresh(st){
+    try { const r = await api('/page/' + encodeURIComponent(st.username) + '/' + S.key); st.text = r.text || ''; st.files = r.files || {}; }
+    catch(e){ return; }
+    st.p = progress(S, st); P = d.students.map(x => x.p);
+    if(view === 'one' && d.students[cur] === st && mode !== 'editor') drawOne();
+  }
   function setView(v){ view = v; draw(); }
 
   /* ------------------------------------------------------------- the top */
@@ -185,8 +192,9 @@
     frame.srcdoc = st.text.trim() ? HL.withFiles(st.text, files, location.origin) : '<p style="font:15px system-ui;color:#5f6368;padding:24px">Nothing typed yet.</p>';
     const lines = st.text.split('\n');
     const code = h('div', { class:'rv-code' }, h('pre', { class:'rv-gut' }, lines.map((x, i) => i + 1).join('\n')), h('pre', { class:'rv-src', html:paint(st.text) || ' ' }));
-    const modes = h('div', { class:'rv-seg small' }, ...[['page', 'Page'], ['code', 'Code'], ['both', 'Both']].map(([v, t]) =>
-      h('button', { type:'button', class:mode === v ? 'on' : '', onclick:() => { mode = v; store.set('mode', v); drawOne(); } }, t)));
+    const modes = h('div', { class:'rv-seg small' }, ...[['page', 'Page'], ['code', 'Code'], ['both', 'Both'], ['editor', 'Editor']].map(([v, t]) =>
+      h('button', { type:'button', class:mode === v ? 'on' : '', title:v === 'editor' ? 'Their editor, as they see it, with History (what you type here changes their page)' : null,
+        onclick:() => { const left = mode === 'editor' && v !== 'editor'; mode = v; store.set('mode', v); drawOne(); if(left) fresh(st); } }, t)));
     const pick = h('select', { class:'rv-sel rv-who-sel', 'aria-label':'Student', onchange:e => { cur = Number(e.target.value); drawOne(); } },
       ...d.students.map((x, i) => h('option', { value:i, selected:i === cur }, x.name + (P[i].level != null ? '  ·  ' + (P[i].level || '–') : ''))));
     const bar1 = h('div', { class:'rv-bar1' },
@@ -198,7 +206,10 @@
       h('a', { class:'rv-btn ghost', href:S.path + '?u=' + encodeURIComponent(st.username), target:'_blank', rel:'noopener', title:'Open their page in the editor (History is there too)' }, 'Open in editor ↗'),
       h('span', { class:'grow' }), modes,
       h('span', { class:'rv-state ' + s.cls }, s.text));
-    const stage = h('div', { class:'rv-stage ' + mode }, mode !== 'code' ? h('div', { class:'rv-pagebox' }, frame) : null, mode !== 'page' ? code : null);
+    // Editor: the student's own editor (the code they typed, the page beside it, 🕘 History), right here
+    const stage = mode === 'editor'
+      ? h('div', { class:'rv-stage editor' }, h('iframe', { class:'rv-editor', src:S.path + '?u=' + encodeURIComponent(st.username), title:st.name + '’s editor' }))
+      : h('div', { class:'rv-stage ' + mode }, mode !== 'code' ? h('div', { class:'rv-pagebox' }, frame) : null, mode !== 'page' ? code : null);
     box.replaceChildren(h('div', { class:'rv-one' }, bar1, h('div', { class:'rv-split' }, stage, panel(st, p, s))));
   }
 
