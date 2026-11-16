@@ -591,17 +591,22 @@
   const RUBRIC_LEVELS = { 1:'Identify & Define', 2:'Use & Organize', 3:'Investigate & Construct', 4:'Design & Create' };
   const EXTRA_TAGS = ['a', 'h3', 'h4', 'strong', 'b', 'i', 'u', 'span', 'div', 'table', 'hr', 'figure', 'figcaption', 'video', 'iframe', 'button', 'nav', 'blockquote'];
   const MODEL_SELS = ['body', 'h1', 'h2', 'li', 'img', 'section', 'header', 'footer', 'ul', 'ol', 'p'];
+  // clean code: one page, nothing after </html>, no starter code, every list closed
+  function cleanFlags(s){
+    const flags = [], t = s.replace(/<!--[\s\S]*?-->/g, '');
+    if((t.match(/<html[\s>]/gi) || []).length > 1 || (t.match(/<body[\s>]/gi) || []).length > 1) flags.push('The page is pasted in twice (two <html> or <body> tags)');
+    if(/<\/html>\s*\S/i.test(t)) flags.push('Code after </html>');
+    if(/my first (?:heading|paragraph)/i.test(t)) flags.push('Starter code left in ("My first heading")');
+    if((t.match(/<[uo]l[\s>]/gi) || []).length !== (t.match(/<\/[uo]l>/gi) || []).length) flags.push('A list is not closed (<ul>/<ol> without its closing tag)');
+    return flags;
+  }
   function resumeLevel(s){
     s = typeof s === 'string' ? s : '';
     const groups = [1, 2, 3, 4, 5].map(n => { const ps = RUBRIC_PARTS.filter(p => p.group === n), miss = ps.filter(p => !p.test(s));
       return { n, total:ps.length, done:ps.length - miss.length, missing:miss.map(p => p.id) }; });
     const g = n => groups[n - 1], full = n => !g(n).missing.length, upTo = n => groups.slice(0, n).every(x => !x.missing.length);
     // clean code: one page, nothing after </html>, no starter code, every list closed
-    const flags = [];
-    if((s.match(/<html[\s>]/gi) || []).length > 1 || (s.match(/<body[\s>]/gi) || []).length > 1) flags.push('The page is pasted in twice (two <html> or <body> tags)');
-    if(/<\/html>\s*\S/i.test(s)) flags.push('Code after </html>');
-    if(/my first (?:heading|paragraph)/i.test(s)) flags.push('Starter code left in ("My first heading")');
-    if((s.match(/<[uo]l[\s>]/gi) || []).length !== (s.match(/<\/[uo]l>/gi) || []).length) flags.push('A list is not closed (<ul>/<ol> without its closing tag)');
+    const flags = cleanFlags(s);
     // beyond the model page: other tags, or CSS for other selectors (classes, ids, :hover…)
     const tags = [...new Set((s.match(/<([a-z][a-z0-9]*)/gi) || []).map(t => t.slice(1).toLowerCase()))].filter(t => EXTRA_TAGS.includes(t));
     const sels = [];
@@ -622,12 +627,44 @@
     return { level, name:RUBRIC_LEVELS[level] || '', why, groups, flags, extras, next, close };
   }
 
+  /* GAME WEBSITE SCORE — out of 100, from the checklist, for the teacher's Review page:
+       1 Top 10 · 2 How to play 15 · 3 Screenshots 15 · 4 Features 10 · 5 What players say 5 ·
+       6 How I made it 20 · 7 Footer & privacy 5 · 8 CSS & design 20 (5 of them: original design, the teacher's call)
+     A box that is done earns its points; a few earn part of them when they are part way
+     (1 screenshot of 2, 1–2 feature cards of 3). 90+ = Level 4, 80+ = 3, 65+ = 2, below = 1. */
+  const GAME_POINTS = { gtitle:3, gtagline:2, gcover:3, gbutton:2, ghow:3, gkeys:6, gwinlose:6, gshots:5, galt:5, gcaps:5, gfeat:10, gquotes:5,
+    gmade:2, gloop:6, gif:6, gbug:6, gfooter:3, gprivacy:1, gnoresume:1, gcssbody:5, gcssh:3, gcssimg:3, gpics:2 };
+  const GAME_SECTIONS = [[1, 'Top of the page', 10], [2, 'How to play', 15], [3, 'Screenshots', 15], [4, 'Features', 10], [5, 'What players say', 5],
+    [6, 'How I made it', 20], [7, 'Footer & privacy', 5], [8, 'CSS & design', 20]];
+  const scoreLevel = n => n >= 90 ? 4 : n >= 80 ? 3 : n >= 65 ? 2 : 1;
+  function gameScore(s){
+    s = typeof s === 'string' ? s : '';
+    const has = new Set(gameInfo(s).has), flags = cleanFlags(s), x = noNotes(s);
+    const part = id => {
+      if(has.has(id)) return GAME_POINTS[id];
+      if(id === 'gshots') return imgs(GSEC(x, SHOTS)).filter(hasSrc).length === 1 ? 2 : 0;
+      if(id === 'gfeat') return Math.min(2, (GSEC(x, FEAT).match(/<h3[\s>]/gi) || []).length) * 3;
+      return 0;
+    };
+    const sections = GAME_SECTIONS.map(([n, name, max]) => {
+      // privacy and "no resume left" are checked in part 8 of the checklist, but count in the footer's 5 points
+      const ids = GAME_PARTS.filter(p => (p.group === n && !['gprivacy', 'gnoresume'].includes(p.id)) || (n === 7 && ['gprivacy', 'gnoresume'].includes(p.id))).map(p => p.id);
+      const rows = ids.map(id => ({ id, pts:part(id), max:GAME_POINTS[id] }));
+      if(n === 8) rows.push({ id:'clean', pts:0, max:2 }, { id:'original', pts:0, max:5, judge:true });
+      return { n, name, max, pts:rows.reduce((t, r) => t + r.pts, 0), rows };
+    });
+    // clean code earns its 2 points once there is something of their own on the page
+    if(!flags.length && sections.some(x => x.pts)){ const c = sections[7].rows.find(r => r.id === 'clean'); c.pts = 2; sections[7].pts += 2; }
+    const empty = !s.trim(), total = empty ? 0 : sections.reduce((t, x) => t + x.pts, 0);
+    return { total, level:empty ? 0 : scoreLevel(total), sections, flags, empty };
+  }
+
   /* how a score is made out of 100 */
   const score = (right, total) => total ? Math.min(100, Math.round(100 * right / total)) : 0;
 
   const HTMLLESSONS = { ACTS, CARDS, TYPE, CLOSE, MATCH_WORDS, MATCH_TAGS, wrap, BUILD, FIX, PAGE_START, GOALS, score,
     C1_ACTS, C1_WORDS, C1_SORT, C1_ELEMENTS, C1_TAGS, C1_JOBS, C1_PLACE, C1_PAGE, C1_ORDER, C1_EXIT, C1_H1, SITE_MAX, SITE_GROUPS, SITE_PARTS, siteInfo,
     WIKI_PIC, WIKI_FILES, FILE_NAME, fileName, filesOf, withFiles, WIKI_START, WIKI_GROUPS, WIKI_PARTS, wikiInfo, GAME_START, GAME_GROUPS, GAME_PARTS, gameInfo, SITES, sitesOf,
-    RUBRIC_PARTS, RUBRIC_LEVELS, resumeLevel };
+    RUBRIC_PARTS, RUBRIC_LEVELS, resumeLevel, cleanFlags, GAME_POINTS, GAME_SECTIONS, gameScore, scoreLevel };
   if(typeof module !== 'undefined') module.exports = HTMLLESSONS; else root.HTMLLESSONS = HTMLLESSONS;
 })(this);

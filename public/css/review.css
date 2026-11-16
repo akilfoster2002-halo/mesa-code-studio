@@ -45,6 +45,8 @@ button,select{font:inherit}
 .rv-level{display:inline-grid;place-items:center;min-width:26px;height:26px;padding:0 6px;border-radius:8px;color:#fff;font-weight:700;background:#9aa0a6;flex:none}
 .rv-level.l1{background:var(--l1)} .rv-level.l2{background:var(--l2)} .rv-level.l3{background:var(--l3)} .rv-level.l4{background:var(--l4)}
 .rv-level.big{min-width:52px;height:52px;font-size:26px;border-radius:14px}
+.rv-level.pts{min-width:34px}
+.rv-level.big.pts{min-width:64px;font-size:24px}
 .rv-level.sm{height:24px;font-size:12.5px;padding:0 8px}
 .rv-state{font-size:12.5px;font-weight:600;border-radius:999px;padding:4px 10px;white-space:nowrap;background:#f1f3f4;color:var(--muted)}
 .rv-state.in{background:#e6f4ea;color:#137333} .rv-state.ext{background:#fef7e0;color:#b06000}
@@ -99,7 +101,7 @@ button,select{font:inherit}
 .rv-part summary{display:flex;align-items:center;gap:10px;cursor:pointer;padding:6px 4px;list-style:none}
 .rv-part summary::-webkit-details-marker{display:none}
 .rv-part summary span:first-child{flex:none;width:150px;font-size:13px}
-.rv-part summary small{color:var(--muted);width:40px;text-align:right}
+.rv-part summary small{color:var(--muted);width:52px;text-align:right;white-space:nowrap}
 .rv-part.all summary small{color:#137333;font-weight:600}
 .rv-part.all .rv-bar i{background:#188038}
 .rv-miss{margin:0 0 8px;padding-left:22px;font-size:13px;color:#b3261e}
@@ -129,3 +131,15 @@ button,select{font:inherit}
   .rv-panel{width:auto;border-left:0;border-top:1px solid var(--line)}
   .rv-stage{min-height:60vh}
 }
+
+/* the Game Website: a score out of 100 */
+.rv-score{display:flex;align-items:center;gap:8px;margin-bottom:6px;flex-wrap:wrap}
+.rv-score-in{width:84px;height:42px;border:2px solid var(--line);border-radius:10px;font-size:20px;font-weight:700;text-align:center;color:var(--ink)}
+.rv-score-in:focus{outline:none;border-color:var(--blue)}
+.rv-of{color:var(--muted);font-weight:600}
+.rv-pts{margin-top:12px}
+.rv-ptlist{list-style:none;margin:0 0 8px;padding:0 0 0 6px;font-size:12.5px}
+.rv-ptlist li{display:flex;justify-content:space-between;gap:10px;padding:2px 0}
+.rv-ptlist li b{white-space:nowrap;font-weight:600}
+.rv-ptlist li.ok{color:#137333} .rv-ptlist li.no{color:#b3261e} .rv-ptlist li.part{color:#b06000} .rv-ptlist li.judge{color:var(--blue)}
+.rv-note{margin:10px 0 0;font-size:12.5px;color:var(--muted);background:var(--bg);border-radius:8px;padding:7px 10px}

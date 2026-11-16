@@ -53,3 +53,22 @@ test('Contact: a real school email and the school, however it is laid out', () =
   assert.deepStrictEqual(L(model.replace('<h2>Contact</h2>', '<h2>Contacts</h2>')).groups[1].missing, []);
   assert.deepStrictEqual(L(model.replace('<h2>About Me</h2>', '<h2>About me:</h2>')).groups[1].missing, []);
 });
+
+/* the Game Website: a suggested score out of 100 */
+const fs = require('fs'), path = require('path');
+const game = fs.readFileSync(path.join(__dirname, 'fixtures/game-example.html'), 'utf8');
+test('Game Website score: 100 points in 8 sections, from the checklist; original design is the teacher’s 5', () => {
+  assert.deepStrictEqual(H.GAME_SECTIONS.map(x => x[2]), [10, 15, 15, 10, 5, 20, 5, 20]);
+  const r = H.gameScore(game);
+  assert.deepStrictEqual([r.total, r.level, r.sections.map(x => x.pts)], [95, 4, [10, 15, 15, 10, 5, 20, 5, 15]]);
+  assert.deepStrictEqual(r.sections[7].rows.find(x => x.id === 'original'), { id:'original', pts:0, max:5, judge:true });
+  // each section adds up to its points
+  for(const x of r.sections) assert.strictEqual(x.rows.reduce((t, y) => t + y.max, 0), x.max);
+  assert.deepStrictEqual([H.gameScore(H.GAME_START).total, H.gameScore('').level], [0, 0]);
+  // no How I made it: −20; one feature card of three: 3 of 10; code after </html>: −2
+  assert.strictEqual(H.gameScore(game.replace(/<section>\s*<h2>How I made it<\/h2>[\s\S]*?<\/section>/, '')).sections[5].pts, 0);
+  const feat = game.match(/<h2>Why it's fun<\/h2>[\s\S]*?<\/section>/)[0];
+  assert.strictEqual(H.gameScore(game.replace(feat, feat.replace(/<h3>(?:It gets|Beat)[\s\S]*?<\/p>/g, ''))).sections[3].pts, 3);
+  assert.strictEqual(H.gameScore(game + '<p>more</p>').total, 93);
+  assert.deepStrictEqual([90, 89, 80, 79, 65, 64].map(H.scoreLevel), [4, 3, 3, 2, 2, 1]);
+});

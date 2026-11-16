@@ -836,5 +836,11 @@ test('Review: the teacher loads a whole class’s pages at once and keeps a 1–
   await grade(null);
   assert.strictEqual((await (await call(t.cookie, '/room/2/review/site')).json()).students.find(x => x.username === 'dev').grade, null);
   await call(t.cookie, '/room/2/work/site', { method:'PUT', body:JSON.stringify({ due:null }) });
+  // the Game Website is graded out of 100
+  const score = g => call(t.cookie, '/room/2/review/game/dev', { method:'PUT', body:JSON.stringify({ grade:g }) });
+  assert.deepStrictEqual([(await score(101)).status, (await score(8.5)).status, (await score(-1)).status], [400, 400, 400]);
+  assert.deepStrictEqual(await (await score(87)).json(), { username:'dev', grade:87 });
+  assert.strictEqual((await (await call(t.cookie, '/room/2/review/game')).json()).students.find(x => x.username === 'dev').grade, 87);
+  await score(null);
   assert.strictEqual((await fetch(base + '/review')).status, 200);
 });

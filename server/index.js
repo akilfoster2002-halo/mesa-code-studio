@@ -402,7 +402,8 @@ async function api(req, res, url){
       if(p[4] && !p[5] && m === 'PUT'){
         if(!kidsOf().some(u => u.username === p[4])) return send(res, 404, { error:'none' });
         const b = await readJSON(req, 500), g = b.grade == null || b.grade === '' ? null : Number(b.grade);
-        if(g !== null && ![1, 2, 3, 4].includes(g)) return send(res, 400, { error:'grade' });
+        // the Game Website is graded out of 100; the others by rubric level, 1–4
+        if(g !== null && !(S.key === 'game' ? Number.isInteger(g) && g >= 0 && g <= 100 : [1, 2, 3, 4].includes(g))) return send(res, 400, { error:'grade' });
         const cur = await store.getClass(period), data = { ...((cur || {}).data || {}) };      // the newest copy: only this grade changes
         const reviews = { ...(data.reviews || {}) }, mine = { ...(reviews[S.key] || {}) };
         if(g === null) delete mine[p[4]]; else mine[p[4]] = g;

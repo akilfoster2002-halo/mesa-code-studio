@@ -87,7 +87,12 @@
     const has = S.info(st.text, S.who ? st.who : '').has;
     const groups = S.groups.map(g => { const ps = S.parts.filter(p => p.group === g.n), miss = ps.filter(p => !has.includes(p.id));
       return { n:g.n, total:ps.length, done:ps.length - miss.length, missing:miss.map(p => p.id) }; });
-    return { level:null, groups, flags:[], extras:[], parts:S.parts, done:has.length, total:S.parts.length };
+    const base = { level:null, groups, flags:[], extras:[], parts:S.parts, done:has.length, total:S.parts.length };
+    if(S.key !== 'game') return base;
+    // the Game Website: a score out of 100 from the checklist, and the level it falls in
+    const sc = HL.gameScore(st.text);
+    return { ...base, score:sc, level:sc.level, name:HL.RUBRIC_LEVELS[sc.level] || '', flags:sc.flags,
+      why:sc.empty ? 'Nothing typed yet' : sc.total + ' of 95 points from the checklist; original design (5) is your call' };
   }
   function status(d, st){
     if(st.in) return { cls:'in', text:'Turned in', sub:when(st.in) };
@@ -97,7 +102,8 @@
     return { cls:'prog', text:'In progress', sub:'' };
   }
   const levelChip = (P, big) => P.level == null ? null :
-    h('span', { class:'rv-level l' + P.level + (big ? ' big' : ''), title:P.why || '' }, P.level ? String(P.level) : '–');
+    h('span', { class:'rv-level l' + P.level + (big ? ' big' : '') + (P.score ? ' pts' : ''), title:P.why || '' }, !P.level ? '–' : P.score ? String(P.score.total) : String(P.level));
+  const mark = P => P.level == null ? '' : '  ·  ' + (!P.level ? '–' : P.score ? P.score.total : P.level);
   const bar = pct => h('span', { class:'rv-bar' }, h('i', { style:{ width:Math.round(pct * 100) + '%' } }));
 
   /* --------------------------------------------------------------- start */
@@ -135,10 +141,11 @@
   function order(){
     for(const st of d.students) st.p = progress(S, st);
     d.students.sort((a, b) => sort === 'level'
-      ? ((a.p.level == null ? a.p.done / (a.p.total || 1) : a.p.level) - (b.p.level == null ? b.p.done / (b.p.total || 1) : b.p.level)) || a.name.localeCompare(b.name)
+      ? (rank(a.p) - rank(b.p)) || a.name.localeCompare(b.name)
       : a.name.localeCompare(b.name));
     P = d.students.map(st => st.p);
   }
+  const rank = p => p.score ? p.score.total : p.level == null ? p.done / (p.total || 1) : p.level;
   const url = () => { const q = new URLSearchParams({ p:period, s:S.key }); if(view === 'grid') q.set('v', 'grid');
     else if(d.students[cur]) q.set('u', d.students[cur].username); history.replaceState(null, '', '/review?' + q); };
   function go(n){ if(!d.students.length) return; const was = d.students[cur]; cur = (cur + n + d.students.length) % d.students.length; drawOne(); if(mode === 'editor') fresh(was); }
@@ -166,7 +173,7 @@
       h('span', { class:'grow' }),
       h('button', { class:'rv-btn ghost', type:'button', title:'Sort the students', onclick:() => {
         const u = (d.students[cur] || {}).username; sort = sort === 'az' ? 'level' : 'az'; store.set('sort', sort); order();
-        cur = Math.max(0, d.students.findIndex(st => st.username === u)); draw(); } }, sort === 'az' ? 'A–Z' : S.key === 'site' ? 'Lowest level first' : 'Least done first'),
+        cur = Math.max(0, d.students.findIndex(st => st.username === u)); draw(); } }, sort === 'az' ? 'A–Z' : S.key === 'site' ? 'Lowest level first' : S.key === 'game' ? 'Lowest score first' : 'Least done first'),
       summary());
     const body = h('div', { class:'rv-body' });
     app.replaceChildren(h('div', { class:'rv' }, top, body));
@@ -175,8 +182,10 @@
   }
   // how many at each level (My Resume), or how many are done
   function summary(){
-    if(S.key === 'site'){ const n = [0, 1, 2, 3, 4].map(l => P.filter(p => p.level === l).length);
-      return h('div', { class:'rv-sum' }, ...[4, 3, 2, 1].map(l => h('span', { class:'rv-level l' + l + ' sm', title:'Level ' + l + ': ' + HL.RUBRIC_LEVELS[l] }, l + ' × ' + n[l])),
+    if(S.key === 'site' || S.key === 'game'){ const n = [0, 1, 2, 3, 4].map(l => P.filter(p => p.level === l).length);
+      const band = { 4:'90–100', 3:'80–89', 2:'65–79', 1:'below 65' };
+      return h('div', { class:'rv-sum' }, ...[4, 3, 2, 1].map(l => h('span', { class:'rv-level l' + l + ' sm',
+          title:'Level ' + l + ': ' + HL.RUBRIC_LEVELS[l] + (S.key === 'game' ? ' (' + band[l] + ')' : '') }, l + ' × ' + n[l])),
         n[0] ? h('small', {}, n[0] + ' not started') : null); }
     return h('div', { class:'rv-sum' }, h('small', {}, P.filter(p => p.done === p.total).length + ' of ' + P.length + ' done'));
   }
@@ -196,7 +205,7 @@
       h('button', { type:'button', class:mode === v ? 'on' : '', title:v === 'editor' ? 'Their editor, as they see it, with History (what you type here changes their page)' : null,
         onclick:() => { const left = mode === 'editor' && v !== 'editor'; mode = v; store.set('mode', v); drawOne(); if(left) fresh(st); } }, t)));
     const pick = h('select', { class:'rv-sel rv-who-sel', 'aria-label':'Student', onchange:e => { cur = Number(e.target.value); drawOne(); } },
-      ...d.students.map((x, i) => h('option', { value:i, selected:i === cur }, x.name + (P[i].level != null ? '  ·  ' + (P[i].level || '–') : ''))));
+      ...d.students.map((x, i) => h('option', { value:i, selected:i === cur }, x.name + mark(P[i]))));
     const bar1 = h('div', { class:'rv-bar1' },
       avatar(st), pick,
       h('button', { class:'rv-arrow', type:'button', title:'Previous student (←)', onclick:() => go(-1) }, '‹'),
@@ -216,7 +225,19 @@
   // the right side: grade, suggested level, flags, progress by Part
   function panel(st, p, s){
     const name = id => { const x = p.parts.find(q => q.id === id); return x ? (x.say ? x.say.en : x.en) : id; };
-    const grade = h('div', { class:'rv-grade' }, ...[1, 2, 3, 4].map(g => h('button', { type:'button', class:'g' + g + (st.grade === g ? ' on' : ''),
+    const save = async (want, el) => {
+      el.disabled = true;
+      try { const r = await send('/room/' + encodeURIComponent(period) + '/review/' + S.key + '/' + encodeURIComponent(st.username), { grade:want }); st.grade = r.grade; }
+      catch(x){ alert('The grade was not saved. Use a whole number from 0 to 100.'); }
+      drawOne();
+    };
+    const box = h('input', { class:'rv-score-in', type:'number', min:'0', max:'100', step:'1', value:st.grade == null ? '' : st.grade, 'aria-label':'Score out of 100',
+      onkeydown:e => { if(e.key === 'Enter') e.target.nextSibling.click(); } });
+    const grade = S.key === 'game' ? h('div', { class:'rv-score' }, box, h('span', { class:'rv-of' }, '/ 100'),
+        h('button', { class:'rv-btn primary small', type:'button', onclick:e => save(box.value === '' ? null : Number(box.value), e.target) }, 'Save'),
+        p.score && !p.score.empty ? h('button', { class:'rv-btn ghost small', type:'button', title:'Put the suggested score in the box (then add original design and Save)',
+          onclick:() => { box.value = p.score.total; box.focus(); } }, 'Use ' + p.score.total) : null)
+      : h('div', { class:'rv-grade' }, ...[1, 2, 3, 4].map(g => h('button', { type:'button', class:'g' + g + (st.grade === g ? ' on' : ''),
       title:'Level ' + g + ': ' + HL.RUBRIC_LEVELS[g], onclick:async e => {
         const want = st.grade === g ? null : g, btns = e.target.parentNode.querySelectorAll('button');
         btns.forEach(b => b.disabled = true);
@@ -232,8 +253,8 @@
         load(st.username);
       } }, '✏️ Send hints') : null;
     return h('aside', { class:'rv-panel' },
-      h('section', {}, h('h3', {}, 'Grade'), grade, h('small', { class:'muted' }, st.grade ? 'Saved. Only you see it. Click again to clear.' : 'Only you see this grade.')),
-      p.level != null ? h('section', { class:'rv-suggest' }, h('h3', {}, 'Suggested level'),
+      h('section', {}, h('h3', {}, 'Grade'), grade, h('small', { class:'muted' }, st.grade != null ? 'Saved' + (S.key === 'game' ? ' (Level ' + HL.scoreLevel(st.grade) + ')' : '') + '. Only you see it. ' + (S.key === 'game' ? 'Empty the box and Save to clear.' : 'Click again to clear.') : 'Only you see this grade.')),
+      p.score ? scoreBox(p) : p.level != null ? h('section', { class:'rv-suggest' }, h('h3', {}, 'Suggested level'),
         h('div', { class:'rv-sug-row' }, levelChip(p, true), h('div', {}, h('b', {}, p.level ? p.name : 'Not started'), h('p', {}, p.why))),
         p.close ? h('p', { class:'rv-close' }, '⭐ One step from Level ' + (p.level + 1) + (p.next.length === 1 ? ': ' + name(p.next[0]) : '')) : null) : null,
       st.drop ? h('section', { class:'rv-drop' }, h('b', {}, '⚠️ Most of this page was erased'),
@@ -253,6 +274,19 @@
         hint));
   }
 
+  // the Game Website's suggested score: the total, its level, and the points of each section
+  const ROW = { clean:'Clean code (one page, lists closed)', original:'Original design choices: your call' };
+  function scoreBox(p){
+    const sc = p.score, label = id => ROW[id] || (p.parts.find(q => q.id === id) || {}).say?.en || id;
+    return h('section', { class:'rv-suggest' }, h('h3', {}, 'Suggested score'),
+      h('div', { class:'rv-sug-row' }, levelChip(p, true), h('div', {}, h('b', {}, sc.empty ? 'Not started' : 'Level ' + p.level + ' · ' + p.name), h('p', {}, p.why))),
+      sc.empty ? null : h('div', { class:'rv-pts' }, ...sc.sections.map(x => h('details', { class:'rv-part' + (x.pts === x.max ? ' all' : '') },
+        h('summary', {}, h('span', {}, x.n + '. ' + x.name), bar(x.pts / x.max), h('small', {}, x.pts + ' / ' + x.max)),
+        h('ul', { class:'rv-ptlist' }, ...x.rows.map(r => h('li', { class:r.pts === r.max ? 'ok' : r.judge ? 'judge' : r.pts ? 'part' : 'no' },
+          h('span', {}, label(r.id)), h('b', {}, r.judge ? '+0–' + r.max : r.pts + ' / ' + r.max))))))),
+      sc.empty ? null : h('p', { class:'rv-note' }, 'Read the How I made it explanations: a box turns green when the words are there, so give half points if one is there but not really explained.'));
+  }
+
   /* --------------------------------------------------------------- grid */
   function drawGrid(box){
     url();
@@ -266,8 +300,8 @@
       return h('button', { class:'rv-card', type:'button', onclick:() => { cur = i; view = 'one'; draw(); } },
         h('div', { class:'rv-thumb' }, st.text.trim() ? f : h('span', { class:'rv-blank' }, 'Not started')),
         h('div', { class:'rv-card-b' }, avatar(st), h('div', { class:'rv-card-n' }, h('b', {}, st.name),
-            h('small', {}, p.done + ' / ' + p.total + ' boxes' + (st.drop ? ' · ⚠️ erased' : '') + (p.close ? ' · ⭐ close' : ''))),
-          levelChip(p), st.grade ? h('span', { class:'rv-mygrade', title:'Your grade' }, '✓ ' + st.grade) : null),
+            h('small', {}, (p.score && !p.score.empty ? 'Level ' + p.level + ' · ' : '') + p.done + ' / ' + p.total + ' boxes' + (st.drop ? ' · ⚠️ erased' : '') + (p.close ? ' · ⭐ close' : ''))),
+          levelChip(p), st.grade != null ? h('span', { class:'rv-mygrade', title:'Your grade' }, '✓ ' + st.grade) : null),
         h('div', { class:'rv-card-f' }, bar(p.done / (p.total || 1)), h('span', { class:'rv-state sm ' + s.cls }, s.text)));
     })));
   }
