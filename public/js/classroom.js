@@ -132,7 +132,7 @@
   const fmtDate = s => new Date(s + (s.length === 10 ? 'T12:00:00' : '')).toLocaleDateString(I18N.lang === 'es' ? 'es' : 'en', { month:'short', day:'numeric' });
   const fmtWhen = s => { const d = new Date(s); return d.toLocaleDateString(I18N.lang === 'es' ? 'es' : 'en', { month:'short', day:'numeric' }) + ', ' + d.toLocaleTimeString(I18N.lang === 'es' ? 'es' : 'en', { hour:'numeric', minute:'2-digit' }); };
   // a teacher's own assignment carries its due date; a built-in one has the class's setting, or its own default (`due` in classwork.js)
-  const setting = it => it.custom ? { due:it.custom.due } : (room && room.work[it.id]) || (it.due ? { due:it.due } : {});
+  const setting = it => it.custom ? { due:it.custom.due } : (room && room.work[it.id]) || { ...(it.due ? { due:it.due } : {}), ...(it.hidden ? { hidden:true } : {}) };
   const visible = it => me.role === 'teacher' || !setting(it).hidden;
   // a teacher's assignment given to some students only: their names (none = the whole class)
   const forNames = a => a && Array.isArray(a.to) && a.to.length ? a.to.map(u => ((room.students || []).find(k => k.username === u) || { name:u }).name) : null;

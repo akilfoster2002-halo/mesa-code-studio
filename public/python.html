@@ -1,0 +1,166 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<!-- =====================================================================
+     PYTHON CALCULATOR — the finished calculator for the Python unit
+     (python/calculator.py), run in the browser with Pyodide. Click a topic
+     to light up the lines that use it. ?embed hides the top bar.
+     ===================================================================== -->
+<title>Python Calculator</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect x='1' y='1' width='14' height='14' rx='3' fill='%233776ab'/%3E%3C/svg%3E">
+<style>
+  :root{ --bg:#f4f6fb; --ink:#1d2b4f; --panel:#1e2433; --line:#2b3245; --code:#e8ecf5; --muted:#8a94ad;
+    --hl:#3a4a2a; --blue:#3776ab; --yellow:#ffd43b; }
+  *{ box-sizing:border-box; }
+  body{ margin:0; background:var(--bg); color:var(--ink); font:16px/1.4 system-ui, sans-serif; }
+  header{ display:flex; align-items:center; gap:12px; padding:10px 16px; background:var(--blue); color:#fff; }
+  header a{ color:#fff; text-decoration:none; font-weight:600; }
+  header h1{ font-size:18px; margin:0; flex:1; }
+  body.embed header{ display:none; }
+  main{ max-width:1200px; margin:0 auto; padding:16px; }
+  .topics{ display:flex; flex-wrap:wrap; gap:8px; margin-bottom:10px; }
+  .chip{ border:2px solid var(--blue); background:#fff; color:var(--ink); border-radius:999px; padding:6px 12px;
+    font:inherit; font-size:14px; cursor:pointer; }
+  .chip.on{ background:var(--blue); color:#fff; }
+  .card{ background:#fff; border-left:5px solid var(--yellow); border-radius:8px; padding:8px 12px; margin-bottom:12px; min-height:2.6em; }
+  .card b{ color:var(--blue); }
+  .card .es{ color:#5b6b8c; display:block; font-size:14px; }
+  .cols{ display:grid; grid-template-columns:minmax(0, 3fr) minmax(0, 2fr); gap:14px; }
+  @media (max-width:800px){ .cols{ grid-template-columns:1fr; } }
+  .pane{ background:var(--panel); border-radius:10px; overflow:hidden; display:flex; flex-direction:column; }
+  .pane-h{ display:flex; align-items:center; gap:8px; padding:8px 12px; color:var(--code); background:#161b27; font-weight:600; }
+  .pane-h span{ flex:1; }
+  .btn{ border:0; border-radius:8px; padding:7px 14px; font:inherit; font-weight:700; cursor:pointer; background:#3b4560; color:#fff; }
+  .btn.run{ background:#2fa84f; }
+  .btn:disabled{ opacity:.5; cursor:default; }
+  .code{ margin:0; padding:8px 0; overflow:auto; font:600 15px/1.5 "Ubuntu Mono", ui-monospace, Menlo, monospace; color:var(--code); }
+  .ln{ display:flex; padding:0 12px 0 0; border-left:4px solid transparent; }
+  .ln.hl{ background:var(--hl); border-left-color:var(--yellow); }
+  .ln i{ width:38px; flex:none; text-align:right; padding-right:12px; color:var(--muted); font-style:normal; user-select:none; }
+  .ln code{ white-space:pre; font:inherit; }
+  .c{ color:#7f8ba6; } .s{ color:#9ce28b; } .k{ color:#ff9eb8; } .n{ color:#ffd479; } .f{ color:#7fc8ff; }
+  #out{ flex:1; min-height:320px; max-height:620px; overflow:auto; margin:0; padding:12px; color:#d6f5d6;
+    font:600 15px/1.5 "Ubuntu Mono", ui-monospace, Menlo, monospace; white-space:pre-wrap; }
+  #out .you{ color:var(--yellow); }
+  #out .err{ color:#ff8a8a; }
+  .ask{ display:flex; gap:6px; padding:8px; background:#161b27; }
+  .ask input{ flex:1; border:2px solid #3b4560; border-radius:8px; padding:7px 10px; background:#0f131c; color:#fff;
+    font:600 15px "Ubuntu Mono", ui-monospace, monospace; }
+  .ask input:disabled{ opacity:.4; }
+</style>
+</head>
+<body>
+<header><a href="/">◀ Classroom</a><h1>🐍 Python Calculator · Calculadora en Python</h1></header>
+<main>
+  <div class="topics" id="topics"></div>
+  <div class="card" id="card"><b>👆 Click a topic</b> to light up the lines that use it.<span class="es">Haz clic en un tema para ver las líneas que lo usan.</span></div>
+  <div class="cols">
+    <section class="pane">
+      <div class="pane-h"><span>calculator.py</span></div>
+      <pre class="code" id="code"></pre>
+    </section>
+    <section class="pane">
+      <div class="pane-h"><span>Output · Salida</span><button class="btn run" id="run" disabled>⏳ Loading…</button></div>
+      <pre id="out"></pre>
+      <form class="ask" id="ask"><input id="in" autocomplete="off" disabled placeholder="Type here, then Enter · Escribe aquí"><button class="btn" id="send" disabled>⏎</button></form>
+    </section>
+  </div>
+</main>
+<script src="https://cdn.jsdelivr.net/pyodide/v0.26.4/full/pyodide.js"></script>
+<script>
+if(/[?&]embed\b/.test(location.search)) document.body.classList.add('embed');
+
+/* the Python topics the calculator teaches: each lights up the lines it matches */
+const TOPICS = [
+  { icon:'💬', en:'Comments', es:'Comentarios', re:/#/,
+    say:['A # starts a note for people. Python skips it.', 'Un # empieza una nota para personas. Python la salta.'] },
+  { icon:'🖨', en:'print()', es:'print()', re:/\bprint\(/,
+    say:['print() shows words or numbers on the screen.', 'print() muestra palabras o números en la pantalla.'] },
+  { icon:'📦', en:'Variables', es:'Variables', re:/^\s*[a-z_]+ = /,
+    say:['A variable is a box with a name that holds a value.', 'Una variable es una caja con nombre que guarda un valor.'] },
+  { icon:'⌨️', en:'input()', es:'input()', re:/\binput\(/,
+    say:['input() asks the user a question and waits for an answer.', 'input() le hace una pregunta al usuario y espera la respuesta.'] },
+  { icon:'🔢', en:'Numbers: float()', es:'Números: float()', re:/\bfloat\(/,
+    say:['input() gives text. float() turns that text into a number.', 'input() da texto. float() convierte ese texto en número.'] },
+  { icon:'➕', en:'Math signs', es:'Signos de matemáticas', re:/return a [-+*/] b/,
+    say:['+ add, - subtract, * multiply, / divide.', '+ suma, - resta, * multiplica, / divide.'] },
+  { icon:'🔀', en:'if / elif / else', es:'if / elif / else', re:/^\s*(if|elif|else)\b/,
+    say:['if checks a question. elif checks another. else is for everything left.', 'if revisa una pregunta. elif revisa otra. else es para todo lo demás.'] },
+  { icon:'🧰', en:'Functions', es:'Funciones', re:/\bdef\b|\breturn\b|calculate\(/,
+    say:['def makes a function: a job with a name. return gives the answer back.', 'def crea una función: un trabajo con nombre. return devuelve la respuesta.'] },
+  { icon:'🔁', en:'while loop', es:'Ciclo while', re:/\bwhile\b|again/,
+    say:['while repeats the lines under it as long as the question is True.', 'while repite las líneas de abajo mientras la pregunta sea verdadera.'] },
+  { icon:'📋', en:'Lists', es:'Listas', re:/history/,
+    say:['A list holds many values in order. append() adds one more.', 'Una lista guarda muchos valores en orden. append() agrega uno más.'] },
+  { icon:'🔂', en:'for loop', es:'Ciclo for', re:/^\s*for\b|^\s{4}print\(answer\)/,
+    say:['for goes through every item in a list, one at a time.', 'for recorre cada cosa de una lista, una por una.'] },
+  { icon:'🧵', en:'f-strings', es:'f-strings', re:/f"/,
+    say:['f"…{name}…" puts a variable right inside the words.', 'f"…{name}…" pone una variable dentro de las palabras.'] },
+  { icon:'🛟', en:'try / except', es:'try / except', re:/^\s*(try|except)\b/,
+    say:['try runs code that might break. except catches the error so the program keeps going.', 'try corre código que puede fallar. except atrapa el error y el programa sigue.'] }
+];
+
+let SRC = '', lines = [];
+const $ = id => document.getElementById(id);
+const esc = t => t.replace(/&/g, '&amp;').replace(/</g, '&lt;');
+function color(line){
+  // a small highlighter: comments, strings, keywords, numbers, function names
+  const ci = line.search(/#(?=[^"]*$)/), code = ci < 0 ? line : line.slice(0, ci), note = ci < 0 ? '' : line.slice(ci);
+  let h = esc(code).replace(/(f?"[^"]*")|\b(def|return|if|elif|else|while|for|in|try|except)\b|\b(\d+)\b|\b(print|input|float|len|calculate|append|lower)\b(?=\()/g,
+    (m, s, k, n, f) => s ? '<span class="s">' + s + '</span>' : k ? '<span class="k">' + k + '</span>' : n ? '<span class="n">' + n + '</span>' : '<span class="f">' + f + '</span>');
+  return h + (note ? '<span class="c">' + esc(note) + '</span>' : '');
+}
+function showCode(){
+  $('code').innerHTML = lines.map((l, i) => '<div class="ln"><i>' + (i + 1) + '</i><code>' + (color(l) || ' ') + '</code></div>').join('');
+}
+function pick(t, btn){
+  const on = !btn.classList.contains('on');
+  document.querySelectorAll('.chip').forEach(b => b.classList.remove('on'));
+  const rows = [...document.querySelectorAll('.ln')];
+  rows.forEach((r, i) => r.classList.toggle('hl', on && t.re.test(lines[i])));
+  if(!on){ $('card').innerHTML = '<b>👆 Click a topic</b> to light up the lines that use it.<span class="es">Haz clic en un tema para ver las líneas que lo usan.</span>'; return; }
+  btn.classList.add('on');
+  $('card').innerHTML = '<b>' + t.icon + ' ' + esc(t.en) + '</b> — ' + esc(t.say[0]) + '<span class="es">' + esc(t.es) + ' — ' + esc(t.say[1]) + '</span>';
+  const first = rows.find(r => r.classList.contains('hl')); if(first) first.scrollIntoView({ block:'nearest', behavior:'smooth' });
+}
+TOPICS.forEach(t => { const b = document.createElement('button'); b.className = 'chip'; b.type = 'button';
+  b.textContent = t.icon + ' ' + t.en; b.title = t.es; b.onclick = () => pick(t, b); $('topics').append(b); });
+
+/* ---- running it: Pyodide; input() waits for the box under the output ---- */
+const out = $('out');
+function write(text, cls){ const s = document.createElement('span'); if(cls) s.className = cls; s.textContent = text; out.append(s); out.scrollTop = out.scrollHeight; }
+let answer = null;
+function ask(q){
+  write(q);
+  $('in').disabled = $('send').disabled = false; $('in').value = ''; $('in').focus();
+  return new Promise(res => { answer = res; });
+}
+$('ask').onsubmit = e => { e.preventDefault(); if(!answer) return;
+  const v = $('in').value; write(v + '\n', 'you'); $('in').disabled = $('send').disabled = true; const r = answer; answer = null; r(v); };
+
+let py = null;
+async function run(){
+  $('run').disabled = true; $('run').textContent = '▶ Running…'; out.textContent = '';
+  // input() becomes "await input()" so the page can wait for the student's answer
+  const code = SRC.replace(/\binput\(("[^"]*")\)/g, '(await input($1))');
+  try { await py.runPythonAsync(code); }
+  catch(e){ write('\n' + String(e.message || e).trim().split('\n').slice(-1)[0] + '\n', 'err'); }
+  $('run').disabled = false; $('run').textContent = '▶ Run again';
+}
+$('run').onclick = run;
+
+(async () => {
+  SRC = await (await fetch('python/calculator.py')).text();
+  lines = SRC.replace(/\n$/, '').split('\n'); showCode();
+  try {
+    py = await loadPyodide();
+    py.setStdout({ batched:t => write(t + '\n') });
+    py.globals.set('input', q => ask(q == null ? '' : String(q)));
+    $('run').disabled = false; $('run').textContent = '▶ Run';
+  } catch(e){ $('run').textContent = '⚠️ Python could not load'; }
+})();
+</script>
+</body>
+</html>

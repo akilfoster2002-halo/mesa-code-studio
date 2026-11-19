@@ -53,6 +53,12 @@
       { id:'site', kind:'assignment', at:'2026-10-29T14:10:00Z', due:RESUME_DUE, site:'site', icon:'📄', title:{ en:'My Resume', es:'Mi currículum' },
         line:{ en:'Type your resume.html in the editor. Every class you add to it.', es:'Escribe tu resume.html en el editor. Cada clase le añades algo.' },
         status:siteStatus('site', RESUME_DUE) }
+    ] },
+    // Python unit: the finished calculator they will build by the end. Starts hidden: the teacher shows it per period.
+    { id:'python', icon:'🐍', title:{ en:'Projects: Python', es:'Proyectos: Python' }, items:[
+      { id:'pycalc', kind:'material', hidden:true, icon:'🧮', title:{ en:'Python Calculator', es:'Calculadora en Python' }, href:'/python', frame:'/python?embed',
+        line:{ en:'The calculator we will build in Python. Run it, then click a topic to see the code for it.', es:'La calculadora que vamos a construir en Python. Córrela y haz clic en un tema para ver su código.' },
+        status:() => ({ state:'none', pct:0, text:'' }) }
     ] }
   ];
   const ITEMS = TOPICS.flatMap(t => t.items.map(it => ({ ...it, topic:t })));

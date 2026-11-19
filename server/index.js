@@ -45,6 +45,7 @@ const HTMLLESSONS = require('../public/js/html-lessons.js');
 const MERGE = require('../public/js/merge.js');
 const HIST = require('./pagehist.js');
 const HINTS = require('./hints.js');
+const CLASSWORK = require('../public/js/classwork.js');
 
 const PORT = Number(process.env.PORT) || 8790;
 const PUBLIC = path.join(__dirname, '..', 'public');
@@ -171,6 +172,7 @@ function serveStatic(req, res, pathname){
   if(pathname === '/html' || pathname === '/html/') pathname = '/html.html';
   if(/^\/(resume|wiki|game)\/?$/.test(pathname)) pathname = '/resume.html';   // one editor for both pages
   if(pathname === '/review' || pathname === '/review/') pathname = '/review.html';     // the teacher's Review page
+  if(pathname === '/python' || pathname === '/python/') pathname = '/python.html';
   if(pathname === '/drive' || pathname === '/drive/') pathname = '/drive.html';
   const file = path.normalize(path.join(PUBLIC, decodeURIComponent(pathname)));
   if(!file.startsWith(PUBLIC)) return send(res, 403, 'forbidden');
@@ -540,7 +542,9 @@ async function api(req, res, url){
       const kids = new Set(users.filter(u => u.role === 'student' && String(u.period) === period).map(u => u.username));
       const open = 'open' in b ? [...new Set((Array.isArray(b.open) ? b.open : []).map(String))].filter(u => kids.has(u)) : (Array.isArray(was.open) ? was.open : []);
       const w = { hidden:'hidden' in b ? !!b.hidden : !!was.hidden, due, ...(('locked' in b ? !!b.locked : !!was.locked) ? { locked:true } : {}), ...(open.length ? { open } : {}) };
-      if(!w.hidden && !w.due && !w.locked) delete room.work[p[3]]; else room.work[p[3]] = w;
+      // an item that starts hidden (it.hidden) keeps an entry once a teacher shows it
+      const startsHidden = !!(CLASSWORK.ITEMS.find(i => i.id === p[3]) || {}).hidden;
+      if(w.hidden === startsHidden && !w.due && !w.locked) delete room.work[p[3]]; else room.work[p[3]] = w;
       await store.saveClass(period, room);
       return send(res, 200, room);
     }
